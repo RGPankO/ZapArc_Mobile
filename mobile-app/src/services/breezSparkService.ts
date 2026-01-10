@@ -386,10 +386,10 @@ export async function listPayments(): Promise<TransactionInfo[]> {
 
     return payments.map((payment: any) => {
       const rawAmount = payment.amount || 0;
-      const amount = typeof rawAmount === 'bigint' ? Number(rawAmount) : Number(rawAmount);
+      const amountSat = typeof rawAmount === 'bigint' ? Number(rawAmount) : Number(rawAmount);
 
       const rawFees = payment.fees || 0;
-      const feeSats = typeof rawFees === 'bigint' ? Number(rawFees) : Number(rawFees);
+      const feeSat = typeof rawFees === 'bigint' ? Number(rawFees) : Number(rawFees);
 
       const rawTime = payment.timestamp || 0;
       let timestamp = typeof rawTime === 'bigint' ? Number(rawTime) : Number(rawTime);
@@ -407,8 +407,8 @@ export async function listPayments(): Promise<TransactionInfo[]> {
       return {
         id: payment.id,
         type,
-        amount,
-        feeSats,
+        amountSat,
+        feeSat,
         status: mapPaymentStatus(payment.status),
         timestamp: timestamp || Date.now(),
         description,

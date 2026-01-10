@@ -157,17 +157,10 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
 
-      console.log('🔍 [useWalletAuth] Biometric check:', {
-        hasHardware,
-        isEnrolled,
-        available: hasHardware && isEnrolled,
-      });
-
       setBiometricAvailable(hasHardware && isEnrolled);
 
       if (hasHardware && isEnrolled) {
         const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-        console.log('🔍 [useWalletAuth] Supported biometric types:', types);
 
         if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
           setBiometricType('facial');

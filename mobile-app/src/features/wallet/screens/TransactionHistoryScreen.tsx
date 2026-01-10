@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Text, IconButton, Chip, Button, Divider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useWallet } from '../../../hooks/useWallet';
 import type { Transaction } from '../types';
@@ -74,6 +74,13 @@ export function TransactionHistoryScreen(): React.JSX.Element {
       setRefreshing(false);
     }
   }, [refreshTransactions]);
+
+  // Refresh transactions when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      refreshTransactions();
+    }, [refreshTransactions])
+  );
 
   // Format time
   const formatTime = (timestamp: number): string => {

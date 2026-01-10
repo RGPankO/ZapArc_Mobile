@@ -96,8 +96,6 @@ export function useSettings(): SettingsState & SettingsActions {
 
       const userSettings = await settingsService.getUserSettings();
       setSettings(userSettings);
-
-      console.log('✅ [useSettings] Settings loaded');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load settings';
       setError(message);

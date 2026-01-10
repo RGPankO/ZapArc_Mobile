@@ -440,14 +440,13 @@ export function useWallet(): WalletState & WalletActions {
       const txs: Transaction[] = payments.map((p) => ({
         id: p.id,
         type: p.type,
-        amount: p.amount, // Fixed: breezSparkService returns 'amount', not 'amountSat'
-        feeSats: p.feeSats, // Fixed: breezSparkService returns 'feeSats', not 'feeSat'
+        amount: p.amountSat,
+        feeSats: p.feeSat,
         status: p.status,
         timestamp: p.timestamp,
         description: p.description,
       }));
       setTransactions(txs);
-      console.log('✅ [useWallet] Transactions refreshed:', txs.length);
     } catch (err) {
       console.error('❌ [useWallet] Failed to refresh transactions:', err);
     }
@@ -466,7 +465,6 @@ export function useWallet(): WalletState & WalletActions {
       const sdkInitialized = BreezSparkService.isSDKInitialized();
 
       if (sdkInitialized && !isConnected && isMounted) {
-        console.log('✅ [useWallet] SDK now initialized, syncing state...');
         setIsConnected(true);
         // Refresh balance and transactions when SDK becomes available
         await refreshBalance();
@@ -504,6 +502,8 @@ export function useWallet(): WalletState & WalletActions {
         setError(null);
 
         const result = await BreezSparkService.payInvoice(bolt11);
+        
+        // Refresh balance and transactions after payment
         await refreshBalance();
         await refreshTransactions();
 

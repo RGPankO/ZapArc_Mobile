@@ -186,8 +186,6 @@ class StorageService {
    * Load multi-wallet storage data
    */
   async loadMultiWalletStorage(): Promise<MultiWalletStorage | null> {
-    console.log('🔵 [StorageService] LOAD_MULTI_WALLET_STORAGE');
-
     try {
       const serialized = await SecureStore.getItemAsync(STORAGE_KEYS.MULTI_WALLET_DATA);
 
@@ -265,11 +263,6 @@ class StorageService {
         console.log('🔧 [StorageService] Saving migrated data...');
         await this.saveMultiWalletStorage(storage);
       }
-
-      console.log('✅ [StorageService] LOAD_MULTI_WALLET_STORAGE SUCCESS', {
-        masterKeyCount: storage.masterKeys.length,
-        activeMasterKeyId: storage.activeMasterKeyId,
-      });
 
       return storage;
     } catch (error) {

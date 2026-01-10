@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Text, IconButton, useTheme, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useWallet } from '../../../hooks/useWallet';
 import { useWalletAuth } from '../../../hooks/useWalletAuth';
@@ -86,6 +86,16 @@ export function HomeScreen(): React.JSX.Element {
       handleRefresh();
     }
   }, [isConnected, handleRefresh]);
+
+  // Refresh transactions when screen comes into focus
+  // This ensures the transaction list updates when returning from payment screen
+  useFocusEffect(
+    useCallback(() => {
+      if (isConnected && !isLoading) {
+        refreshTransactions();
+      }
+    }, [isConnected, isLoading, refreshTransactions])
+  );
 
   // Navigation handlers
   const handleSend = (): void => {
