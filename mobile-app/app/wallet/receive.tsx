@@ -222,6 +222,8 @@ export default function ReceiveScreen() {
             activeOutlineColor="#FFC107"
             textColor="#FFFFFF"
             placeholderTextColor="rgba(255, 255, 255, 0.5)"
+            outlineStyle={styles.inputOutline}
+            contentStyle={styles.inputContent}
           />
 
           <View style={styles.presetsContainer}>
@@ -250,6 +252,8 @@ export default function ReceiveScreen() {
             activeOutlineColor="#FFC107"
             textColor="#FFFFFF"
             placeholderTextColor="rgba(255, 255, 255, 0.5)"
+            outlineStyle={styles.inputOutline}
+            contentStyle={styles.inputContent}
             multiline
             numberOfLines={2}
           />
@@ -312,8 +316,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: '#1a1a2e',
     marginBottom: 16,
+  },
+  inputOutline: {
+    borderRadius: 8,
+  },
+  inputContent: {
+    paddingTop: 8,
   },
   descriptionInput: {
     marginTop: 8,

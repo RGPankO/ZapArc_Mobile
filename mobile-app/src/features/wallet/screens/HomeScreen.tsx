@@ -8,8 +8,9 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  Modal,
 } from 'react-native';
-import { Text, IconButton, useTheme, ActivityIndicator } from 'react-native-paper';
+import { Text, IconButton, useTheme, ActivityIndicator, Button, Divider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -50,6 +51,7 @@ export function HomeScreen(): React.JSX.Element {
   // State
   const [refreshing, setRefreshing] = useState(false);
   const [showBalance, setShowBalance] = useState(true);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
   // Currency formatting
   const formatBalance = (sats: number): string => {
@@ -137,7 +139,7 @@ export function HomeScreen(): React.JSX.Element {
       <TouchableOpacity
         key={tx.id || index}
         style={styles.transactionItem}
-        onPress={() => router.push(`/wallet/transaction/${tx.id}`)}
+        onPress={() => setSelectedTransaction(tx)}
       >
         <View style={styles.transactionIcon}>
           <Text style={styles.transactionIconText}>
@@ -289,9 +291,124 @@ export function HomeScreen(): React.JSX.Element {
             )}
           </View>
         </ScrollView>
+
+        {/* Transaction Details Modal */}
+        {selectedTransaction && renderDetailsModal()}
       </SafeAreaView>
     </LinearGradient>
   );
+
+  // Helper function to format time
+  function formatTime(timestamp: number): string {
+    return new Date(timestamp).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  // Render transaction details modal
+  function renderDetailsModal(): React.JSX.Element | null {
+    if (!selectedTransaction) return null;
+
+    const tx = selectedTransaction;
+    const isReceived = tx.type === 'receive';
+    const date = new Date(tx.timestamp);
+
+    return (
+      <Modal
+        visible={!!selectedTransaction}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedTransaction(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Transaction Details</Text>
+              <IconButton
+                icon="close"
+                iconColor="rgba(255, 255, 255, 0.6)"
+                size={24}
+                onPress={() => setSelectedTransaction(null)}
+              />
+            </View>
+
+            {/* Amount */}
+            <View style={styles.modalAmountContainer}>
+              <View style={styles.modalIcon}>
+                <Text style={styles.modalIconText}>
+                  {isReceived ? '↓' : '↑'}
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.modalAmount,
+                  isReceived ? styles.amountReceived : styles.amountSent,
+                ]}
+              >
+                {isReceived ? '+' : '-'}{(tx.amount ?? 0).toLocaleString()} sats
+              </Text>
+              <Text style={[
+                styles.modalStatus,
+                tx.status === 'completed' && styles.statusCompleted,
+                tx.status === 'pending' && styles.statusPending,
+                tx.status === 'failed' && styles.statusFailed,
+              ]}>
+                {tx.status === 'completed' ? '✓ Completed' : 
+                 tx.status === 'pending' ? '⏳ Pending' : 
+                 tx.status === 'failed' ? '✕ Failed' : tx.status}
+              </Text>
+            </View>
+
+            <Divider style={styles.divider} />
+
+            {/* Details */}
+            <View style={styles.detailsContainer}>
+              <DetailRow label="Type" value={isReceived ? 'Received' : 'Sent'} />
+              <DetailRow
+                label="Date"
+                value={date.toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              />
+              <DetailRow label="Time" value={formatTime(tx.timestamp)} />
+              {tx.description && (
+                <DetailRow label="Description" value={tx.description} />
+              )}
+              {tx.feeSats !== undefined && tx.feeSats > 0 && (
+                <DetailRow label="Fee" value={`${tx.feeSats.toLocaleString()} sats`} />
+              )}
+            </View>
+
+            {/* Close Button */}
+            <Button
+              mode="outlined"
+              onPress={() => setSelectedTransaction(null)}
+              style={styles.closeModalButton}
+              labelStyle={styles.closeModalButtonLabel}
+            >
+              Close
+            </Button>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  // Detail row component
+  function DetailRow({ label, value }: { label: string; value: string }): React.JSX.Element {
+    return (
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>{label}</Text>
+        <Text style={styles.detailValue} numberOfLines={2}>
+          {value}
+        </Text>
+      </View>
+    );
+  }
 }
 
 // =============================================================================
@@ -505,5 +622,97 @@ const styles = StyleSheet.create({
   },
   amountSent: {
     color: '#FF6B6B',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#1a1a2e',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  modalAmountContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  modalIconText: {
+    fontSize: 24,
+    color: '#FFFFFF',
+  },
+  modalAmount: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  modalStatus: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
+  },
+  statusCompleted: {
+    color: '#4CAF50',
+  },
+  statusPending: {
+    color: '#FFC107',
+  },
+  statusFailed: {
+    color: '#FF5252',
+  },
+  divider: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginBottom: 16,
+  },
+  detailsContainer: {
+    marginBottom: 24,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
+  detailValue: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    textAlign: 'right',
+    flex: 1,
+    marginLeft: 16,
+  },
+  closeModalButton: {
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 12,
+  },
+  closeModalButtonLabel: {
+    color: '#FFFFFF',
   },
 });

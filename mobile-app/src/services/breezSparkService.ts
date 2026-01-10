@@ -404,12 +404,15 @@ export async function listPayments(): Promise<TransactionInfo[]> {
 
       const description = payment.details?.description || payment.description || '';
 
+      const mappedStatus = mapPaymentStatus(payment.status);
+      console.log(`[Payment ${payment.id}] Raw status:`, payment.status, '-> Mapped:', mappedStatus);
+
       return {
         id: payment.id,
         type,
         amountSat,
         feeSat,
-        status: mapPaymentStatus(payment.status),
+        status: mappedStatus,
         timestamp: timestamp || Date.now(),
         description,
       };
