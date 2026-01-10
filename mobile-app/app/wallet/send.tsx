@@ -1,0 +1,551 @@
+import React, { useState, useCallback } from 'react';
+import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { Text, Button, TextInput } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BarCodeScanner } from 'expo-barcode-scanner';
+import { useWallet } from '../../src/hooks/useWallet';
+import { BreezSparkService } from '../../src/services/breezSparkService';
+
+type SendStep = 'input' | 'preview' | 'scanning';
+
+interface PaymentPreview {
+  recipient: string;
+  amount: number;
+  fee: number;
+  total: number;
+  description?: string;
+}
+
+export default function SendScreen() {
+  const { balance, refreshBalance } = useWallet();
+
+  const [step, setStep] = useState<SendStep>('input');
+  const [paymentInput, setPaymentInput] = useState('');
+  const [amount, setAmount] = useState('');
+  const [comment, setComment] = useState('');
+  const [preview, setPreview] = useState<PaymentPreview | null>(null);
+  const [isPreparing, setIsPreparing] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [prepareResponse, setPrepareResponse] = useState<any>(null);
+
+  // Request camera permissions for QR scanner
+  const requestCameraPermission = useCallback(async () => {
+    const { status } = await BarCodeScanner.requestPermissionsAsync();
+    setHasPermission(status === 'granted');
+    return status === 'granted';
+  }, []);
+
+  const handleScanQR = useCallback(async () => {
+    const granted = await requestCameraPermission();
+    if (granted) {
+      setStep('scanning');
+    } else {
+      Alert.alert(
+        'Permission Required',
+        'Camera permission is required to scan QR codes'
+      );
+    }
+  }, [requestCameraPermission]);
+
+  const handleBarCodeScanned = useCallback(
+    ({ data }: { type: string; data: string }) => {
+      setPaymentInput(data);
+      setStep('input');
+      Alert.alert('QR Code Scanned', 'Payment information has been filled in');
+    },
+    []
+  );
+
+  const handlePreviewPayment = useCallback(async () => {
+    if (!paymentInput.trim()) {
+      Alert.alert('Error', 'Please enter a Lightning invoice or address');
+      return;
+    }
+
+    try {
+      setIsPreparing(true);
+
+      // Parse the payment request
+      const parsedRequest = await BreezSparkService.parsePaymentRequest(paymentInput);
+
+      if (!parsedRequest.isValid) {
+        Alert.alert(
+          'Invalid Payment Request',
+          'Please enter a valid Lightning invoice, LNURL, or Lightning address'
+        );
+        return;
+      }
+
+      // Determine amount
+      let paymentAmount: number;
+
+      if (parsedRequest.type === 'bolt11' && parsedRequest.amountSat !== undefined) {
+        // Bolt11 with embedded amount
+        paymentAmount = parsedRequest.amountSat;
+      } else {
+        // User must specify amount
+        const parsedAmount = parseInt(amount, 10);
+        if (!parsedAmount || parsedAmount <= 0) {
+          Alert.alert('Error', 'Please enter a valid amount');
+          return;
+        }
+        paymentAmount = parsedAmount;
+      }
+
+      // Check balance
+      if (paymentAmount > balance) {
+        Alert.alert(
+          'Insufficient Balance',
+          `You have ${balance.toLocaleString()} sats but trying to send ${paymentAmount.toLocaleString()} sats`
+        );
+        return;
+      }
+
+      // Prepare the payment to get fee estimate
+      const prepared = await BreezSparkService.prepareSendPayment(
+        paymentInput,
+        paymentAmount
+      );
+
+      setPrepareResponse(prepared);
+
+      // Extract fee from prepare response
+      const feeAmount = Number(prepared.fee || 0);
+      const totalAmount = paymentAmount + feeAmount;
+
+      // Check total against balance
+      if (totalAmount > balance) {
+        Alert.alert(
+          'Insufficient Balance',
+          `Total (${totalAmount.toLocaleString()} sats including ${feeAmount.toLocaleString()} sats fee) exceeds your balance of ${balance.toLocaleString()} sats`
+        );
+        return;
+      }
+
+      // Create preview
+      const paymentPreview: PaymentPreview = {
+        recipient: paymentInput,
+        amount: paymentAmount,
+        fee: feeAmount,
+        total: totalAmount,
+        description: parsedRequest.description || comment || undefined,
+      };
+
+      setPreview(paymentPreview);
+      setStep('preview');
+    } catch (error) {
+      console.error('Failed to prepare payment:', error);
+      Alert.alert(
+        'Error',
+        error instanceof Error ? error.message : 'Failed to prepare payment'
+      );
+    } finally {
+      setIsPreparing(false);
+    }
+  }, [paymentInput, amount, comment, balance]);
+
+  const handleSendPayment = useCallback(async () => {
+    if (!preview || !prepareResponse) {
+      return;
+    }
+
+    try {
+      setIsSending(true);
+
+      const result = await BreezSparkService.sendPayment(prepareResponse);
+
+      if (result.success) {
+        Alert.alert(
+          'Payment Sent',
+          `Successfully sent ${preview.amount.toLocaleString()} sats`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Refresh balance and go back to home
+                refreshBalance();
+                router.replace('/wallet/home');
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Payment Failed', result.error || 'Unknown error occurred');
+        setStep('input');
+      }
+    } catch (error) {
+      console.error('Failed to send payment:', error);
+      Alert.alert(
+        'Error',
+        error instanceof Error ? error.message : 'Failed to send payment'
+      );
+      setStep('input');
+    } finally {
+      setIsSending(false);
+    }
+  }, [preview, prepareResponse, refreshBalance]);
+
+  const handleBackToInput = useCallback(() => {
+    setStep('input');
+    setPreview(null);
+    setPrepareResponse(null);
+  }, []);
+
+  // Render QR Scanner
+  if (step === 'scanning') {
+    return (
+      <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.gradient}>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => setStep('input')}>
+              <Text style={styles.backButton}>← Back</Text>
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Scan QR Code</Text>
+            <View style={styles.headerSpacer} />
+          </View>
+
+          <View style={styles.scannerContainer}>
+            <BarCodeScanner
+              onBarCodeScanned={handleBarCodeScanned}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View style={styles.scannerOverlay}>
+              <Text style={styles.scannerText}>
+                Point your camera at a Lightning QR code
+              </Text>
+            </View>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
+    );
+  }
+
+  // Render Payment Preview
+  if (step === 'preview' && preview) {
+    return (
+      <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.gradient}>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={handleBackToInput}>
+              <Text style={styles.backButton}>← Back</Text>
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Withdraw Funds</Text>
+            <View style={styles.headerSpacer} />
+          </View>
+
+          <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+            <Text style={styles.sectionTitle}>Payment Preview</Text>
+
+            <View style={styles.previewContainer}>
+              <View style={styles.previewRow}>
+                <Text style={styles.previewLabel}>Recipient:</Text>
+                <Text style={styles.previewValue} numberOfLines={1} ellipsizeMode="middle">
+                  {preview.recipient}
+                </Text>
+              </View>
+
+              <View style={styles.previewRow}>
+                <Text style={styles.previewLabel}>Amount:</Text>
+                <Text style={styles.previewAmount}>
+                  {preview.amount.toLocaleString()} sats
+                </Text>
+              </View>
+
+              <View style={styles.previewRow}>
+                <Text style={styles.previewLabel}>Fee:</Text>
+                <Text style={styles.previewFee}>
+                  {preview.fee.toLocaleString()} sats
+                </Text>
+              </View>
+
+              <View style={[styles.previewRow, styles.previewTotal]}>
+                <Text style={styles.previewTotalLabel}>Total:</Text>
+                <Text style={styles.previewTotalAmount}>
+                  {preview.total.toLocaleString()} sats
+                </Text>
+              </View>
+
+              {preview.description && (
+                <View style={styles.previewRow}>
+                  <Text style={styles.previewLabel}>Description:</Text>
+                  <Text style={styles.previewValue}>{preview.description}</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.buttonRow}>
+              <Button
+                mode="outlined"
+                onPress={handleBackToInput}
+                disabled={isSending}
+                style={styles.cancelButton}
+                textColor="rgba(255, 255, 255, 0.6)"
+              >
+                Preview Payment
+              </Button>
+
+              <Button
+                mode="contained"
+                onPress={handleSendPayment}
+                loading={isSending}
+                disabled={isSending}
+                style={styles.sendButton}
+                buttonColor="#FFC107"
+                textColor="#1a1a2e"
+              >
+                Send Payment
+              </Button>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </LinearGradient>
+    );
+  }
+
+  // Render Input Form
+  return (
+    <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.gradient}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={styles.backButton}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Withdraw Funds</Text>
+          <View style={styles.headerSpacer} />
+        </View>
+
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.balanceContainer}>
+            <Text style={styles.balanceLabel}>Available Balance:</Text>
+            <Text style={styles.balanceAmount}>{balance.toLocaleString()} sats</Text>
+          </View>
+
+          <Text style={styles.label}>Lightning Invoice or Address:</Text>
+
+          <TextInput
+            mode="outlined"
+            placeholder="Paste Lightning invoice (lnbc...) or Lightning address (user@domain.com)"
+            value={paymentInput}
+            onChangeText={setPaymentInput}
+            style={styles.input}
+            outlineColor="rgba(255, 255, 255, 0.3)"
+            activeOutlineColor="#FFC107"
+            textColor="#FFFFFF"
+            placeholderTextColor="rgba(255, 255, 255, 0.5)"
+            multiline
+            numberOfLines={3}
+          />
+
+          <Button
+            mode="outlined"
+            onPress={handleScanQR}
+            icon="qrcode-scan"
+            style={styles.scanButton}
+            textColor="#FFC107"
+          >
+            Scan QR Code
+          </Button>
+
+          <Text style={styles.label}>Amount (leave empty for invoice amount):</Text>
+
+          <TextInput
+            mode="outlined"
+            label="Amount in sats"
+            value={amount}
+            onChangeText={setAmount}
+            keyboardType="numeric"
+            style={styles.input}
+            outlineColor="rgba(255, 255, 255, 0.3)"
+            activeOutlineColor="#FFC107"
+            textColor="#FFFFFF"
+            placeholderTextColor="rgba(255, 255, 255, 0.5)"
+          />
+
+          <Text style={styles.label}>Comment (optional):</Text>
+
+          <TextInput
+            mode="outlined"
+            placeholder="Payment description"
+            value={comment}
+            onChangeText={setComment}
+            style={styles.input}
+            outlineColor="rgba(255, 255, 255, 0.3)"
+            activeOutlineColor="#FFC107"
+            textColor="#FFFFFF"
+            placeholderTextColor="rgba(255, 255, 255, 0.5)"
+          />
+
+          <Button
+            mode="contained"
+            onPress={handlePreviewPayment}
+            loading={isPreparing}
+            disabled={isPreparing || !paymentInput.trim()}
+            style={styles.previewButton}
+            buttonColor="#FFC107"
+            textColor="#1a1a2e"
+          >
+            Preview Payment
+          </Button>
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
+  );
+}
+
+const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  backButton: {
+    fontSize: 16,
+    color: '#FFC107',
+    fontWeight: '600',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  headerSpacer: {
+    width: 60,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 24,
+  },
+  balanceContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    alignItems: 'center',
+  },
+  balanceLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginBottom: 4,
+  },
+  balanceAmount: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFC107',
+  },
+  label: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  input: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginBottom: 8,
+  },
+  scanButton: {
+    borderColor: '#FFC107',
+    marginBottom: 16,
+  },
+  previewButton: {
+    marginTop: 24,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 24,
+  },
+  previewContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  previewRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  previewLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    flex: 1,
+  },
+  previewValue: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    flex: 2,
+    textAlign: 'right',
+  },
+  previewAmount: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  previewFee: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  previewTotal: {
+    borderBottomWidth: 0,
+    paddingTop: 16,
+    marginTop: 8,
+  },
+  previewTotalLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  previewTotalAmount: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFC107',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  sendButton: {
+    flex: 1,
+  },
+  scannerContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  scannerOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 24,
+    alignItems: 'center',
+  },
+  scannerText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+});

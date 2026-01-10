@@ -348,12 +348,15 @@ export async function receivePayment(
   }
 
   try {
+    // Create the payment method using the SDK's factory pattern
+    const paymentMethod = BreezSDK.ReceivePaymentMethod.Bolt11Invoice.new({
+      description: description || '',
+      amountSats: BigInt(amountSat),
+      expirySecs: 900, // 15 minutes
+    });
+
     const response = await sdkInstance.receivePayment({
-      paymentMethod: {
-        type: 'bolt11Invoice',
-        amountSat: BigInt(amountSat),
-        description,
-      },
+      paymentMethod,
     });
 
     return {
