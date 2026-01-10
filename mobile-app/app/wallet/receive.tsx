@@ -63,7 +63,7 @@ export default function ReceiveScreen() {
   const handleCopyInvoice = useCallback(async () => {
     try {
       await Clipboard.setStringAsync(invoice);
-      Alert.alert('Copied', 'Invoice copied to clipboard');
+      // Android's built-in clipboard notification will show a non-blocking toast
     } catch (error) {
       console.error('Failed to copy invoice:', error);
       Alert.alert('Error', 'Failed to copy invoice');
@@ -118,11 +118,8 @@ export default function ReceiveScreen() {
         // Check if expired
         if (Date.now() >= expiryTime) {
           clearInterval(interval);
-          Alert.alert(
-            'Invoice Expired',
-            'This invoice has expired. Please generate a new one.',
-            [{ text: 'OK', onPress: handleNewInvoice }]
-          );
+          // Auto-return to input screen without popup
+          handleNewInvoice();
         }
       }, 1000);
 

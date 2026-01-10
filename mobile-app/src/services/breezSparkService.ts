@@ -503,29 +503,74 @@ export async function parsePaymentRequest(input: string): Promise<{
   amountSat?: number;
   description?: string;
 }> {
-  const trimmed = input.trim().toLowerCase();
+  if (!_isNativeAvailable || !sdkInstance) {
+    // Fallback to simple string matching if SDK not available
+    const trimmed = input.trim().toLowerCase();
 
-  if (trimmed.includes('@') && trimmed.includes('.')) {
-    return { type: 'lightningAddress', isValid: true };
+    if (trimmed.includes('@') && trimmed.includes('.')) {
+      return { type: 'lightningAddress', isValid: true };
+    }
+
+    if (trimmed.startsWith('lnurl')) {
+      return { type: 'lnurl', isValid: true };
+    }
+
+    if (trimmed.startsWith('lnbc') || trimmed.startsWith('lntb') || trimmed.startsWith('lnbcrt')) {
+      return { type: 'bolt11', isValid: true };
+    }
+
+    if (trimmed.startsWith('bc1') || trimmed.startsWith('1') || trimmed.startsWith('3') || trimmed.startsWith('tb1')) {
+      return { type: 'bitcoinAddress', isValid: true };
+    }
+
+    if (trimmed.startsWith('sp1')) {
+      return { type: 'sparkAddress', isValid: true };
+    }
+
+    return { type: 'unknown', isValid: false };
   }
 
-  if (trimmed.startsWith('lnurl')) {
-    return { type: 'lnurl', isValid: true };
-  }
+  try {
+    // Use SDK to parse for full details including amount
+    const parsed = await sdkInstance.parse(input.trim());
 
-  if (trimmed.startsWith('lnbc') || trimmed.startsWith('lntb') || trimmed.startsWith('lnbcrt')) {
-    return { type: 'bolt11', isValid: true };
-  }
+    // Check the parsed result type
+    if (parsed.tag === 'Bolt11Invoice' && parsed.inner) {
+      // The inner might be an array with the invoice details as first element
+      const innerData = Array.isArray(parsed.inner) ? parsed.inner[0] : parsed.inner;
+      const invoiceDetails = innerData?.invoiceDetails || innerData;
 
-  if (trimmed.startsWith('bc1') || trimmed.startsWith('1') || trimmed.startsWith('3') || trimmed.startsWith('tb1')) {
-    return { type: 'bitcoinAddress', isValid: true };
-  }
+      const amountSat = invoiceDetails?.amountMsat ? Number(invoiceDetails.amountMsat) / 1000 : undefined;
 
-  if (trimmed.startsWith('sp1')) {
-    return { type: 'sparkAddress', isValid: true };
-  }
+      return {
+        type: 'bolt11',
+        isValid: true,
+        amountSat,
+        description: invoiceDetails?.description,
+      };
+    }
 
-  return { type: 'unknown', isValid: false };
+    if (parsed.tag === 'LightningAddress') {
+      return { type: 'lightningAddress', isValid: true };
+    }
+
+    if (parsed.tag === 'Lnurl') {
+      return { type: 'lnurl', isValid: true };
+    }
+
+    if (parsed.tag === 'BitcoinAddress') {
+      return { type: 'bitcoinAddress', isValid: true };
+    }
+
+    if (parsed.tag === 'SparkAddress') {
+      return { type: 'sparkAddress', isValid: true };
+    }
+
+    return { type: 'unknown', isValid: false };
+  } catch (error) {
+    console.error('Failed to parse payment request:', error);
+    return { type: 'unknown', isValid: false };
+  }
 }
 
 /**

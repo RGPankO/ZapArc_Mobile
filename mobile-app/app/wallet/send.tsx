@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { Text, Button, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,6 +30,30 @@ export default function SendScreen() {
   const [isSending, setIsSending] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [prepareResponse, setPrepareResponse] = useState<any>(null);
+  const [scanned, setScanned] = useState(false);
+
+  // Auto-fill amount when invoice is pasted
+  useEffect(() => {
+    const checkAndFillAmount = async () => {
+      if (!paymentInput.trim()) return;
+
+      try {
+        const parsed = await BreezSparkService.parsePaymentRequest(paymentInput);
+        console.log('🔍 [Send] Parsed:', parsed.type, 'Valid:', parsed.isValid, 'Amount:', parsed.amountSat);
+
+        if (parsed.isValid && parsed.amountSat !== undefined) {
+          console.log('✅ [Send] Auto-filling amount:', parsed.amountSat);
+          setAmount(parsed.amountSat.toString());
+        } else {
+          console.log('⚠️ [Send] No amount in invoice or invalid');
+        }
+      } catch (error) {
+        console.error('❌ [Send] Failed to parse payment request:', error);
+      }
+    };
+
+    checkAndFillAmount();
+  }, [paymentInput]);
 
   // Request camera permissions for QR scanner
   const requestCameraPermission = useCallback(async () => {
@@ -41,6 +65,7 @@ export default function SendScreen() {
   const handleScanQR = useCallback(async () => {
     const granted = await requestCameraPermission();
     if (granted) {
+      setScanned(false); // Reset scanned flag
       setStep('scanning');
     } else {
       Alert.alert(
@@ -51,12 +76,27 @@ export default function SendScreen() {
   }, [requestCameraPermission]);
 
   const handleBarCodeScanned = useCallback(
-    ({ data }: { type: string; data: string }) => {
+    async ({ data }: { type: string; data: string }) => {
+      if (scanned) return; // Prevent multiple scans
+      setScanned(true);
+
+      console.log('📷 [Send] QR Code scanned, navigating to input');
       setPaymentInput(data);
       setStep('input');
-      Alert.alert('QR Code Scanned', 'Payment information has been filled in');
+
+      // Try to parse and auto-fill amount if present
+      try {
+        const parsed = await BreezSparkService.parsePaymentRequest(data);
+        if (parsed.isValid && parsed.amountSat !== undefined) {
+          setAmount(parsed.amountSat.toString());
+        }
+      } catch (error) {
+        console.error('Failed to parse scanned QR code:', error);
+      }
+
+      // No popup - user can see the form is filled
     },
-    []
+    [scanned]
   );
 
   const handlePreviewPayment = useCallback(async () => {
@@ -113,7 +153,21 @@ export default function SendScreen() {
       setPrepareResponse(prepared);
 
       // Extract fee from prepare response
-      const feeAmount = Number(prepared.fee || 0);
+      // The fee is in paymentMethod.inner (either lightningFeeSats or feeQuote depending on type)
+      let feeAmount = 0;
+      if (prepared.paymentMethod) {
+        const method = prepared.paymentMethod;
+        if (method.tag === 'Bolt11Invoice' || method.tag === 'SparkInvoice') {
+          feeAmount = Number(method.inner?.lightningFeeSats || 0);
+          // Add spark transfer fee if present
+          if (method.inner?.sparkTransferFeeSats) {
+            feeAmount += Number(method.inner.sparkTransferFeeSats);
+          }
+        } else if (method.tag === 'BitcoinAddress') {
+          // For on-chain, fee is in feeQuote
+          feeAmount = Number(method.inner?.feeQuote?.feeSats || 0);
+        }
+      }
       const totalAmount = paymentAmount + feeAmount;
 
       // Check total against balance
@@ -158,20 +212,10 @@ export default function SendScreen() {
       const result = await BreezSparkService.sendPayment(prepareResponse);
 
       if (result.success) {
-        Alert.alert(
-          'Payment Sent',
-          `Successfully sent ${preview.amount.toLocaleString()} sats`,
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Refresh balance and go back to home
-                refreshBalance();
-                router.replace('/wallet/home');
-              },
-            },
-          ]
-        );
+        // Refresh balance and go back to home immediately
+        refreshBalance();
+        router.replace('/wallet/home');
+        // Android will show transaction in the list - no popup needed
       } else {
         Alert.alert('Payment Failed', result.error || 'Unknown error occurred');
         setStep('input');
