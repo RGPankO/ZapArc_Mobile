@@ -1,26 +1,18 @@
 {
-  "name": "mobile-skeleton-app",
+  "name": "zap-arc-mobile",
   "version": "1.0.0",
-  "description": "A complete cross-platform mobile app skeleton with React Native and Node.js backend",
+  "description": "Cross-platform mobile wallet for Zap-Arc using Breez SDK Spark",
   "private": true,
   "scripts": {
-    "postinstall": "concurrently \"cd backend && npm install\" \"cd mobile-app && npm install\"",
-    "setup": "npm run setup:backend && npm run setup:mobile",
-    "setup:backend": "cd backend && npm install && npm run db:setup",
+    "postinstall": "cd mobile-app && npm install",
+    "setup": "npm run setup:mobile",
     "setup:mobile": "cd mobile-app && npm install",
-    "services:start": "docker-compose up -d",
-    "services:stop": "docker-compose down",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:mobile\"",
-    "dev:backend": "cd backend && npm run dev",
+    "dev": "npm run dev:mobile",
     "dev:mobile": "cd mobile-app && npm start",
-    "test": "npm run test:backend && npm run test:mobile",
-    "test:backend": "cd backend && npm test",
+    "test": "npm run test:mobile",
     "test:mobile": "cd mobile-app && npm test",
-    "clean": "npm run clean:backend && npm run clean:mobile",
-    "clean:backend": "cd backend && rm -rf node_modules && rm -rf dist",
-    "clean:mobile": "cd mobile-app && rm -rf node_modules && rm -rf .expo",
-    "reset:db": "cd backend && npm run db:migrate:reset",
-    "db:studio": "cd backend && npm run db:studio"
+    "clean": "npm run clean:mobile",
+    "clean:mobile": "cd mobile-app && rm -rf node_modules && rm -rf .expo"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
@@ -28,20 +20,16 @@
   "keywords": [
     "react-native",
     "expo",
-    "nodejs",
-    "express",
-    "mobile-app",
-    "skeleton",
-    "authentication",
+    "lightning-network",
+    "bitcoin",
+    "mobile-wallet",
+    "breez-sdk-spark",
     "typescript"
   ],
-  "author": "Your Name",
+  "author": "Zap-Arc Team",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/xAleksandar/mobile-skeleton-app.git"
-  },
   "dependencies": {
-    "expo": "^54.0.31"
+    "expo": "^54.0.31",
+    "expo-dev-client": "~6.0.20"
   }
 }
