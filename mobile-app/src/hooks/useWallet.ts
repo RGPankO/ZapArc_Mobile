@@ -436,6 +436,7 @@ export function useWallet(): WalletState & WalletActions {
       }
 
       const payments = await BreezSparkService.listPayments();
+      
       // Map TransactionInfo to Transaction type
       const txs: Transaction[] = payments.map((p) => ({
         id: p.id,
@@ -446,6 +447,7 @@ export function useWallet(): WalletState & WalletActions {
         timestamp: p.timestamp,
         description: p.description,
       }));
+      
       setTransactions(txs);
     } catch (err) {
       console.error('❌ [useWallet] Failed to refresh transactions:', err);
@@ -501,15 +503,28 @@ export function useWallet(): WalletState & WalletActions {
         setIsLoading(true);
         setError(null);
 
+        console.log('🔵 [sendPayment] Starting payment...');
         const result = await BreezSparkService.payInvoice(bolt11);
         
-        // Refresh balance and transactions after payment
-        await refreshBalance();
-        await refreshTransactions();
+        if (!result.success) {
+          console.log('❌ [sendPayment] Payment failed:', result.error);
+          return false;
+        }
 
-        return result.success;
+        console.log('✅ [sendPayment] Payment successful, paymentId:', result.paymentId);
+        
+        // Refresh balance and transactions
+        console.log('🔄 [sendPayment] Refreshing balance...');
+        await refreshBalance();
+        
+        console.log('🔄 [sendPayment] Refreshing transactions...');
+        await refreshTransactions();
+        
+        console.log('✅ [sendPayment] All refreshes complete');
+        return true;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Payment failed';
+        console.error('❌ [sendPayment] Error:', message);
         setError(message);
         throw err;
       } finally {

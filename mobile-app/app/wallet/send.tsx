@@ -212,10 +212,14 @@ export default function SendScreen() {
       const result = await BreezSparkService.sendPayment(prepareResponse);
 
       if (result.success) {
-        // Refresh balance and go back to home immediately
-        refreshBalance();
-        router.replace('/wallet/home');
-        // Android will show transaction in the list - no popup needed
+        // Refresh balance immediately
+        await refreshBalance();
+        
+        // Wait for SDK to sync the payment to its database
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Navigate to home - useFocusEffect will refresh transactions
+        router.navigate('/wallet/home');
       } else {
         Alert.alert('Payment Failed', result.error || 'Unknown error occurred');
         setStep('input');

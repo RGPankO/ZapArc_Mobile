@@ -93,8 +93,8 @@ export function PaymentConfirmationScreen(): React.JSX.Element {
 
   // Handle done (after success/failure)
   const handleDone = useCallback(() => {
-    router.dismissAll();
-    router.replace('/wallet/home');
+    // Navigate back to home - this will trigger useFocusEffect to refresh transactions
+    router.navigate('/wallet/home');
   }, []);
 
   // Format sats with thousand separators

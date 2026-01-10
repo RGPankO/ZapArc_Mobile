@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
   },
   qrContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   qrCodeWrapper: {
     padding: 16,
@@ -353,38 +353,38 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 12,
   },
   invoiceContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
+    padding: 12,
+    marginBottom: 16,
   },
   invoiceLabel: {
-    fontSize: 14,
+    fontSize: 13,
     color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   invoiceScroll: {
-    maxHeight: 100,
-    marginBottom: 12,
+    maxHeight: 120,
+    marginBottom: 10,
   },
   invoiceScrollContent: {
     paddingVertical: 4,
   },
   invoiceText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#FFFFFF',
     fontFamily: 'monospace',
-    lineHeight: 18,
+    lineHeight: 16,
   },
   copyButton: {
     borderColor: '#FFC107',
   },
   statusContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   waitingText: {
     fontSize: 16,
