@@ -65,6 +65,7 @@ export function WalletManagementScreen(): React.JSX.Element {
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
   const [newName, setNewName] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [selectedMasterKeyId, setSelectedMasterKeyId] = useState<string | null>(null);
   const [pinInput, setPinInput] = useState('');
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,7 +114,11 @@ export function WalletManagementScreen(): React.JSX.Element {
         setProcessing(true);
         setError(null);
 
-        await addSubWallet(masterKeyId);
+        const nickname = newName.trim() || undefined;
+        await addSubWallet(masterKeyId, nickname);
+        setModalType(null);
+        setSelectedMasterKeyId(null);
+        setNewName('');
         Alert.alert('Success', 'Sub-wallet created successfully');
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to add sub-wallet';
@@ -122,7 +127,7 @@ export function WalletManagementScreen(): React.JSX.Element {
         setProcessing(false);
       }
     },
-    [addSubWallet]
+    [addSubWallet, newName]
   );
 
   // ========================================
@@ -340,7 +345,15 @@ export function WalletManagementScreen(): React.JSX.Element {
                 styles.addSubWalletButton,
                 !canAddSub && styles.addSubWalletButtonDisabled,
               ]}
-              onPress={() => canAddSub && handleAddSubWallet(masterKey.id)}
+              onPress={() => {
+                if (canAddSub) {
+                  setSelectedMasterKeyId(masterKey.id);
+                  // Calculate next sub-wallet index for default name
+                  const nextIndex = masterKey.subWallets.length;
+                  setNewName(`Sub-Wallet ${nextIndex + 1}`);
+                  setModalType('addSubWallet');
+                }
+              }}
               disabled={!canAddSub}
             >
               <IconButton
@@ -526,6 +539,64 @@ export function WalletManagementScreen(): React.JSX.Element {
   };
 
   // ========================================
+  // Render Add Sub-Wallet Modal
+  // ========================================
+
+  const renderAddSubWalletModal = (): React.JSX.Element | null => {
+    if (modalType !== 'addSubWallet' || !selectedMasterKeyId) return null;
+
+    return (
+      <Portal>
+        <Dialog
+          visible
+          onDismiss={() => {
+            setModalType(null);
+            setSelectedMasterKeyId(null);
+            setNewName('');
+          }}
+          style={styles.dialog}
+        >
+          <Dialog.Title style={styles.dialogTitle}>Name Your Sub-Wallet</Dialog.Title>
+          <Dialog.Content>
+            <Text style={styles.dialogText}>
+              Choose a name for your new sub-wallet.
+            </Text>
+
+            <TextInput
+              style={styles.nameInputField}
+              value={newName}
+              onChangeText={setNewName}
+              placeholder="Sub-Wallet name"
+              placeholderTextColor="rgba(255, 255, 255, 0.4)"
+              autoFocus
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              onPress={() => {
+                setModalType(null);
+                setSelectedMasterKeyId(null);
+                setNewName('');
+              }}
+              labelStyle={styles.cancelButtonLabel}
+            >
+              Cancel
+            </Button>
+            <Button
+              onPress={() => handleAddSubWallet(selectedMasterKeyId)}
+              disabled={!newName.trim() || processing}
+              loading={processing}
+              labelStyle={styles.primaryButtonLabel}
+            >
+              Create
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+    );
+  };
+
+  // ========================================
   // Render
   // ========================================
 
@@ -569,6 +640,7 @@ export function WalletManagementScreen(): React.JSX.Element {
 
         {/* Modals */}
         {renderDeleteModal()}
+        {renderAddSubWalletModal()}
       </SafeAreaView>
     </LinearGradient>
   );
@@ -804,5 +876,16 @@ const styles = StyleSheet.create({
   },
   deleteButtonLabel: {
     color: '#F44336',
+  },
+  nameInputField: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginTop: 8,
+  },
+  primaryButtonLabel: {
+    color: '#FFC107',
   },
 });

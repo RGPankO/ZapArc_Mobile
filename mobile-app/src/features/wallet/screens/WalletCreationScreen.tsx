@@ -10,6 +10,7 @@ import {
   Alert,
   BackHandler,
 } from 'react-native';
+import { Modal } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Button, Text, TextInput, ProgressBar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -48,6 +49,8 @@ export function WalletCreationScreen(): React.JSX.Element {
   const [pasteText, setPasteText] = useState('');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
+  const [walletName, setWalletName] = useState('Sub-Wallet 1');
+  const [showNameModal, setShowNameModal] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showMnemonic, setShowMnemonic] = useState(false);
@@ -231,14 +234,16 @@ export function WalletCreationScreen(): React.JSX.Element {
       setIsLoading(true);
       setError(null);
 
-      await createMasterKey(pin);
+      // Use custom name or default to "Main Wallet"
+      const nickname = walletName.trim() || undefined;
+      await createMasterKey(pin, nickname);
       setCurrentStep('complete');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create wallet');
     } finally {
       setIsLoading(false);
     }
-  }, [pinValid, pin, createMasterKey]);
+  }, [pinValid, pin, walletName, createMasterKey]);
 
   // ========================================
   // Step 5: Complete
@@ -526,6 +531,9 @@ export function WalletCreationScreen(): React.JSX.Element {
           keyboardType="numeric"
           maxLength={6}
           style={styles.pinInput}
+          outlineColor="rgba(255, 255, 255, 0.3)"
+          activeOutlineColor="#FFC107"
+          textColor="#FFFFFF"
         />
 
         <TextInput
@@ -638,6 +646,45 @@ export function WalletCreationScreen(): React.JSX.Element {
 
         {/* Content */}
         {renderCurrentStep()}
+
+        {/* Wallet Name Modal */}
+        <Modal
+          visible={showNameModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowNameModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Name Your Wallet</Text>
+              <Text style={styles.modalDescription}>
+                Choose a name for your first sub-wallet. You can change this later.
+              </Text>
+
+              <TextInput
+                mode="outlined"
+                label="Wallet Name"
+                value={walletName}
+                onChangeText={setWalletName}
+                autoFocus
+                style={styles.nameInput}
+                outlineColor="rgba(255, 255, 255, 0.3)"
+                activeOutlineColor="#FFC107"
+                textColor="#FFFFFF"
+              />
+
+              <Button
+                mode="contained"
+                onPress={() => setShowNameModal(false)}
+                style={styles.modalButton}
+                buttonColor="#FFC107"
+                textColor="#1a1a2e"
+              >
+                Continue
+              </Button>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -1007,5 +1054,40 @@ const styles = StyleSheet.create({
   },
   successEmoji: {
     fontSize: 48,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#1a1a2e',
+    borderRadius: 24,
+    padding: 32,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  modalDescription: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  nameInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginBottom: 24,
+  },
+  modalButton: {
+    borderRadius: 12,
   },
 });

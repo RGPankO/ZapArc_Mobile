@@ -643,7 +643,15 @@ export function addPaymentListener(
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapPaymentStatus(status: any): 'pending' | 'completed' | 'failed' {
-  // Spark SDK may return status as an object like { type: 'completed' } or as a string
+  // Handle numeric status codes from Breez SDK
+  if (typeof status === 'number') {
+    if (status === 0) return 'completed'; // Completed
+    if (status === 1) return 'pending';   // Pending
+    if (status === 2) return 'failed';    // Failed
+    return 'pending'; // Default for unknown numeric codes
+  }
+  
+  // Handle object status (e.g., { type: 'completed' })
   let s: string;
   if (typeof status === 'object' && status !== null) {
     s = (status.type || status.variant || '').toLowerCase();
