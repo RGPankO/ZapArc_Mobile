@@ -69,6 +69,14 @@ try {
 let sdkInstance: any = null;
 let _isInitialized = false;
 
+// Event listeners
+type PaymentEventCallback = (payment: TransactionInfo) => void;
+const paymentEventListeners: Set<PaymentEventCallback> = new Set();
+
+// Event listener subscription (returns unsubscribe function)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let eventListenerUnsubscribe: (() => void) | null = null;
+
 // =============================================================================
 // Public API
 // =============================================================================
@@ -181,6 +189,10 @@ export async function initializeSDK(
     });
 
     _isInitialized = true;
+    
+    // Setup event listeners for real-time updates
+    await setupEventListeners();
+    
     console.log('✅ [BreezSparkService] Breez SDK initialized successfully');
     console.log('✅ [BreezSparkService] sdkInstance:', !!sdkInstance);
     return true;
@@ -220,6 +232,12 @@ export async function disconnectSDK(): Promise<void> {
   if (!_isNativeAvailable) return;
 
   try {
+    // Unsubscribe from events
+    if (eventListenerUnsubscribe) {
+      eventListenerUnsubscribe();
+      eventListenerUnsubscribe = null;
+    }
+
     if (sdkInstance) {
       // Spark SDK uses sdkInstance.disconnect(), not BreezSDK.disconnect()
       await sdkInstance.disconnect();
@@ -229,6 +247,70 @@ export async function disconnectSDK(): Promise<void> {
     }
   } catch (error) {
     console.error('❌ [BreezSparkService] Failed to disconnect SDK:', error);
+  }
+}
+
+/**
+ * Subscribe to payment events
+ * Returns unsubscribe function
+ */
+export function onPaymentReceived(callback: PaymentEventCallback): () => void {
+  paymentEventListeners.add(callback);
+  console.log('✅ [BreezSparkService] Payment event listener added');
+  
+  return () => {
+    paymentEventListeners.delete(callback);
+    console.log('✅ [BreezSparkService] Payment event listener removed');
+  };
+}
+
+/**
+ * Setup SDK event listeners
+ * Called internally after SDK initialization
+ */
+async function setupEventListeners(): Promise<void> {
+  if (!sdkInstance || !_isNativeAvailable) return;
+
+  try {
+    // Unsubscribe from previous listener if exists
+    if (eventListenerUnsubscribe) {
+      eventListenerUnsubscribe();
+    }
+
+    // Subscribe to SDK events
+    // The Breez SDK emits events for payments
+    eventListenerUnsubscribe = await sdkInstance.addEventListener((event: any) => {
+      console.log('📡 [BreezSparkService] SDK Event received:', event?.type || 'unknown');
+
+      // Handle payment received event
+      if (event?.type === 'paymentSucceeded' || event?.type === 'invoicePaid') {
+        const payment: TransactionInfo = {
+          id: event.details?.paymentId || String(Date.now()),
+          type: 'receive',
+          amountSat: Number(event.details?.amountSat || 0),
+          feeSat: Number(event.details?.feeSat || 0),
+          status: 'completed',
+          timestamp: Date.now(),
+          description: event.details?.description,
+        };
+
+        console.log('💰 [BreezSparkService] Payment received event:', payment);
+
+        // Notify all listeners
+        paymentEventListeners.forEach((listener) => {
+          try {
+            listener(payment);
+          } catch (err) {
+            console.error('❌ [BreezSparkService] Event listener error:', err);
+          }
+        });
+      }
+    });
+
+    console.log('✅ [BreezSparkService] Event listeners setup complete');
+  } catch (error) {
+    console.warn('⚠️ [BreezSparkService] Failed to setup event listeners:', error);
+    // Don't fail initialization if events don't work
   }
 }
 

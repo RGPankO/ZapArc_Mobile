@@ -77,7 +77,7 @@ export function HomeScreen(): React.JSX.Element {
     }
   };
 
-  // Refresh handler
+  // Refresh handler (for manual pull-to-refresh)
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -88,16 +88,18 @@ export function HomeScreen(): React.JSX.Element {
   }, [refreshBalance, refreshTransactions]);
 
   // Initial load and wallet switch - refresh when connected or when wallet changes
-  // When user switches between main wallets or sub-wallets, this will trigger a refresh
+  // Don't show pull-to-refresh spinner here since cached data loads instantly
   useEffect(() => {
     if (isConnected && activeWalletInfo) {
       console.log('🔄 [HomeScreen] Wallet changed or connected, refreshing...', {
         masterKey: activeWalletInfo.masterKeyNickname,
         subWallet: activeWalletInfo.subWalletNickname,
       });
-      handleRefresh();
+      // Call refresh directly without setting refreshing state
+      // This allows cached data to show immediately without spinner
+      Promise.all([refreshBalance(), refreshTransactions()]);
     }
-  }, [isConnected, activeWalletInfo?.masterKeyId, activeWalletInfo?.subWalletIndex, handleRefresh]);
+  }, [isConnected, activeWalletInfo?.masterKeyId, activeWalletInfo?.subWalletIndex, refreshBalance, refreshTransactions]);
 
   // Refresh transactions when screen comes into focus
   // This ensures the transaction list updates when returning from payment screen
