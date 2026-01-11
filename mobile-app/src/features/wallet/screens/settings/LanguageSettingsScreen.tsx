@@ -3,12 +3,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Text, RadioButton, Switch, Button, IconButton } from 'react-native-paper';
+import { Text, RadioButton, Button, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../../../hooks/useSettings';
 import { useLanguage } from '../../../../hooks/useLanguage';
+import { useAppTheme } from '../../../../contexts/ThemeContext';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../../utils/theme-helpers';
 
 // =============================================================================
 // Component
@@ -16,18 +18,21 @@ import { useLanguage } from '../../../../hooks/useLanguage';
 
 export function LanguageSettingsScreen(): React.JSX.Element {
   const { settings, updateSettings } = useSettings();
-  const { t } = useLanguage();
+  const { currentLanguage, setLanguage, resetToAuto, t } = useLanguage();
+  const { themeMode } = useAppTheme();
 
-  // State
-  const [language, setLanguage] = useState<'en' | 'bg' | 'auto'>('auto');
-  const [isLocationBased, setIsLocationBased] = useState(true);
+  const gradientColors = getGradientColors(themeMode);
+  const primaryText = getPrimaryTextColor(themeMode);
+  const secondaryText = getSecondaryTextColor(themeMode);
+
+  // State - use settings.language which can be 'auto', 'en', or 'bg'
+  const [selectedLanguage, setSelectedLanguage] = useState<'en' | 'bg' | 'auto'>('auto');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Load settings on mount
+  // Load current settings
   useEffect(() => {
-    if (settings) {
-      setLanguage(settings.language || 'auto');
-      setIsLocationBased(settings.isLocationBased ?? true);
+    if (settings?.language) {
+      setSelectedLanguage(settings.language);
     }
   }, [settings]);
 
@@ -36,10 +41,17 @@ export function LanguageSettingsScreen(): React.JSX.Element {
     setIsSaving(true);
 
     try {
+      // Update settings first
       await updateSettings({
-        language,
-        isLocationBased,
+        language: selectedLanguage,
       });
+
+      // Apply language change through i18n hook
+      if (selectedLanguage === 'auto') {
+        await resetToAuto();
+      } else {
+        await setLanguage(selectedLanguage);
+      }
 
       Alert.alert('Saved', 'Language settings updated', [
         { text: 'OK', onPress: () => router.back() },
@@ -53,7 +65,7 @@ export function LanguageSettingsScreen(): React.JSX.Element {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
@@ -61,11 +73,11 @@ export function LanguageSettingsScreen(): React.JSX.Element {
         <View style={styles.header}>
           <IconButton
             icon="arrow-left"
-            iconColor="#FFFFFF"
+            iconColor={primaryText}
             size={24}
             onPress={() => router.back()}
           />
-          <Text style={styles.headerTitle}>{t('language')}</Text>
+          <Text style={[styles.headerTitle, { color: primaryText }]}>{t('language')}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -73,25 +85,25 @@ export function LanguageSettingsScreen(): React.JSX.Element {
           <View style={styles.content}>
             {/* Language Selection */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Select Language</Text>
+              <Text style={[styles.sectionTitle, { color: primaryText }]}>Select Language</Text>
 
               <RadioButton.Group
                 onValueChange={(value) =>
-                  setLanguage(value as 'en' | 'bg' | 'auto')
+                  setSelectedLanguage(value as 'en' | 'bg' | 'auto')
                 }
-                value={language}
+                value={selectedLanguage}
               >
                 <View style={styles.radioItem}>
                   <RadioButton.Android
                     value="auto"
                     color="#FFC107"
-                    uncheckedColor="rgba(255, 255, 255, 0.5)"
+                    uncheckedColor={secondaryText}
                   />
                   <View style={styles.radioContent}>
-                    <Text style={styles.radioTitle}>
+                    <Text style={[styles.radioTitle, { color: primaryText }]}>
                       Automatic (Location-based)
                     </Text>
-                    <Text style={styles.radioDescription}>
+                    <Text style={[styles.radioDescription, { color: secondaryText }]}>
                       Detect language based on your location. Bulgarian in
                       Bulgaria, English elsewhere.
                     </Text>
@@ -102,11 +114,11 @@ export function LanguageSettingsScreen(): React.JSX.Element {
                   <RadioButton.Android
                     value="en"
                     color="#FFC107"
-                    uncheckedColor="rgba(255, 255, 255, 0.5)"
+                    uncheckedColor={secondaryText}
                   />
                   <View style={styles.radioContent}>
                     <View style={styles.radioTitleRow}>
-                      <Text style={styles.radioTitle}>English</Text>
+                      <Text style={[styles.radioTitle, { color: primaryText }]}>English</Text>
                       <Text style={styles.flag}>🇬🇧</Text>
                     </View>
                   </View>
@@ -116,11 +128,11 @@ export function LanguageSettingsScreen(): React.JSX.Element {
                   <RadioButton.Android
                     value="bg"
                     color="#FFC107"
-                    uncheckedColor="rgba(255, 255, 255, 0.5)"
+                    uncheckedColor={secondaryText}
                   />
                   <View style={styles.radioContent}>
                     <View style={styles.radioTitleRow}>
-                      <Text style={styles.radioTitle}>Български</Text>
+                      <Text style={[styles.radioTitle, { color: primaryText }]}>Български</Text>
                       <Text style={styles.flag}>🇧🇬</Text>
                     </View>
                   </View>
@@ -128,35 +140,17 @@ export function LanguageSettingsScreen(): React.JSX.Element {
               </RadioButton.Group>
             </View>
 
-            {/* Location Settings */}
-            {language === 'auto' && (
-              <View style={styles.section}>
-                <View style={styles.switchRow}>
-                  <View style={styles.switchContent}>
-                    <Text style={styles.switchTitle}>
-                      Location-based Detection
-                    </Text>
-                    <Text style={styles.switchDescription}>
-                      Use GPS to detect if you're in Bulgaria
-                    </Text>
-                  </View>
-                  <Switch
-                    value={isLocationBased}
-                    onValueChange={setIsLocationBased}
-                    color="#FFC107"
-                  />
-                </View>
-              </View>
-            )}
-
             {/* Info Box */}
             <View style={styles.infoBox}>
               <Text style={styles.infoTitle}>About Language Detection</Text>
-              <Text style={styles.infoText}>
+              <Text style={[styles.infoText, { color: secondaryText }]}>
                 When automatic mode is enabled, the app will use your device
                 location to determine the appropriate language. If you're
                 located within Bulgaria, Bulgarian will be used. Otherwise,
                 English will be the default.
+              </Text>
+              <Text style={[styles.infoText, { color: secondaryText, marginTop: 8 }]}>
+                Current language: {currentLanguage === 'en' ? 'English 🇬🇧' : 'Български 🇧🇬'}
               </Text>
             </View>
           </View>

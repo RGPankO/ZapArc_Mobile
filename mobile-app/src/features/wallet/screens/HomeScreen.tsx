@@ -87,14 +87,17 @@ export function HomeScreen(): React.JSX.Element {
     }
   }, [refreshBalance, refreshTransactions]);
 
-  // Initial load - refresh when connected
-  // Note: The useWallet hook now handles SDK initialization detection
-  // and will automatically refresh balance when SDK becomes available
+  // Initial load and wallet switch - refresh when connected or when wallet changes
+  // When user switches between main wallets or sub-wallets, this will trigger a refresh
   useEffect(() => {
-    if (isConnected) {
+    if (isConnected && activeWalletInfo) {
+      console.log('🔄 [HomeScreen] Wallet changed or connected, refreshing...', {
+        masterKey: activeWalletInfo.masterKeyNickname,
+        subWallet: activeWalletInfo.subWalletNickname,
+      });
       handleRefresh();
     }
-  }, [isConnected, handleRefresh]);
+  }, [isConnected, activeWalletInfo?.masterKeyId, activeWalletInfo?.subWalletIndex, handleRefresh]);
 
   // Refresh transactions when screen comes into focus
   // This ensures the transaction list updates when returning from payment screen

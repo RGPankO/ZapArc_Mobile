@@ -395,6 +395,30 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
         setActiveWalletInfo(walletInfo);
         setCurrentMasterKeyId(masterKeyId);
 
+        // Cache PIN for future use
+        sessionPinRef.current = pin;
+
+        // Reinitialize SDK with the new wallet's mnemonic
+        try {
+          const mnemonic = await storageService.getMasterKeyMnemonic(masterKeyId, pin);
+          if (mnemonic) {
+            const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, subWalletIndex);
+            
+            // Disconnect old SDK instance first
+            await BreezSparkService.disconnectSDK();
+            console.log('🔌 [useWalletAuth] Disconnected old SDK instance');
+            
+            // Initialize with new wallet's mnemonic
+            await BreezSparkService.initializeSDK(derivedMnemonic);
+            console.log('✅ [useWalletAuth] SDK reinitialized for new wallet:', {
+              masterKeyId,
+              subWalletIndex,
+            });
+          }
+        } catch (sdkError) {
+          console.error('❌ [useWalletAuth] SDK reinitialization failed:', sdkError);
+        }
+
         await storageService.unlockWallet();
         setIsUnlocked(true);
         updateActivity();
