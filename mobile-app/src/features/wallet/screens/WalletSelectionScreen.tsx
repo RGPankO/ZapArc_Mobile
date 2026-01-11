@@ -13,6 +13,8 @@ import { Text, IconButton, Button, useTheme, Divider } from 'react-native-paper'
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAppTheme } from '../../../contexts/ThemeContext';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor } from '../../../utils/theme-helpers';
 import { useWallet } from '../../../hooks/useWallet';
 import { useWalletAuth } from '../../../hooks/useWalletAuth';
 import type { MasterKeyEntry, SubWalletEntry } from '../types';
@@ -22,7 +24,12 @@ import type { MasterKeyEntry, SubWalletEntry } from '../types';
 // =============================================================================
 
 export function WalletSelectionScreen(): React.JSX.Element {
-  const theme = useTheme();
+  const { themeMode } = useAppTheme();
+  const gradientColors = getGradientColors(themeMode);
+  const primaryTextColor = getPrimaryTextColor(themeMode);
+  const secondaryTextColor = getSecondaryTextColor(themeMode);
+  const iconColor = getIconColor(themeMode);
+
   const { masterKeys, activeWalletInfo } = useWallet();
   const { selectWallet, selectSubWallet, currentMasterKeyId } = useWalletAuth();
 
@@ -136,8 +143,8 @@ export function WalletSelectionScreen(): React.JSX.Element {
               <Text style={styles.masterKeyIconText}>🔑</Text>
             </View>
             <View style={styles.masterKeyTextContainer}>
-              <Text style={styles.masterKeyName}>{masterKey.nickname}</Text>
-              <Text style={styles.masterKeySubtitle}>
+              <Text style={[styles.masterKeyName, { color: primaryTextColor }]}>{masterKey.nickname}</Text>
+              <Text style={[styles.masterKeySubtitle, { color: secondaryTextColor }]}>
                 {masterKey.subWallets.length} sub-wallet
                 {masterKey.subWallets.length !== 1 ? 's' : ''}
               </Text>
@@ -146,7 +153,7 @@ export function WalletSelectionScreen(): React.JSX.Element {
 
           <IconButton
             icon={isExpanded ? 'chevron-up' : 'chevron-down'}
-            iconColor="rgba(255, 255, 255, 0.5)"
+            iconColor={iconColor}
             size={24}
           />
         </TouchableOpacity>
@@ -173,8 +180,8 @@ export function WalletSelectionScreen(): React.JSX.Element {
                     </Text>
                   </View>
                   <View>
-                    <Text style={styles.subWalletName}>{subWallet.nickname}</Text>
-                    <Text style={styles.subWalletIndex}>
+                    <Text style={[styles.subWalletName, { color: primaryTextColor }]}>{subWallet.nickname}</Text>
+                    <Text style={[styles.subWalletIndex, { color: secondaryTextColor }]}>
                       Index: {subWallet.index}
                     </Text>
                   </View>
@@ -224,8 +231,8 @@ export function WalletSelectionScreen(): React.JSX.Element {
     return (
       <View style={styles.pinModalOverlay}>
         <View style={styles.pinModalContent}>
-          <Text style={styles.pinModalTitle}>Enter PIN</Text>
-          <Text style={styles.pinModalSubtitle}>
+          <Text style={[styles.pinModalTitle, { color: primaryTextColor }]}>Enter PIN</Text>
+          <Text style={[styles.pinModalSubtitle, { color: secondaryTextColor }]}>
             Unlock {masterKey?.nickname || 'wallet'}
           </Text>
 
@@ -267,7 +274,7 @@ export function WalletSelectionScreen(): React.JSX.Element {
                     }}
                     disabled={key === ''}
                   >
-                    <Text style={styles.miniKeypadKeyText}>{key}</Text>
+                    <Text style={[styles.miniKeypadKeyText, { color: primaryTextColor }]}>{key}</Text>
                   </TouchableOpacity>
                 )
               )}
@@ -283,7 +290,7 @@ export function WalletSelectionScreen(): React.JSX.Element {
                 setError(null);
               }}
               style={styles.cancelPinButton}
-              labelStyle={styles.cancelPinButtonLabel}
+              labelStyle={[styles.cancelPinButtonLabel, { color: secondaryTextColor }]}
             >
               Cancel
             </Button>
@@ -309,7 +316,7 @@ export function WalletSelectionScreen(): React.JSX.Element {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
@@ -319,9 +326,9 @@ export function WalletSelectionScreen(): React.JSX.Element {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <IconButton icon="arrow-left" iconColor="#FFFFFF" size={24} />
+            <IconButton icon="arrow-left" iconColor={primaryTextColor} size={24} />
           </TouchableOpacity>
-          <Text style={styles.title}>Select Wallet</Text>
+          <Text style={[styles.title, { color: primaryTextColor }]}>Select Wallet</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -337,7 +344,7 @@ export function WalletSelectionScreen(): React.JSX.Element {
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateIcon}>📭</Text>
-            <Text style={styles.emptyStateText}>No wallets found</Text>
+            <Text style={[styles.emptyStateText, { color: secondaryTextColor }]}>No wallets found</Text>
             <Button
               mode="contained"
               onPress={() => router.push('/wallet/welcome')}
@@ -379,7 +386,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     flex: 1,
     textAlign: 'center',
   },
@@ -432,12 +438,10 @@ const styles = StyleSheet.create({
   masterKeyName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
     marginBottom: 2,
   },
   masterKeySubtitle: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.5)',
   },
   subWalletsContainer: {
     paddingHorizontal: 16,
@@ -477,11 +481,9 @@ const styles = StyleSheet.create({
   subWalletName: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#FFFFFF',
   },
   subWalletIndex: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.4)',
   },
   activeIndicator: {
     backgroundColor: '#4CAF50',
@@ -519,7 +521,6 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.6)',
     marginBottom: 24,
   },
   createWalletButton: {
@@ -546,13 +547,11 @@ const styles = StyleSheet.create({
   pinModalTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 8,
   },
   pinModalSubtitle: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.6)',
     textAlign: 'center',
     marginBottom: 24,
   },
@@ -607,7 +606,6 @@ const styles = StyleSheet.create({
   miniKeypadKeyText: {
     fontSize: 20,
     fontWeight: '500',
-    color: '#FFFFFF',
   },
   pinModalButtons: {
     flexDirection: 'row',
@@ -618,7 +616,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   cancelPinButtonLabel: {
-    color: 'rgba(255, 255, 255, 0.7)',
   },
   confirmPinButton: {
     flex: 1,

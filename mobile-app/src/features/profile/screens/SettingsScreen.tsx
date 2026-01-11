@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { TextInput, Button, Text, Card, List, Switch, Dialog, Portal } from 'react-native-paper';
+import { TextInput, Button, Text, Card, List, Switch, Dialog, Portal, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { router } from 'expo-router';
-import { useChangePassword, useDeleteAccount } from '../../../hooks';
+import { useChangePassword, useDeleteAccount, useSettings } from '../../../hooks';
 import { useLogout } from '../hooks';
+import { useAppTheme } from '../../../contexts/ThemeContext';
 
 interface PasswordFormData {
   currentPassword: string;
@@ -33,6 +34,7 @@ const passwordSchema = yup.object({
 });
 
 export function SettingsScreen(): React.JSX.Element {
+  const theme = useTheme();
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -40,9 +42,9 @@ export function SettingsScreen(): React.JSX.Element {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // App preferences (these would be stored in AsyncStorage in a real app)
-  const [notifications, setNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
+  // App preferences
+  const { settings, setTheme: saveTheme, setNotificationsEnabled } = useSettings();
+  const { themeMode, toggleTheme } = useAppTheme();
   const [autoSync, setAutoSync] = useState(true);
 
   const changePassword = useChangePassword();
@@ -137,6 +139,8 @@ export function SettingsScreen(): React.JSX.Element {
     );
   };
 
+  const styles = createStyles(theme);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -156,8 +160,8 @@ export function SettingsScreen(): React.JSX.Element {
                 description="Receive notifications about app updates"
                 right={() => (
                   <Switch
-                    value={notifications}
-                    onValueChange={setNotifications}
+                    value={settings?.notificationsEnabled ?? true}
+                    onValueChange={setNotificationsEnabled}
                   />
                 )}
               />
@@ -167,8 +171,8 @@ export function SettingsScreen(): React.JSX.Element {
                 description="Use dark theme throughout the app"
                 right={() => (
                   <Switch
-                    value={darkMode}
-                    onValueChange={setDarkMode}
+                    value={themeMode === 'dark'}
+                    onValueChange={toggleTheme}
                   />
                 )}
               />
@@ -366,10 +370,10 @@ export function SettingsScreen(): React.JSX.Element {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -383,20 +387,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
     fontWeight: 'bold',
+    color: theme.colors.onBackground,
   },
   card: {
     marginBottom: 16,
-    backgroundColor: 'white',
+    backgroundColor: theme.colors.surface,
   },
   sectionTitle: {
     marginBottom: 8,
     fontWeight: 'bold',
+    color: theme.colors.onSurface,
   },
   dangerText: {
     color: '#f44336',
   },
   errorBanner: {
-    backgroundColor: '#ffebee',
+    backgroundColor: theme.dark ? 'rgba(244, 67, 54, 0.1)' : '#ffebee',
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
@@ -404,14 +410,14 @@ const styles = StyleSheet.create({
     borderLeftColor: '#f44336',
   },
   errorText: {
-    color: '#c62828',
+    color: '#f44336',
     fontSize: 14,
   },
   inputContainer: {
     marginBottom: 16,
   },
   input: {
-    backgroundColor: 'white',
+    backgroundColor: theme.colors.surface,
   },
   fieldError: {
     color: '#f44336',

@@ -9,6 +9,8 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../../hooks/useSettings';
 import { useLanguage } from '../../../hooks/useLanguage';
+import { useAppTheme } from '../../../contexts/ThemeContext';
+import { getGradientColors, BRAND_COLOR, getPrimaryTextColor, getSecondaryTextColor } from '../../../utils/theme-helpers';
 
 // =============================================================================
 // Component
@@ -17,6 +19,11 @@ import { useLanguage } from '../../../hooks/useLanguage';
 export function WalletSettingsScreen(): React.JSX.Element {
   const { settings } = useSettings();
   const { t, language } = useLanguage();
+  const { themeMode, theme } = useAppTheme();
+
+  const gradientColors = getGradientColors(themeMode);
+  const primaryTextColor = getPrimaryTextColor(themeMode);
+  const secondaryTextColor = getSecondaryTextColor(themeMode);
 
   // Format currency display
   const getCurrencyDisplay = (): string => {
@@ -49,7 +56,7 @@ export function WalletSettingsScreen(): React.JSX.Element {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
@@ -57,18 +64,18 @@ export function WalletSettingsScreen(): React.JSX.Element {
         <View style={styles.header}>
           <IconButton
             icon="arrow-left"
-            iconColor="#FFFFFF"
+            iconColor={primaryTextColor}
             size={24}
             onPress={() => router.back()}
           />
-          <Text style={styles.headerTitle}>{t('settings')}</Text>
+          <Text style={[styles.headerTitle, { color: primaryTextColor }]}>{t('settings')}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
         <ScrollView style={styles.scrollView}>
           {/* Wallet Configuration */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Wallet Configuration</Text>
+            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>Wallet Configuration</Text>
 
             <List.Item
               title="Wallet Type"
@@ -81,11 +88,11 @@ export function WalletSettingsScreen(): React.JSX.Element {
                 <List.Icon {...props} icon="wallet" color="#FFC107" />
               )}
               right={(props) => (
-                <List.Icon {...props} icon="chevron-right" color="#666" />
+                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
               )}
               onPress={() => router.push('/wallet/settings/wallet-config')}
-              titleStyle={styles.listTitle}
-              descriptionStyle={styles.listDescription}
+              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
+              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
               style={styles.listItem}
             />
 
@@ -98,11 +105,11 @@ export function WalletSettingsScreen(): React.JSX.Element {
                 <List.Icon {...props} icon="currency-btc" color="#FFC107" />
               )}
               right={(props) => (
-                <List.Icon {...props} icon="chevron-right" color="#666" />
+                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
               )}
               onPress={() => router.push('/wallet/settings/amounts')}
-              titleStyle={styles.listTitle}
-              descriptionStyle={styles.listDescription}
+              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
+              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
               style={styles.listItem}
             />
 
@@ -115,18 +122,18 @@ export function WalletSettingsScreen(): React.JSX.Element {
                 <List.Icon {...props} icon="cash" color="#FFC107" />
               )}
               right={(props) => (
-                <List.Icon {...props} icon="chevron-right" color="#666" />
+                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
               )}
               onPress={() => router.push('/wallet/settings/currency')}
-              titleStyle={styles.listTitle}
-              descriptionStyle={styles.listDescription}
+              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
+              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
               style={styles.listItem}
             />
           </View>
 
           {/* Language & Region */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('language')}</Text>
+            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>{t('language')}</Text>
 
             <List.Item
               title={t('language')}
@@ -135,18 +142,18 @@ export function WalletSettingsScreen(): React.JSX.Element {
                 <List.Icon {...props} icon="translate" color="#FFC107" />
               )}
               right={(props) => (
-                <List.Icon {...props} icon="chevron-right" color="#666" />
+                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
               )}
               onPress={() => router.push('/wallet/settings/language')}
-              titleStyle={styles.listTitle}
-              descriptionStyle={styles.listDescription}
+              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
+              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
               style={styles.listItem}
             />
           </View>
 
           {/* Security */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('security')}</Text>
+            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>{t('security')}</Text>
 
             <List.Item
               title="Auto-Lock Timeout"
@@ -155,11 +162,11 @@ export function WalletSettingsScreen(): React.JSX.Element {
                 <List.Icon {...props} icon="timer" color="#FFC107" />
               )}
               right={(props) => (
-                <List.Icon {...props} icon="chevron-right" color="#666" />
+                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
               )}
               onPress={() => router.push('/wallet/settings/security')}
-              titleStyle={styles.listTitle}
-              descriptionStyle={styles.listDescription}
+              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
+              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
               style={styles.listItem}
             />
 
@@ -174,55 +181,18 @@ export function WalletSettingsScreen(): React.JSX.Element {
                 <List.Icon {...props} icon="fingerprint" color="#FFC107" />
               )}
               right={(props) => (
-                <List.Icon {...props} icon="chevron-right" color="#666" />
+                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
               )}
               onPress={() => router.push('/wallet/settings/security')}
-              titleStyle={styles.listTitle}
-              descriptionStyle={styles.listDescription}
-              style={styles.listItem}
-            />
-          </View>
-
-          {/* Domain & Blacklist */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Content Filtering</Text>
-
-            <List.Item
-              title="Domain Management"
-              description="Manage allowed domains for tips"
-              left={(props) => (
-                <List.Icon {...props} icon="web" color="#FFC107" />
-              )}
-              right={(props) => (
-                <List.Icon {...props} icon="chevron-right" color="#666" />
-              )}
-              onPress={() => router.push('/wallet/settings/domains')}
-              titleStyle={styles.listTitle}
-              descriptionStyle={styles.listDescription}
-              style={styles.listItem}
-            />
-
-            <Divider style={styles.divider} />
-
-            <List.Item
-              title="Blacklist"
-              description="Block specific LNURLs or addresses"
-              left={(props) => (
-                <List.Icon {...props} icon="block-helper" color="#FFC107" />
-              )}
-              right={(props) => (
-                <List.Icon {...props} icon="chevron-right" color="#666" />
-              )}
-              onPress={() => router.push('/wallet/settings/blacklist')}
-              titleStyle={styles.listTitle}
-              descriptionStyle={styles.listDescription}
+              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
+              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
               style={styles.listItem}
             />
           </View>
 
           {/* Backup & Recovery */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Backup & Recovery</Text>
+            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>Backup & Recovery</Text>
 
             <List.Item
               title="View Recovery Phrase"
@@ -231,18 +201,55 @@ export function WalletSettingsScreen(): React.JSX.Element {
                 <List.Icon {...props} icon="key" color="#FFC107" />
               )}
               right={(props) => (
-                <List.Icon {...props} icon="chevron-right" color="#666" />
+                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
               )}
               onPress={() => router.push('/wallet/settings/backup')}
-              titleStyle={styles.listTitle}
-              descriptionStyle={styles.listDescription}
+              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
+              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
+              style={styles.listItem}
+            />
+          </View>
+
+          {/* App Settings */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>App Settings</Text>
+
+            <List.Item
+              title="Theme"
+              description="Dark mode and display settings"
+              left={(props) => (
+                <List.Icon {...props} icon="theme-light-dark" color="#FFC107" />
+              )}
+              right={(props) => (
+                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
+              )}
+              onPress={() => router.push('/wallet/settings/theme')}
+              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
+              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
+              style={styles.listItem}
+            />
+
+            <Divider style={styles.divider} />
+
+            <List.Item
+              title="Notifications"
+              description="Manage notification preferences"
+              left={(props) => (
+                <List.Icon {...props} icon="bell" color="#FFC107" />
+              )}
+              right={(props) => (
+                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
+              )}
+              onPress={() => router.push('/wallet/settings/notifications')}
+              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
+              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
               style={styles.listItem}
             />
           </View>
 
           {/* About */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>About</Text>
+            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>About</Text>
 
             <List.Item
               title="Version"
@@ -250,8 +257,8 @@ export function WalletSettingsScreen(): React.JSX.Element {
               left={(props) => (
                 <List.Icon {...props} icon="information" color="#FFC107" />
               )}
-              titleStyle={styles.listTitle}
-              descriptionStyle={styles.listDescription}
+              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
+              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
               style={styles.listItem}
             />
           </View>

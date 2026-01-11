@@ -9,11 +9,18 @@ import {
   Vibration,
   Animated,
 } from 'react-native';
-import { Text, IconButton, useTheme } from 'react-native-paper';
+import { Text, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useWalletAuth } from '../../../hooks/useWalletAuth';
+import { useAppTheme } from '../../../contexts/ThemeContext';
+import {
+  getGradientColors,
+  getPrimaryTextColor,
+  getSecondaryTextColor,
+  BRAND_COLOR,
+} from '../../../utils/theme-helpers';
 
 // =============================================================================
 // Constants
@@ -32,7 +39,13 @@ const KEYPAD = [
 // =============================================================================
 
 export function PinEntryScreen(): React.JSX.Element {
-  const theme = useTheme();
+  const { themeMode } = useAppTheme();
+  
+  // Get theme colors
+  const gradientColors = getGradientColors(themeMode);
+  const primaryText = getPrimaryTextColor(themeMode);
+  const secondaryText = getSecondaryTextColor(themeMode);
+  
   // Get route params for wallet switching
   const params = useLocalSearchParams<{ masterKeyId?: string; subWalletIndex?: string }>();
   const targetMasterKeyId = params.masterKeyId;
@@ -203,15 +216,15 @@ export function PinEntryScreen(): React.JSX.Element {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Unlock Wallet</Text>
+          <Text style={[styles.title, { color: primaryText }]}>Unlock Wallet</Text>
           {activeWalletInfo && (
-            <Text style={styles.walletInfo}>
+            <Text style={[styles.walletInfo, { color: secondaryText }]}>
               {activeWalletInfo.masterKeyNickname} • {activeWalletInfo.subWalletNickname}
             </Text>
           )}
@@ -266,7 +279,7 @@ export function PinEntryScreen(): React.JSX.Element {
                       <IconButton
                         icon={getBiometricIcon()}
                         size={28}
-                        iconColor="#FFC107"
+                        iconColor={BRAND_COLOR}
                       />
                     </TouchableOpacity>
                   ) : (
@@ -286,7 +299,7 @@ export function PinEntryScreen(): React.JSX.Element {
                         icon="backspace-outline"
                         size={28}
                         iconColor={
-                          pin.length > 0 ? '#FFFFFF' : 'rgba(255, 255, 255, 0.3)'
+                          pin.length > 0 ? primaryText : secondaryText
                         }
                       />
                     </TouchableOpacity>
@@ -300,7 +313,7 @@ export function PinEntryScreen(): React.JSX.Element {
                     onPress={() => handleKeyPress(key)}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.keypadKeyText}>{key}</Text>
+                    <Text style={[styles.keypadKeyText, { color: primaryText }]}>{key}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -314,7 +327,7 @@ export function PinEntryScreen(): React.JSX.Element {
             style={styles.biometricLabel}
             onPress={handleBiometricUnlock}
           >
-            <Text style={styles.biometricLabelText}>{getBiometricLabel()}</Text>
+            <Text style={[styles.biometricLabelText, { color: BRAND_COLOR }]}>{getBiometricLabel()}</Text>
           </TouchableOpacity>
         )}
 
@@ -323,7 +336,7 @@ export function PinEntryScreen(): React.JSX.Element {
           style={styles.switchWalletButton}
           onPress={() => router.push('/wallet/select')}
         >
-          <Text style={styles.switchWalletText}>Switch Wallet</Text>
+          <Text style={[styles.switchWalletText, { color: secondaryText }]}>Switch Wallet</Text>
         </TouchableOpacity>
       </SafeAreaView>
     </LinearGradient>
@@ -350,12 +363,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     marginBottom: 8,
   },
   walletInfo: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.6)',
   },
   pinDisplayContainer: {
     alignItems: 'center',
@@ -411,14 +422,12 @@ const styles = StyleSheet.create({
   keypadKeyText: {
     fontSize: 28,
     fontWeight: '500',
-    color: '#FFFFFF',
   },
   biometricLabel: {
     alignSelf: 'center',
     padding: 12,
   },
   biometricLabelText: {
-    color: '#FFC107',
     fontSize: 16,
     fontWeight: '500',
   },
@@ -427,7 +436,6 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   switchWalletText: {
-    color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 14,
   },
 });

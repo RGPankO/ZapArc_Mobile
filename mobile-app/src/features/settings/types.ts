@@ -24,6 +24,7 @@ export interface UserSettings {
   defaultTippingAmounts: [number, number, number]; // Amounts when tipping others
 
   // App Behavior
+  theme: ThemeMode; // Light or dark theme
   biometricEnabled: boolean;
   autoLockTimeout: AutoLockTimeout; // In seconds
   notificationsEnabled: boolean;
@@ -36,6 +37,11 @@ export interface UserSettings {
  * Supported currency codes for display
  */
 export type CurrencyCode = 'sats' | 'btc' | 'usd' | 'eur' | 'bgn';
+
+/**
+ * Theme mode options
+ */
+export type ThemeMode = 'light' | 'dark';
 
 /**
  * Auto-lock timeout options (in seconds)
@@ -121,6 +127,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   useBuiltInWallet: true,
   defaultPostingAmounts: [100, 500, 1000],
   defaultTippingAmounts: [100, 500, 1000],
+  theme: 'dark', // Default to dark theme to match current app style
   biometricEnabled: false,
   autoLockTimeout: 900, // 15 minutes
   notificationsEnabled: true,

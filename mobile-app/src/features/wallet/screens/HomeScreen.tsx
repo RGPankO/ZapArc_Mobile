@@ -10,10 +10,12 @@ import {
   RefreshControl,
   Modal,
 } from 'react-native';
-import { Text, IconButton, useTheme, ActivityIndicator, Button, Divider } from 'react-native-paper';
+import { Text, IconButton, ActivityIndicator, Button, Divider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAppTheme } from '../../../contexts/ThemeContext';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor } from '../../../utils/theme-helpers';
 import { useWallet } from '../../../hooks/useWallet';
 import { useWalletAuth } from '../../../hooks/useWalletAuth';
 import { useSettings } from '../../../hooks/useSettings';
@@ -35,7 +37,6 @@ interface QuickActionProps {
 // =============================================================================
 
 export function HomeScreen(): React.JSX.Element {
-  const theme = useTheme();
   const {
     balance,
     transactions,
@@ -47,6 +48,12 @@ export function HomeScreen(): React.JSX.Element {
   } = useWallet();
   const { lock } = useWalletAuth();
   const { settings } = useSettings();
+
+  const { themeMode } = useAppTheme();
+  const gradientColors = getGradientColors(themeMode);
+  const primaryTextColor = getPrimaryTextColor(themeMode);
+  const secondaryTextColor = getSecondaryTextColor(themeMode);
+  const iconColor = getIconColor(themeMode);
 
   // State
   const [refreshing, setRefreshing] = useState(false);
@@ -129,6 +136,10 @@ export function HomeScreen(): React.JSX.Element {
     router.replace('/wallet/unlock');
   };
 
+  const handleSettings = (): void => {
+    router.push('/wallet/settings');
+  };
+
   // Render transaction item
   const renderTransaction = (tx: Transaction, index: number): React.JSX.Element => {
     const isReceived = tx.type === 'receive';
@@ -142,15 +153,15 @@ export function HomeScreen(): React.JSX.Element {
         onPress={() => setSelectedTransaction(tx)}
       >
         <View style={styles.transactionIcon}>
-          <Text style={styles.transactionIconText}>
+          <Text style={[styles.transactionIconText, { color: primaryTextColor }]}>
             {isReceived ? '↓' : '↑'}
           </Text>
         </View>
         <View style={styles.transactionInfo}>
-          <Text style={styles.transactionDescription} numberOfLines={1}>
+          <Text style={[styles.transactionDescription, { color: primaryTextColor }]} numberOfLines={1}>
             {tx.description || (isReceived ? 'Received' : 'Sent')}
           </Text>
-          <Text style={styles.transactionDate}>{date}</Text>
+          <Text style={[styles.transactionDate, { color: secondaryTextColor }]}>{date}</Text>
         </View>
         <Text
           style={[
@@ -166,7 +177,7 @@ export function HomeScreen(): React.JSX.Element {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container} edges={['top']}>
@@ -180,16 +191,16 @@ export function HomeScreen(): React.JSX.Element {
               <Text style={styles.walletIconText}>💰</Text>
             </View>
             <View>
-              <Text style={styles.walletName} numberOfLines={1}>
+              <Text style={[styles.walletName, { color: primaryTextColor }]} numberOfLines={1}>
                 {activeWalletInfo?.masterKeyNickname || 'Wallet'}
               </Text>
-              <Text style={styles.subWalletName} numberOfLines={1}>
+              <Text style={[styles.subWalletName, { color: secondaryTextColor }]} numberOfLines={1}>
                 {activeWalletInfo?.subWalletNickname || 'Main Wallet'}
               </Text>
             </View>
             <IconButton
               icon="chevron-down"
-              iconColor="rgba(255, 255, 255, 0.6)"
+              iconColor={iconColor}
               size={20}
             />
           </TouchableOpacity>
@@ -197,15 +208,21 @@ export function HomeScreen(): React.JSX.Element {
           <View style={styles.headerActions}>
             <IconButton
               icon="eye"
-              iconColor="rgba(255, 255, 255, 0.6)"
+              iconColor={iconColor}
               size={22}
               onPress={() => setShowBalance(!showBalance)}
             />
             <IconButton
               icon="lock"
-              iconColor="rgba(255, 255, 255, 0.6)"
+              iconColor={iconColor}
               size={22}
               onPress={handleLock}
+            />
+            <IconButton
+              icon="cog"
+              iconColor={iconColor}
+              size={22}
+              onPress={handleSettings}
             />
           </View>
         </View>
@@ -223,11 +240,11 @@ export function HomeScreen(): React.JSX.Element {
         >
           {/* Balance Card */}
           <View style={styles.balanceCard}>
-            <Text style={styles.balanceLabel}>Total Balance</Text>
+            <Text style={[styles.balanceLabel, { color: secondaryTextColor }]}>Total Balance</Text>
             {isLoading && !balance ? (
               <ActivityIndicator color="#FFC107" size="large" />
             ) : (
-              <Text style={styles.balanceAmount}>{formatBalance(balance)}</Text>
+              <Text style={[styles.balanceAmount, { color: primaryTextColor }]}>{formatBalance(balance)}</Text>
             )}
             {!showBalance && (
               <TouchableOpacity onPress={() => setShowBalance(true)}>
@@ -266,7 +283,7 @@ export function HomeScreen(): React.JSX.Element {
 
           {/* Recent Transactions */}
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Transactions</Text>
+            <Text style={[styles.sectionTitle, { color: primaryTextColor }]}>Recent Transactions</Text>
             <TouchableOpacity onPress={handleViewHistory}>
               <Text style={styles.seeAllButton}>See All</Text>
             </TouchableOpacity>
@@ -276,13 +293,13 @@ export function HomeScreen(): React.JSX.Element {
             {isLoading && transactions.length === 0 ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator color="#FFC107" />
-                <Text style={styles.loadingText}>Loading transactions...</Text>
+                <Text style={[styles.loadingText, { color: secondaryTextColor }]}>Loading transactions...</Text>
               </View>
             ) : transactions.length === 0 ? (
               <View style={styles.emptyTransactions}>
                 <Text style={styles.emptyIcon}>📭</Text>
-                <Text style={styles.emptyText}>No transactions yet</Text>
-                <Text style={styles.emptySubtext}>
+                <Text style={[styles.emptyText, { color: secondaryTextColor }]}>No transactions yet</Text>
+                <Text style={[styles.emptySubtext, { color: secondaryTextColor }]}>
                   Send or receive Bitcoin to get started
                 </Text>
               </View>
@@ -325,10 +342,10 @@ export function HomeScreen(): React.JSX.Element {
           <View style={styles.modalContent}>
             {/* Header */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Transaction Details</Text>
+              <Text style={[styles.modalTitle, { color: primaryTextColor }]}>Transaction Details</Text>
               <IconButton
                 icon="close"
-                iconColor="rgba(255, 255, 255, 0.6)"
+                iconColor={iconColor}
                 size={24}
                 onPress={() => setSelectedTransaction(null)}
               />
@@ -337,7 +354,7 @@ export function HomeScreen(): React.JSX.Element {
             {/* Amount */}
             <View style={styles.modalAmountContainer}>
               <View style={styles.modalIcon}>
-                <Text style={styles.modalIconText}>
+                <Text style={[styles.modalIconText, { color: primaryTextColor }]}>
                   {isReceived ? '↓' : '↑'}
                 </Text>
               </View>
@@ -351,12 +368,13 @@ export function HomeScreen(): React.JSX.Element {
               </Text>
               <Text style={[
                 styles.modalStatus,
+                { color: secondaryTextColor },
                 tx.status === 'completed' && styles.statusCompleted,
                 tx.status === 'pending' && styles.statusPending,
                 tx.status === 'failed' && styles.statusFailed,
               ]}>
-                {tx.status === 'completed' ? '✓ Completed' : 
-                 tx.status === 'pending' ? '⏳ Pending' : 
+                {tx.status === 'completed' ? '✓ Completed' :
+                 tx.status === 'pending' ? '⏳ Pending' :
                  tx.status === 'failed' ? '✕ Failed' : tx.status}
               </Text>
             </View>
@@ -388,7 +406,7 @@ export function HomeScreen(): React.JSX.Element {
               mode="outlined"
               onPress={() => setSelectedTransaction(null)}
               style={styles.closeModalButton}
-              labelStyle={styles.closeModalButtonLabel}
+              labelStyle={[styles.closeModalButtonLabel, { color: primaryTextColor }]}
             >
               Close
             </Button>
@@ -402,8 +420,8 @@ export function HomeScreen(): React.JSX.Element {
   function DetailRow({ label, value }: { label: string; value: string }): React.JSX.Element {
     return (
       <View style={styles.detailRow}>
-        <Text style={styles.detailLabel}>{label}</Text>
-        <Text style={styles.detailValue} numberOfLines={2}>
+        <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>{label}</Text>
+        <Text style={[styles.detailValue, { color: primaryTextColor }]} numberOfLines={2}>
           {value}
         </Text>
       </View>
@@ -421,12 +439,15 @@ function QuickAction({
   onPress,
   color = '#FFC107',
 }: QuickActionProps): React.JSX.Element {
+  const { themeMode } = useAppTheme();
+  const secondaryTextColor = getSecondaryTextColor(themeMode);
+
   return (
     <TouchableOpacity style={styles.quickAction} onPress={onPress}>
       <View style={[styles.quickActionIcon, { backgroundColor: `${color}20` }]}>
         <Text style={[styles.quickActionIconText, { color }]}>{icon}</Text>
       </View>
-      <Text style={styles.quickActionLabel}>{label}</Text>
+      <Text style={[styles.quickActionLabel, { color: secondaryTextColor }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -469,12 +490,10 @@ const styles = StyleSheet.create({
   walletName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
     maxWidth: 150,
   },
   subWalletName: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.5)',
     maxWidth: 150,
   },
   headerActions: {
@@ -496,13 +515,11 @@ const styles = StyleSheet.create({
   },
   balanceLabel: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.6)',
     marginBottom: 8,
   },
   balanceAmount: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#FFFFFF',
   },
   tapToReveal: {
     fontSize: 12,
@@ -532,7 +549,6 @@ const styles = StyleSheet.create({
   },
   quickActionLabel: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -543,7 +559,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#FFFFFF',
   },
   seeAllButton: {
     fontSize: 14,
@@ -560,7 +575,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 14,
   },
   emptyTransactions: {
@@ -573,12 +587,10 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
     marginBottom: 4,
   },
   emptySubtext: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.4)',
     textAlign: 'center',
   },
   transactionItem: {
@@ -599,19 +611,16 @@ const styles = StyleSheet.create({
   },
   transactionIconText: {
     fontSize: 18,
-    color: '#FFFFFF',
   },
   transactionInfo: {
     flex: 1,
   },
   transactionDescription: {
     fontSize: 14,
-    color: '#FFFFFF',
     marginBottom: 2,
   },
   transactionDate: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.4)',
   },
   transactionAmount: {
     fontSize: 14,
@@ -645,7 +654,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#FFFFFF',
   },
   modalAmountContainer: {
     alignItems: 'center',
@@ -662,7 +670,6 @@ const styles = StyleSheet.create({
   },
   modalIconText: {
     fontSize: 24,
-    color: '#FFFFFF',
   },
   modalAmount: {
     fontSize: 28,
@@ -671,7 +678,6 @@ const styles = StyleSheet.create({
   },
   modalStatus: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.6)',
   },
   statusCompleted: {
     color: '#4CAF50',
@@ -699,11 +705,9 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.5)',
   },
   detailValue: {
     fontSize: 14,
-    color: '#FFFFFF',
     textAlign: 'right',
     flex: 1,
     marginLeft: 16,
@@ -713,6 +717,5 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   closeModalButtonLabel: {
-    color: '#FFFFFF',
   },
 });

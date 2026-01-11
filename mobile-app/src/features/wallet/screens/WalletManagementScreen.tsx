@@ -22,6 +22,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAppTheme } from '../../../contexts/ThemeContext';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor } from '../../../utils/theme-helpers';
 import { useWallet } from '../../../hooks/useWallet';
 import { useWalletAuth } from '../../../hooks/useWalletAuth';
 import type { MasterKeyEntry, SubWalletEntry } from '../types';
@@ -56,6 +58,12 @@ export function WalletManagementScreen(): React.JSX.Element {
     isLoading,
   } = useWallet();
   const { activeWalletInfo, verifyPin, selectSubWallet } = useWalletAuth();
+
+  const { themeMode } = useAppTheme();
+  const gradientColors = getGradientColors(themeMode);
+  const primaryTextColor = getPrimaryTextColor(themeMode);
+  const secondaryTextColor = getSecondaryTextColor(themeMode);
+  const iconColor = getIconColor(themeMode);
 
   // State
   const [expandedMasterKeys, setExpandedMasterKeys] = useState<Set<string>>(
@@ -265,8 +273,8 @@ export function WalletManagementScreen(): React.JSX.Element {
               <Text style={styles.masterKeyIconText}>🔑</Text>
             </View>
             <View style={styles.masterKeyText}>
-              <Text style={styles.masterKeyName}>{masterKey.nickname}</Text>
-              <Text style={styles.masterKeySubtitle}>
+              <Text style={[styles.masterKeyName, { color: primaryTextColor }]}>{masterKey.nickname}</Text>
+              <Text style={[styles.masterKeySubtitle, { color: secondaryTextColor }]}>
                 {masterKey.subWallets.length} sub-wallet
                 {masterKey.subWallets.length !== 1 ? 's' : ''}
                 {masterKey.archivedSubWallets.length > 0 &&
@@ -275,7 +283,7 @@ export function WalletManagementScreen(): React.JSX.Element {
             </View>
             <IconButton
               icon={isExpanded ? 'chevron-up' : 'chevron-down'}
-              iconColor="rgba(255, 255, 255, 0.5)"
+              iconColor={secondaryTextColor}
               size={24}
             />
           </TouchableOpacity>
@@ -287,7 +295,7 @@ export function WalletManagementScreen(): React.JSX.Element {
             anchor={
               <IconButton
                 icon="dots-vertical"
-                iconColor="rgba(255, 255, 255, 0.6)"
+                iconColor={iconColor}
                 size={20}
                 onPress={() => setMenuVisible(masterKey.id)}
               />
@@ -332,7 +340,7 @@ export function WalletManagementScreen(): React.JSX.Element {
             {/* Archived Sub-Wallets */}
             {masterKey.archivedSubWallets.length > 0 && (
               <View style={styles.archivedSection}>
-                <Text style={styles.archivedLabel}>Archived</Text>
+                <Text style={[styles.archivedLabel, { color: secondaryTextColor }]}>Archived</Text>
                 {masterKey.archivedSubWallets.map((subWallet) =>
                   renderSubWallet(masterKey.id, subWallet, true)
                 )}
@@ -371,7 +379,7 @@ export function WalletManagementScreen(): React.JSX.Element {
                   Add Sub-Wallet
                 </Text>
                 {!canAddSub && (
-                  <Text style={styles.addSubWalletHint}>
+                  <Text style={[styles.addSubWalletHint, { color: secondaryTextColor }]}>
                     Last sub-wallet needs transaction history
                   </Text>
                 )}
@@ -425,12 +433,13 @@ export function WalletManagementScreen(): React.JSX.Element {
             <Text
               style={[
                 styles.subWalletName,
+                { color: primaryTextColor },
                 isArchived && styles.subWalletNameArchived,
               ]}
             >
               {subWallet.nickname}
             </Text>
-            <Text style={styles.subWalletIndex}>
+            <Text style={[styles.subWalletIndex, { color: secondaryTextColor }]}>
               Index: {subWallet.index}
               {subWallet.hasActivity === true && ' • Has activity'}
               {subWallet.hasActivity === false && ' • No activity'}
@@ -440,7 +449,7 @@ export function WalletManagementScreen(): React.JSX.Element {
 
         {isActive && (
           <View style={styles.activeIndicator}>
-            <Text style={styles.activeIndicatorText}>Active</Text>
+            <Text style={[styles.activeIndicatorText, { color: primaryTextColor }]}>Active</Text>
           </View>
         )}
 
@@ -448,7 +457,7 @@ export function WalletManagementScreen(): React.JSX.Element {
         {!isActive && !isArchived && subWallet.index !== 0 && (
           <IconButton
             icon="archive"
-            iconColor="rgba(255, 255, 255, 0.4)"
+            iconColor={secondaryTextColor}
             size={18}
             onPress={() => handleArchiveSubWallet(masterKeyId, subWallet.index)}
           />
@@ -489,12 +498,12 @@ export function WalletManagementScreen(): React.JSX.Element {
           }}
           style={styles.dialog}
         >
-          <Dialog.Title style={styles.dialogTitle}>Delete Wallet</Dialog.Title>
+          <Dialog.Title style={[styles.dialogTitle, { color: primaryTextColor }]}>Delete Wallet</Dialog.Title>
           <Dialog.Content>
             <Text style={styles.dialogWarning}>
               ⚠️ This action cannot be undone!
             </Text>
-            <Text style={styles.dialogText}>
+            <Text style={[styles.dialogText, { color: secondaryTextColor }]}>
               You are about to delete "{targetWallet?.nickname}". Make sure you
               have backed up your recovery phrase.
             </Text>
@@ -502,11 +511,11 @@ export function WalletManagementScreen(): React.JSX.Element {
             {error && <Text style={styles.dialogError}>{error}</Text>}
 
             <TextInput
-              style={styles.pinInputField}
+              style={[styles.pinInputField, { color: primaryTextColor }]}
               value={pinInput}
               onChangeText={setPinInput}
               placeholder="Enter PIN to confirm"
-              placeholderTextColor="rgba(255, 255, 255, 0.4)"
+              placeholderTextColor={secondaryTextColor}
               secureTextEntry
               keyboardType="numeric"
               maxLength={6}
@@ -520,7 +529,7 @@ export function WalletManagementScreen(): React.JSX.Element {
                 setPinInput('');
                 setError(null);
               }}
-              labelStyle={styles.cancelButtonLabel}
+              labelStyle={[styles.cancelButtonLabel, { color: secondaryTextColor }]}
             >
               Cancel
             </Button>
@@ -556,18 +565,18 @@ export function WalletManagementScreen(): React.JSX.Element {
           }}
           style={styles.dialog}
         >
-          <Dialog.Title style={styles.dialogTitle}>Name Your Sub-Wallet</Dialog.Title>
+          <Dialog.Title style={[styles.dialogTitle, { color: primaryTextColor }]}>Name Your Sub-Wallet</Dialog.Title>
           <Dialog.Content>
-            <Text style={styles.dialogText}>
+            <Text style={[styles.dialogText, { color: secondaryTextColor }]}>
               Choose a name for your new sub-wallet.
             </Text>
 
             <TextInput
-              style={styles.nameInputField}
+              style={[styles.nameInputField, { color: primaryTextColor }]}
               value={newName}
               onChangeText={setNewName}
               placeholder="Sub-Wallet name"
-              placeholderTextColor="rgba(255, 255, 255, 0.4)"
+              placeholderTextColor={secondaryTextColor}
               autoFocus
             />
           </Dialog.Content>
@@ -578,7 +587,7 @@ export function WalletManagementScreen(): React.JSX.Element {
                 setSelectedMasterKeyId(null);
                 setNewName('');
               }}
-              labelStyle={styles.cancelButtonLabel}
+              labelStyle={[styles.cancelButtonLabel, { color: secondaryTextColor }]}
             >
               Cancel
             </Button>
@@ -602,7 +611,7 @@ export function WalletManagementScreen(): React.JSX.Element {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
@@ -610,11 +619,11 @@ export function WalletManagementScreen(): React.JSX.Element {
         <View style={styles.header}>
           <IconButton
             icon="arrow-left"
-            iconColor="#FFFFFF"
+            iconColor={iconColor}
             size={24}
             onPress={() => router.back()}
           />
-          <Text style={styles.headerTitle}>Manage Wallets</Text>
+          <Text style={[styles.headerTitle, { color: primaryTextColor }]}>Manage Wallets</Text>
           <IconButton
             icon="plus"
             iconColor="#FFC107"
@@ -667,7 +676,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#FFFFFF',
   },
   scrollView: {
     flex: 1,
@@ -715,12 +723,10 @@ const styles = StyleSheet.create({
   masterKeyName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
     marginBottom: 2,
   },
   masterKeySubtitle: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.5)',
   },
   menuContent: {
     backgroundColor: '#1a1a2e',
@@ -773,14 +779,12 @@ const styles = StyleSheet.create({
   subWalletName: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#FFFFFF',
   },
   subWalletNameArchived: {
-    color: 'rgba(255, 255, 255, 0.5)',
+    opacity: 0.5,
   },
   subWalletIndex: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.4)',
   },
   activeIndicator: {
     backgroundColor: '#4CAF50',
@@ -791,7 +795,6 @@ const styles = StyleSheet.create({
   activeIndicatorText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#FFFFFF',
   },
   restoreButtonLabel: {
     color: '#FFC107',
@@ -803,7 +806,6 @@ const styles = StyleSheet.create({
   archivedLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.4)',
     marginBottom: 8,
     marginLeft: 24,
     textTransform: 'uppercase',
@@ -828,7 +830,6 @@ const styles = StyleSheet.create({
   },
   addSubWalletHint: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.3)',
     marginTop: 2,
   },
   loadingOverlay: {
@@ -845,7 +846,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a2e',
   },
   dialogTitle: {
-    color: '#FFFFFF',
   },
   dialogWarning: {
     color: '#F44336',
@@ -854,7 +854,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   dialogText: {
-    color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 16,
@@ -868,11 +867,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 8,
     padding: 12,
-    color: '#FFFFFF',
     fontSize: 16,
   },
   cancelButtonLabel: {
-    color: 'rgba(255, 255, 255, 0.6)',
   },
   deleteButtonLabel: {
     color: '#F44336',
@@ -881,7 +878,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 8,
     padding: 12,
-    color: '#FFFFFF',
     fontSize: 16,
     marginTop: 8,
   },

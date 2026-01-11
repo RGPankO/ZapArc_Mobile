@@ -15,6 +15,9 @@ export * from './useLanguage';
 // Settings
 export * from './useSettings';
 
+// Theme
+export * from './useTheme';
+
 // Offline and sync
 export * from './useOfflineSync';
 

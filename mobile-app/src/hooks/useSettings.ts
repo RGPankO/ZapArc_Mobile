@@ -10,6 +10,7 @@ import type {
   CurrencyCode,
   AutoLockTimeout,
   SocialPlatform,
+  ThemeMode,
 } from '../features/settings/types';
 
 // =============================================================================
@@ -35,6 +36,7 @@ export interface SettingsActions {
 
   // Individual setting updates
   setCurrency: (currency: CurrencyCode) => Promise<void>;
+  setTheme: (theme: ThemeMode) => Promise<void>;
   setAutoLockTimeout: (timeout: AutoLockTimeout) => Promise<void>;
   setBiometricEnabled: (enabled: boolean) => Promise<void>;
   setNotificationsEnabled: (enabled: boolean) => Promise<void>;
@@ -162,6 +164,13 @@ export function useSettings(): SettingsState & SettingsActions {
   const setAutoLockTimeout = useCallback(
     async (timeout: AutoLockTimeout): Promise<void> => {
       await updateSettings({ autoLockTimeout: timeout });
+    },
+    [updateSettings]
+  );
+
+  const setTheme = useCallback(
+    async (theme: ThemeMode): Promise<void> => {
+      await updateSettings({ theme });
     },
     [updateSettings]
   );
@@ -373,6 +382,7 @@ export function useSettings(): SettingsState & SettingsActions {
 
     // Individual Settings
     setCurrency,
+    setTheme,
     setAutoLockTimeout,
     setBiometricEnabled,
     setNotificationsEnabled,

@@ -1,22 +1,9 @@
 import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
-import { PaperProvider, MD3LightTheme, MD3DarkTheme } from 'react-native-paper';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '../src/lib/queryClient';
 import { initializeDeepLinking } from '../src/utils/deepLinking';
-
-// Custom theme to fix TextInput label clipping issue
-const customTheme = {
-  ...MD3DarkTheme,
-  colors: {
-    ...MD3DarkTheme.colors,
-    // Ensure label has proper background to prevent clipping
-    background: '#1a1a2e',
-    surface: '#1a1a2e',
-    surfaceVariant: 'rgba(255, 255, 255, 0.05)',
-  },
-  roundness: 8,
-};
+import { ThemeProvider } from '../src/contexts/ThemeContext';
 
 export default function RootLayout(): React.JSX.Element {
   useEffect(() => {
@@ -26,7 +13,7 @@ export default function RootLayout(): React.JSX.Element {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <PaperProvider theme={customTheme}>
+      <ThemeProvider>
         <Stack
           screenOptions={{
             headerShown: false,
@@ -55,7 +42,7 @@ export default function RootLayout(): React.JSX.Element {
           />
           <Stack.Screen name="(main)" options={{ headerShown: false }} />
         </Stack>
-      </PaperProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

@@ -8,13 +8,27 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useWallet } from '../../../hooks/useWallet';
+import { useAppTheme } from '../../../contexts/ThemeContext';
+import {
+  getGradientColors,
+  getPrimaryTextColor,
+  getSecondaryTextColor,
+  BRAND_COLOR,
+} from '../../../utils/theme-helpers';
 
 // Lightning bolt icon placeholder - in production, use actual asset
 const LIGHTNING_ICON = '⚡';
 
 export function WalletWelcomeScreen(): React.JSX.Element {
   const { activeMasterKey, addSubWallet, canAddSubWallet } = useWallet();
-  
+  const { themeMode, theme } = useAppTheme();
+
+  // Get theme colors
+  const gradientColors = getGradientColors(themeMode);
+  const primaryText = getPrimaryTextColor(themeMode);
+  const secondaryText = getSecondaryTextColor(themeMode);
+  const dialogBg = theme.colors.surface;
+
   // State for Add Sub-Wallet modal
   const [showAddSubWalletModal, setShowAddSubWalletModal] = useState(false);
   const [subWalletName, setSubWalletName] = useState('');
@@ -59,22 +73,22 @@ export function WalletWelcomeScreen(): React.JSX.Element {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
         <View style={styles.content}>
           {/* Hero Section */}
           <View style={styles.heroSection}>
-            <View style={styles.iconContainer}>
+            <View style={[styles.iconContainer, { borderColor: BRAND_COLOR }]}>
               <Text style={styles.lightningIcon}>{LIGHTNING_ICON}</Text>
             </View>
             
-            <Text style={styles.title}>
+            <Text style={[styles.title, { color: primaryText }]}>
               {activeMasterKey ? 'Set Up Your Wallet' : 'Zap Arc'}
             </Text>
-            <Text style={styles.subtitle}>
-              {activeMasterKey 
+            <Text style={[styles.subtitle, { color: secondaryText }]}>
+              {activeMasterKey
                 ? 'Choose how you want to set up your wallet'
                 : 'Your Lightning Network Wallet'}
             </Text>
@@ -95,9 +109,9 @@ export function WalletWelcomeScreen(): React.JSX.Element {
             <Button
               mode="outlined"
               onPress={handleImportWallet}
-              style={styles.importButton}
+              style={[styles.importButton, { borderColor: secondaryText }]}
               contentStyle={styles.buttonContent}
-              labelStyle={styles.importButtonLabel}
+              labelStyle={[styles.importButtonLabel, { color: primaryText }]}
             >
               Import Existing Wallet
             </Button>
@@ -110,11 +124,13 @@ export function WalletWelcomeScreen(): React.JSX.Element {
                 disabled={!canAdd}
                 style={[
                   styles.addSubWalletButton,
+                  { borderColor: canAdd ? BRAND_COLOR : secondaryText },
                   !canAdd && styles.addSubWalletButtonDisabled,
                 ]}
                 contentStyle={styles.buttonContent}
                 labelStyle={[
                   styles.addSubWalletButtonLabel,
+                  { color: canAdd ? BRAND_COLOR : secondaryText },
                   !canAdd && styles.addSubWalletButtonLabelDisabled,
                 ]}
               >
@@ -123,7 +139,7 @@ export function WalletWelcomeScreen(): React.JSX.Element {
             )}
             
             {activeMasterKey && (
-              <Text style={styles.currentWalletHint}>
+              <Text style={[styles.currentWalletHint, { color: secondaryText }]}>
                 Current wallet: {activeMasterKey.nickname}
               </Text>
             )}
@@ -135,7 +151,7 @@ export function WalletWelcomeScreen(): React.JSX.Element {
               mode="text"
               onPress={() => router.back()}
               style={styles.backButton}
-              labelStyle={styles.backButtonLabel}
+              labelStyle={[styles.backButtonLabel, { color: secondaryText }]}
             >
               Back
             </Button>
@@ -144,7 +160,7 @@ export function WalletWelcomeScreen(): React.JSX.Element {
           {/* Footer - only show if not logged in */}
           {!activeMasterKey && (
             <View style={styles.footer}>
-              <Text style={styles.footerText}>
+              <Text style={[styles.footerText, { color: secondaryText }]}>
                 By continuing, you agree to our Terms of Service
               </Text>
             </View>
@@ -156,29 +172,29 @@ export function WalletWelcomeScreen(): React.JSX.Element {
           <Dialog
             visible={showAddSubWalletModal}
             onDismiss={() => setShowAddSubWalletModal(false)}
-            style={styles.dialog}
+            style={[styles.dialog, { backgroundColor: dialogBg }]}
           >
-            <Dialog.Title style={styles.dialogTitle}>
+            <Dialog.Title style={[styles.dialogTitle, { color: primaryText }]}>
               Name Your Sub-Wallet
             </Dialog.Title>
             <Dialog.Content>
-              <Text style={styles.dialogText}>
+              <Text style={[styles.dialogText, { color: secondaryText }]}>
                 Create a new sub-wallet under "{activeMasterKey?.nickname}"
               </Text>
-              
+
               <RNTextInput
-                style={styles.nameInput}
+                style={[styles.nameInput, { color: primaryText }]}
                 value={subWalletName}
                 onChangeText={setSubWalletName}
                 placeholder="Sub-Wallet name"
-                placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                placeholderTextColor={secondaryText}
                 autoFocus
               />
             </Dialog.Content>
             <Dialog.Actions>
               <Button
                 onPress={() => setShowAddSubWalletModal(false)}
-                labelStyle={styles.cancelButtonLabel}
+                labelStyle={[styles.cancelButtonLabel, { color: secondaryText }]}
               >
                 Cancel
               </Button>
@@ -186,7 +202,6 @@ export function WalletWelcomeScreen(): React.JSX.Element {
                 onPress={handleConfirmAddSubWallet}
                 disabled={!subWalletName.trim() || isAdding}
                 loading={isAdding}
-                labelStyle={styles.primaryButtonLabel}
               >
                 Create
               </Button>
@@ -224,7 +239,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
     borderWidth: 2,
-    borderColor: '#FFC107',
   },
   lightningIcon: {
     fontSize: 48,
@@ -232,13 +246,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
   },
   featuresContainer: {
@@ -262,12 +274,10 @@ const styles = StyleSheet.create({
   featureTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
     marginBottom: 4,
   },
   featureDescription: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.6)',
   },
   buttonContainer: {
     gap: 16,
@@ -286,13 +296,11 @@ const styles = StyleSheet.create({
   },
   importButton: {
     borderRadius: 12,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
     borderWidth: 1,
   },
   importButtonLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
   },
   footer: {
     alignItems: 'center',
@@ -300,46 +308,32 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.4)',
     textAlign: 'center',
   },
   addSubWalletButton: {
     borderRadius: 12,
-    borderColor: '#FFC107',
     borderWidth: 1,
   },
   addSubWalletButtonDisabled: {
-    borderColor: 'rgba(255, 255, 255, 0.2)',
     opacity: 0.5,
   },
   addSubWalletButtonLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFC107',
   },
-  addSubWalletButtonLabelDisabled: {
-    color: 'rgba(255, 255, 255, 0.4)',
-  },
+  addSubWalletButtonLabelDisabled: {},
   currentWalletHint: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.5)',
     textAlign: 'center',
     marginTop: 8,
   },
   backButton: {
     marginTop: 16,
   },
-  backButtonLabel: {
-    color: 'rgba(255, 255, 255, 0.6)',
-  },
-  dialog: {
-    backgroundColor: '#1a1a2e',
-  },
-  dialogTitle: {
-    color: '#FFFFFF',
-  },
+  backButtonLabel: {},
+  dialog: {},
+  dialogTitle: {},
   dialogText: {
-    color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 14,
     marginBottom: 16,
   },
@@ -347,13 +341,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 8,
     padding: 12,
-    color: '#FFFFFF',
     fontSize: 16,
   },
-  cancelButtonLabel: {
-    color: 'rgba(255, 255, 255, 0.6)',
-  },
-  primaryButtonLabel: {
-    color: '#FFC107',
-  },
+  cancelButtonLabel: {},
+  primaryButtonLabel: {},
 });

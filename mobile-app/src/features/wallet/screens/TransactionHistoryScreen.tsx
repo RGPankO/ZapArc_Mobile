@@ -14,6 +14,8 @@ import { Text, IconButton, Chip, Button, Divider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAppTheme } from '../../../contexts/ThemeContext';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor } from '../../../utils/theme-helpers';
 import { useWallet } from '../../../hooks/useWallet';
 import type { Transaction } from '../types';
 
@@ -29,6 +31,12 @@ type FilterType = 'all' | 'sent' | 'received';
 
 export function TransactionHistoryScreen(): React.JSX.Element {
   const { transactions, refreshTransactions, isLoading } = useWallet();
+
+  const { themeMode } = useAppTheme();
+  const gradientColors = getGradientColors(themeMode);
+  const primaryTextColor = getPrimaryTextColor(themeMode);
+  const secondaryTextColor = getSecondaryTextColor(themeMode);
+  const iconColor = getIconColor(themeMode);
 
   // State
   const [filter, setFilter] = useState<FilterType>('all');
@@ -105,16 +113,16 @@ export function TransactionHistoryScreen(): React.JSX.Element {
             isReceived ? styles.iconReceived : styles.iconSent,
           ]}
         >
-          <Text style={styles.transactionIconText}>
+          <Text style={[styles.transactionIconText, { color: primaryTextColor }]}>
             {isReceived ? '↓' : '↑'}
           </Text>
         </View>
 
         <View style={styles.transactionInfo}>
-          <Text style={styles.transactionDescription} numberOfLines={1}>
+          <Text style={[styles.transactionDescription, { color: primaryTextColor }]} numberOfLines={1}>
             {tx.description || (isReceived ? 'Received payment' : 'Sent payment')}
           </Text>
-          <Text style={styles.transactionTime}>{formatTime(tx.timestamp)}</Text>
+          <Text style={[styles.transactionTime, { color: secondaryTextColor }]}>{formatTime(tx.timestamp)}</Text>
         </View>
 
         <View style={styles.transactionAmountContainer}>
@@ -126,7 +134,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
           >
             {isReceived ? '+' : '-'}{(tx.amount ?? 0).toLocaleString()}
           </Text>
-          <Text style={styles.transactionAmountUnit}>sats</Text>
+          <Text style={[styles.transactionAmountUnit, { color: secondaryTextColor }]}>sats</Text>
         </View>
       </TouchableOpacity>
     );
@@ -135,7 +143,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
   // Render section header
   const renderSectionHeader = (date: string): React.JSX.Element => (
     <View style={styles.sectionHeader}>
-      <Text style={styles.sectionHeaderText}>{date}</Text>
+      <Text style={[styles.sectionHeaderText, { color: secondaryTextColor }]}>{date}</Text>
     </View>
   );
 
@@ -158,10 +166,10 @@ export function TransactionHistoryScreen(): React.JSX.Element {
           <View style={styles.modalContent}>
             {/* Header */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Transaction Details</Text>
+              <Text style={[styles.modalTitle, { color: primaryTextColor }]}>Transaction Details</Text>
               <IconButton
                 icon="close"
-                iconColor="rgba(255, 255, 255, 0.6)"
+                iconColor={iconColor}
                 size={24}
                 onPress={() => setSelectedTransaction(null)}
               />
@@ -175,7 +183,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
                   isReceived ? styles.iconReceived : styles.iconSent,
                 ]}
               >
-                <Text style={styles.modalIconText}>
+                <Text style={[styles.modalIconText, { color: primaryTextColor }]}>
                   {isReceived ? '↓' : '↑'}
                 </Text>
               </View>
@@ -227,7 +235,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
               mode="outlined"
               onPress={() => setSelectedTransaction(null)}
               style={styles.closeModalButton}
-              labelStyle={styles.closeModalButtonLabel}
+              labelStyle={[styles.closeModalButtonLabel, { color: primaryTextColor }]}
             >
               Close
             </Button>
@@ -239,7 +247,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
@@ -247,11 +255,11 @@ export function TransactionHistoryScreen(): React.JSX.Element {
         <View style={styles.header}>
           <IconButton
             icon="arrow-left"
-            iconColor="#FFFFFF"
+            iconColor={iconColor}
             size={24}
             onPress={() => router.back()}
           />
-          <Text style={styles.headerTitle}>Transaction History</Text>
+          <Text style={[styles.headerTitle, { color: primaryTextColor }]}>Transaction History</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -296,8 +304,8 @@ export function TransactionHistoryScreen(): React.JSX.Element {
         {filteredTransactions.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>📭</Text>
-            <Text style={styles.emptyTitle}>No Transactions</Text>
-            <Text style={styles.emptySubtitle}>
+            <Text style={[styles.emptyTitle, { color: primaryTextColor }]}>No Transactions</Text>
+            <Text style={[styles.emptySubtitle, { color: secondaryTextColor }]}>
               {filter === 'all'
                 ? 'Your transaction history will appear here'
                 : `No ${filter} transactions found`}
@@ -345,6 +353,11 @@ interface DetailRowProps {
 }
 
 function DetailRow({ label, value, copyable, fullValue }: DetailRowProps): React.JSX.Element {
+  const { themeMode } = useAppTheme();
+  const primaryTextColor = getPrimaryTextColor(themeMode);
+  const secondaryTextColor = getSecondaryTextColor(themeMode);
+  const iconColor = getIconColor(themeMode);
+
   const handleCopy = (): void => {
     // TODO: Implement clipboard copy
     console.log('Copy:', fullValue || value);
@@ -352,15 +365,15 @@ function DetailRow({ label, value, copyable, fullValue }: DetailRowProps): React
 
   return (
     <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>{label}</Text>
       <View style={styles.detailValueContainer}>
-        <Text style={styles.detailValue} numberOfLines={1}>
+        <Text style={[styles.detailValue, { color: primaryTextColor }]} numberOfLines={1}>
           {value}
         </Text>
         {copyable && (
           <IconButton
             icon="content-copy"
-            iconColor="rgba(255, 255, 255, 0.5)"
+            iconColor={iconColor}
             size={16}
             onPress={handleCopy}
             style={styles.copyButton}
@@ -392,7 +405,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#FFFFFF',
   },
   headerSpacer: {
     width: 48,
@@ -429,7 +441,6 @@ const styles = StyleSheet.create({
   sectionHeaderText: {
     fontSize: 13,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.5)',
     textTransform: 'uppercase',
   },
   transactionItem: {
@@ -456,19 +467,16 @@ const styles = StyleSheet.create({
   },
   transactionIconText: {
     fontSize: 18,
-    color: '#FFFFFF',
   },
   transactionInfo: {
     flex: 1,
   },
   transactionDescription: {
     fontSize: 15,
-    color: '#FFFFFF',
     marginBottom: 2,
   },
   transactionTime: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.4)',
   },
   transactionAmountContainer: {
     alignItems: 'flex-end',
@@ -485,7 +493,6 @@ const styles = StyleSheet.create({
   },
   transactionAmountUnit: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.4)',
   },
   emptyContainer: {
     flex: 1,
@@ -500,12 +507,10 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#FFFFFF',
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.5)',
     textAlign: 'center',
   },
   modalOverlay: {
@@ -529,7 +534,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#FFFFFF',
   },
   modalAmountContainer: {
     alignItems: 'center',
@@ -545,7 +549,6 @@ const styles = StyleSheet.create({
   },
   modalIconText: {
     fontSize: 24,
-    color: '#FFFFFF',
   },
   modalAmount: {
     fontSize: 28,
@@ -573,7 +576,6 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.5)',
   },
   detailValueContainer: {
     flexDirection: 'row',
@@ -583,7 +585,6 @@ const styles = StyleSheet.create({
   },
   detailValue: {
     fontSize: 14,
-    color: '#FFFFFF',
     textAlign: 'right',
     maxWidth: '80%',
   },
@@ -596,6 +597,5 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   closeModalButtonLabel: {
-    color: '#FFFFFF',
   },
 });
