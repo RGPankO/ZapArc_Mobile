@@ -56,20 +56,6 @@ export function WalletSettingsScreen(): React.JSX.Element {
     }
   };
 
-  // Format auto-lock display
-  const getAutoLockDisplay = (): string => {
-    if (!settings) return `15 ${t('common.minutes')}`;
-
-    try {
-      const timeout = settings.autoLockTimeout || 900;
-      if (timeout < 60) return `${timeout} ${t('common.seconds')}`;
-      return `${timeout / 60} ${t('common.minutes')}`;
-    } catch (err) {
-      console.error('❌ [WalletSettings] getAutoLockDisplay error:', err);
-      return `15 ${t('common.minutes')}`;
-    }
-  };
-
   // Show loading state if settings not loaded yet
   if (settingsLoading || !settings) {
     return (
@@ -109,6 +95,60 @@ export function WalletSettingsScreen(): React.JSX.Element {
         </View>
 
         <ScrollView style={styles.scrollView}>
+          {/* App Settings - MOVED TO TOP */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>{t('settings.appSettings')}</Text>
+
+            <List.Item
+              title={t('settings.language')}
+              description={getLanguageDisplay()}
+              left={(props) => (
+                <List.Icon {...props} icon="translate" color="#FFC107" />
+              )}
+              right={(props) => (
+                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
+              )}
+              onPress={() => router.push('/wallet/settings/language')}
+              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
+              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
+              style={styles.listItem}
+            />
+
+            <Divider style={styles.divider} />
+
+            <List.Item
+              title={t('settings.theme')}
+              description={t('settings.darkModeSettings')}
+              left={(props) => (
+                <List.Icon {...props} icon="theme-light-dark" color="#FFC107" />
+              )}
+              right={(props) => (
+                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
+              )}
+              onPress={() => router.push('/wallet/settings/theme')}
+              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
+              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
+              style={styles.listItem}
+            />
+
+            <Divider style={styles.divider} />
+
+            <List.Item
+              title={t('settings.notifications')}
+              description={t('settings.manageNotifications')}
+              left={(props) => (
+                <List.Icon {...props} icon="bell" color="#FFC107" />
+              )}
+              right={(props) => (
+                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
+              )}
+              onPress={() => router.push('/wallet/settings/notifications')}
+              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
+              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
+              style={styles.listItem}
+            />
+          </View>
+
           {/* Wallet Configuration */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>{t('settings.walletConfiguration')}</Text>
@@ -167,46 +207,9 @@ export function WalletSettingsScreen(): React.JSX.Element {
             />
           </View>
 
-          {/* Language & Region */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>{t('settings.languageRegion')}</Text>
-
-            <List.Item
-              title={t('settings.language')}
-              description={getLanguageDisplay()}
-              left={(props) => (
-                <List.Icon {...props} icon="translate" color="#FFC107" />
-              )}
-              right={(props) => (
-                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
-              )}
-              onPress={() => router.push('/wallet/settings/language')}
-              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
-              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
-              style={styles.listItem}
-            />
-          </View>
-
-          {/* Security */}
+          {/* Security - Removed Auto-Lock */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>{t('settings.security')}</Text>
-
-            <List.Item
-              title={t('settings.autoLockTimeout')}
-              description={getAutoLockDisplay()}
-              left={(props) => (
-                <List.Icon {...props} icon="timer" color="#FFC107" />
-              )}
-              right={(props) => (
-                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
-              )}
-              onPress={() => router.push('/wallet/settings/security')}
-              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
-              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
-              style={styles.listItem}
-            />
-
-            <Divider style={styles.divider} />
 
             <List.Item
               title={t('settings.biometric')}
@@ -240,60 +243,6 @@ export function WalletSettingsScreen(): React.JSX.Element {
                 <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
               )}
               onPress={() => router.push('/wallet/settings/backup')}
-              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
-              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
-              style={styles.listItem}
-            />
-          </View>
-
-          {/* App Settings */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>{t('settings.appSettings')}</Text>
-
-            <List.Item
-              title={t('settings.theme')}
-              description={t('settings.darkModeSettings')}
-              left={(props) => (
-                <List.Icon {...props} icon="theme-light-dark" color="#FFC107" />
-              )}
-              right={(props) => (
-                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
-              )}
-              onPress={() => router.push('/wallet/settings/theme')}
-              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
-              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
-              style={styles.listItem}
-            />
-
-            <Divider style={styles.divider} />
-
-            <List.Item
-              title={t('settings.notifications')}
-              description={t('settings.manageNotifications')}
-              left={(props) => (
-                <List.Icon {...props} icon="bell" color="#FFC107" />
-              )}
-              right={(props) => (
-                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
-              )}
-              onPress={() => router.push('/wallet/settings/notifications')}
-              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
-              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
-              style={styles.listItem}
-            />
-
-            <Divider style={styles.divider} />
-
-            <List.Item
-              title={t('settings.language')}
-              description={`${t('settings.english')}, ${t('settings.bulgarian')}`}
-              left={(props) => (
-                <List.Icon {...props} icon="translate" color="#FFC107" />
-              )}
-              right={(props) => (
-                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
-              )}
-              onPress={() => router.push('/wallet/settings/language')}
               titleStyle={[styles.listTitle, { color: primaryTextColor }]}
               descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
               style={styles.listItem}
