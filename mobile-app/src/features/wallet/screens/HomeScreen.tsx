@@ -20,6 +20,7 @@ import { useWallet } from '../../../hooks/useWallet';
 import { useWalletAuth } from '../../../hooks/useWalletAuth';
 import { useSettings } from '../../../hooks/useSettings';
 import { useLanguage } from '../../../hooks/useLanguage';
+import { onPaymentReceived } from '../../../services/breezSparkService';
 import type { Transaction } from '../types';
 
 // =============================================================================
@@ -110,6 +111,31 @@ export function HomeScreen(): React.JSX.Element {
       Promise.all([refreshBalance(), refreshTransactions()]);
     }
   }, [isConnected, activeWalletInfo?.masterKeyId, activeWalletInfo?.subWalletIndex, refreshBalance, refreshTransactions]);
+
+  // Subscribe to payment events for real-time balance updates
+  useEffect(() => {
+    const unsubscribe = onPaymentReceived((payment) => {
+      // Check if this is a sync event or a real payment
+      const isSyncEvent = payment.description === '__SYNC_EVENT__';
+      
+      if (isSyncEvent) {
+        console.log('🔄 [HomeScreen] SDK sync event - refreshing...');
+      } else {
+        console.log('💰 [HomeScreen] Payment received - refreshing...', {
+          amount: payment.amountSat,
+          type: payment.type,
+        });
+      }
+      
+      // Refresh balance and transactions
+      refreshBalance();
+      refreshTransactions();
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [refreshBalance, refreshTransactions]);
 
   // Refresh transactions when screen comes into focus
   // This ensures the transaction list updates when returning from payment screen

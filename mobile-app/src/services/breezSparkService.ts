@@ -7,6 +7,7 @@
 // It will NOT work in Expo Go (native modules not available)
 
 import { BREEZ_API_KEY, BREEZ_STORAGE_DIR } from '../config';
+import { sendPaymentReceivedNotification } from './notificationService';
 
 // =============================================================================
 // Types
@@ -190,9 +191,15 @@ export async function initializeSDK(
 
     _isInitialized = true;
     
-    // NOTE: Event listeners DISABLED - addEventListener causes uncatchable native crashes
-    // TODO: Revisit when Breez SDK Spark has proper event listener documentation
-    // For now, users must pull-to-refresh to see new transactions
+    // Setup event listeners for real-time payment notifications
+    // Based on: https://sdk-doc-spark.breez.technology/guide/events.html
+    try {
+      await setupEventListeners();
+      console.log('✅ [BreezSparkService] Event listeners configured');
+    } catch (eventError) {
+      console.warn('⚠️ [BreezSparkService] Event listeners failed (non-fatal):', eventError);
+      // Don't fail SDK init if events don't work - user can still pull-to-refresh
+    }
     
     console.log('✅ [BreezSparkService] Breez SDK initialized successfully');
     console.log('✅ [BreezSparkService] sdkInstance:', !!sdkInstance);
@@ -267,77 +274,123 @@ export function onPaymentReceived(callback: PaymentEventCallback): () => void {
 
 /**
  * Setup SDK event listeners
- * Called internally after SDK initialization
+ * Based on: https://sdk-doc-spark.breez.technology/guide/events.html
  */
 async function setupEventListeners(): Promise<void> {
-  if (!sdkInstance || !_isNativeAvailable || !BreezSDK) return;
+  if (!sdkInstance || !_isNativeAvailable) return;
 
   try {
-    // Log available methods for debugging
-    console.log('🔵 [BreezSparkService] sdkInstance methods:', Object.keys(sdkInstance || {}).slice(0, 30));
-    console.log('🔵 [BreezSparkService] BreezSDK methods:', Object.keys(BreezSDK || {}).slice(0, 30));
-    
     // Unsubscribe from previous listener if exists
     if (eventListenerUnsubscribe) {
       try {
-        eventListenerUnsubscribe();
+        await sdkInstance.removeEventListener(eventListenerUnsubscribe);
       } catch (e) {
-        console.warn('⚠️ [BreezSparkService] Error unsubscribing:', e);
+        console.warn('⚠️ [BreezSparkService] Error removing listener:', e);
       }
       eventListenerUnsubscribe = null;
     }
 
-    // Event handler function
-    const handleEvent = (event: unknown): void => {
-      try {
-        const evt = event as { type?: string; details?: Record<string, unknown> };
-        console.log('📡 [BreezSparkService] SDK Event received:', evt?.type || 'unknown');
-
-        // Handle payment received event
-        if (evt?.type === 'paymentSucceeded' || evt?.type === 'invoicePaid' || evt?.type === 'PaymentSucceeded') {
-          const payment: TransactionInfo = {
-            id: String(evt.details?.paymentId || Date.now()),
-            type: 'receive',
-            amountSat: Number(evt.details?.amountSat || 0),
-            feeSat: Number(evt.details?.feeSat || 0),
-            status: 'completed',
-            timestamp: Date.now(),
-            description: String(evt.details?.description || ''),
+    // Create event listener object with onEvent method (per SDK docs)
+    // The SDK expects an object with an onEvent method, not a plain function
+    const eventListener = {
+      onEvent: async (event: unknown): Promise<void> => {
+        try {
+          // Log full event for debugging (handle BigInt)
+          const safeStringify = (obj: unknown): string => {
+            return JSON.stringify(obj, (_, v) => typeof v === 'bigint' ? v.toString() : v, 2).substring(0, 500);
+          };
+          console.log('📡 [BreezSparkService] SDK Event received:', safeStringify(event));
+          
+          // Cast to expected structure based on SDK docs
+          const evt = event as {
+            tag?: string;
+            inner?: {
+              payment?: unknown;
+              unclaimedDeposits?: unknown;
+              claimedDeposits?: unknown;
+            };
           };
 
-          console.log('💰 [BreezSparkService] Payment received event:', payment);
+          const eventTag = evt?.tag || (event as Record<string, unknown>)?.type || 'unknown';
+          console.log('📡 [BreezSparkService] Event tag:', eventTag);
 
-          // Notify all listeners
-          paymentEventListeners.forEach((listener) => {
-            try {
-              listener(payment);
-            } catch (err) {
-              console.error('❌ [BreezSparkService] Event listener error:', err);
-            }
-          });
+          // Handle PaymentSucceeded event (try multiple possible formats)
+          const isPaymentEvent = 
+            eventTag === 'PaymentSucceeded' || 
+            eventTag === 'paymentSucceeded' ||
+            eventTag === 'payment_succeeded';
+            
+          if (isPaymentEvent) {
+            // Try to find payment data in different possible locations
+            const paymentData = (
+              evt?.inner?.payment || 
+              (event as Record<string, unknown>)?.payment ||
+              (event as Record<string, unknown>)?.data
+            ) as Record<string, unknown>;
+            
+            console.log('💰 [BreezSparkService] Payment event data:', safeStringify(paymentData));
+            
+            const payment: TransactionInfo = {
+              id: String(paymentData?.id || Date.now()),
+              type: 'receive',
+              amountSat: Number(paymentData?.amountSat || paymentData?.amount || 0),
+              feeSat: Number(paymentData?.feeSat || paymentData?.fee || 0),
+              status: 'completed',
+              timestamp: Date.now(),
+              description: String(paymentData?.description || ''),
+            };
+
+            console.log('💰 [BreezSparkService] Payment received:', payment);
+
+            // Send push notification for the payment
+            sendPaymentReceivedNotification(payment.amountSat, payment.description);
+
+            // Notify all listeners (for UI refresh etc)
+            paymentEventListeners.forEach((listener) => {
+              try {
+                listener(payment);
+              } catch (err) {
+                console.error('❌ [BreezSparkService] Listener callback error:', err);
+              }
+            });
+          }
+
+          // Handle Synced event - trigger refresh for all listeners
+          if (eventTag === 'Synced') {
+            console.log('🔄 [BreezSparkService] SDK synced - notifying listeners to refresh');
+            // Create a "sync" event to notify listeners to refresh their data
+            const syncEvent: TransactionInfo = {
+              id: 'sync-' + Date.now(),
+              type: 'receive',
+              amountSat: 0,
+              feeSat: 0,
+              status: 'completed',
+              timestamp: Date.now(),
+              description: '__SYNC_EVENT__', // Special marker
+            };
+            // Notify listeners - they can check for this marker and refresh
+            paymentEventListeners.forEach((listener) => {
+              try {
+                listener(syncEvent);
+              } catch (err) {
+                console.error('❌ [BreezSparkService] Sync listener error:', err);
+              }
+            });
+          }
+
+        } catch (handlerError) {
+          console.error('❌ [BreezSparkService] Event handler error:', handlerError);
         }
-      } catch (handlerError) {
-        console.error('❌ [BreezSparkService] Event handler error:', handlerError);
       }
     };
 
-    // Try module-level addEventListener first (some SDKs use this pattern)
-    if (typeof BreezSDK.addEventListener === 'function') {
-      console.log('🔵 [BreezSparkService] Using BreezSDK.addEventListener');
-      eventListenerUnsubscribe = await BreezSDK.addEventListener(handleEvent);
-      console.log('✅ [BreezSparkService] Event listeners setup via BreezSDK.addEventListener');
-      return;
-    }
+    // Add the event listener using sdk.addEventListener(listener)
+    const listenerId = await sdkInstance.addEventListener(eventListener);
+    console.log('✅ [BreezSparkService] Event listener added with ID:', listenerId);
+    
+    // Store the ID for later removal
+    eventListenerUnsubscribe = listenerId;
 
-    // Try instance-level addEventListener
-    if (sdkInstance && typeof sdkInstance.addEventListener === 'function') {
-      console.log('🔵 [BreezSparkService] Using sdkInstance.addEventListener');
-      eventListenerUnsubscribe = await sdkInstance.addEventListener(handleEvent);
-      console.log('✅ [BreezSparkService] Event listeners setup via sdkInstance.addEventListener');
-      return;
-    }
-
-    console.warn('⚠️ [BreezSparkService] No addEventListener method found on SDK');
   } catch (error) {
     console.warn('⚠️ [BreezSparkService] Failed to setup event listeners:', error);
     // Don't fail initialization if events don't work
@@ -517,7 +570,6 @@ export async function listPayments(): Promise<TransactionInfo[]> {
       const description = payment.details?.description || payment.description || '';
 
       const mappedStatus = mapPaymentStatus(payment.status);
-      console.log(`[Payment ${payment.id}] Raw status:`, payment.status, '-> Mapped:', mappedStatus);
 
       return {
         id: payment.id,
