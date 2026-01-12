@@ -110,7 +110,7 @@ export function HomeScreen(): React.JSX.Element {
       // This allows cached data to show immediately without spinner
       Promise.all([refreshBalance(), refreshTransactions()]);
     }
-  }, [isConnected, activeWalletInfo?.masterKeyId, activeWalletInfo?.subWalletIndex, refreshBalance, refreshTransactions]);
+  }, [isConnected, activeWalletInfo?.masterKeyId, activeWalletInfo?.subWalletIndex]);
 
   // Subscribe to payment events for real-time balance updates
   useEffect(() => {

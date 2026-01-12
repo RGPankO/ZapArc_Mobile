@@ -34,13 +34,6 @@ import type { MasterKeyEntry, SubWalletEntry } from '../types';
 
 type ModalType = 'rename' | 'addSubWallet' | 'confirmDelete' | null;
 
-interface RenameTarget {
-  type: 'master' | 'subWallet';
-  masterKeyId: string;
-  subWalletIndex?: number;
-  currentName: string;
-}
-
 // =============================================================================
 // Component
 // =============================================================================
@@ -55,9 +48,9 @@ export function WalletManagementScreen(): React.JSX.Element {
     restoreSubWallet,
     deleteMasterKey,
     canAddSubWallet,
-    isLoading,
+    getAddSubWalletDisabledReason,
   } = useWallet();
-  const { activeWalletInfo, verifyPin, selectSubWallet } = useWalletAuth();
+  const { selectSubWallet } = useWalletAuth();
 
   const { themeMode } = useAppTheme();
   const gradientColors = getGradientColors(themeMode);
@@ -70,7 +63,6 @@ export function WalletManagementScreen(): React.JSX.Element {
     new Set([activeMasterKey?.id || ''])
   );
   const [modalType, setModalType] = useState<ModalType>(null);
-  const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
   const [newName, setNewName] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [selectedMasterKeyId, setSelectedMasterKeyId] = useState<string | null>(null);
@@ -152,11 +144,11 @@ export function WalletManagementScreen(): React.JSX.Element {
           {
             text: 'Archive',
             style: 'destructive',
-            onPress: async () => {
+            onPress: async (): Promise<void> => {
               try {
                 setProcessing(true);
                 await archiveSubWallet(masterKeyId, subWalletIndex);
-              } catch (err) {
+              } catch {
                 Alert.alert('Error', 'Failed to archive sub-wallet');
               } finally {
                 setProcessing(false);
@@ -175,7 +167,7 @@ export function WalletManagementScreen(): React.JSX.Element {
         setProcessing(true);
         await restoreSubWallet(masterKeyId, subWalletIndex);
         Alert.alert('Success', 'Sub-wallet restored');
-      } catch (err) {
+      } catch {
         Alert.alert('Error', 'Failed to restore sub-wallet');
       } finally {
         setProcessing(false);
@@ -195,11 +187,24 @@ export function WalletManagementScreen(): React.JSX.Element {
     setError(null);
 
     deleteMasterKey(deleteTarget, pinInput)
-      .then(() => {
+      .then(({ activeDeleted, nextActiveId }) => {
         setModalType(null);
         setDeleteTarget(null);
         setPinInput('');
         Alert.alert('Success', 'Wallet deleted successfully');
+
+        if (activeDeleted) {
+          if (nextActiveId) {
+            // Switch to the new active wallet's unlock screen
+            router.replace({
+              pathname: '/wallet/unlock',
+              params: { masterKeyId: nextActiveId, subWalletIndex: '0' },
+            });
+          } else {
+            // No wallets left, go to welcome
+            router.replace('/wallet/welcome');
+          }
+        }
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Failed to delete wallet');
@@ -305,16 +310,13 @@ export function WalletManagementScreen(): React.JSX.Element {
             <Menu.Item
               onPress={() => {
                 setMenuVisible(null);
-                setRenameTarget({
-                  type: 'master',
-                  masterKeyId: masterKey.id,
-                  currentName: masterKey.nickname,
-                });
                 setNewName(masterKey.nickname);
-                setModalType('rename');
+                // setSelectedMasterKeyId(masterKey.id); // If we implement renaming later
+                // setModalType('rename'); // If we implement renaming later
               }}
-              title="Rename"
+              title="Rename (Coming Soon)"
               leadingIcon="pencil"
+              disabled
             />
             <Menu.Item
               onPress={() => {
@@ -357,8 +359,9 @@ export function WalletManagementScreen(): React.JSX.Element {
                 if (canAddSub) {
                   setSelectedMasterKeyId(masterKey.id);
                   // Calculate next sub-wallet index for default name
+                  // Main wallet is index 0. First sub-wallet should be index 1 and named "Sub-Wallet 1"
                   const nextIndex = masterKey.subWallets.length;
-                  setNewName(`Sub-Wallet ${nextIndex + 1}`);
+                  setNewName(`Sub-Wallet ${nextIndex}`);
                   setModalType('addSubWallet');
                 }
               }}
@@ -380,7 +383,7 @@ export function WalletManagementScreen(): React.JSX.Element {
                 </Text>
                 {!canAddSub && (
                   <Text style={[styles.addSubWalletHint, { color: secondaryTextColor }]}>
-                    Last sub-wallet needs transaction history
+                    {getAddSubWalletDisabledReason(masterKey.id) || 'Last sub-wallet needs transaction history'}
                   </Text>
                 )}
               </View>

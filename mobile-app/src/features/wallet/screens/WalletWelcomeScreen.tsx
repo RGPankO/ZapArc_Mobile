@@ -21,7 +21,7 @@ import {
 const LIGHTNING_ICON = '⚡';
 
 export function WalletWelcomeScreen(): React.JSX.Element {
-  const { activeMasterKey, addSubWallet, canAddSubWallet } = useWallet();
+  const { activeMasterKey, addSubWallet, getAddSubWalletDisabledReason } = useWallet();
   const { t } = useLanguage();
   const { themeMode, theme } = useAppTheme();
 
@@ -48,8 +48,9 @@ export function WalletWelcomeScreen(): React.JSX.Element {
     if (!activeMasterKey) return;
     
     // Calculate next sub-wallet index
+    // Main wallet is index 0. First sub-wallet should be index 1 and named "Sub-Wallet 1"
     const nextIndex = activeMasterKey.subWallets.length;
-    setSubWalletName(`Sub-Wallet ${nextIndex + 1}`);
+    setSubWalletName(`Sub-Wallet ${nextIndex}`);
     setShowAddSubWalletModal(true);
   }, [activeMasterKey]);
 
@@ -71,7 +72,8 @@ export function WalletWelcomeScreen(): React.JSX.Element {
     }
   }, [activeMasterKey, subWalletName, addSubWallet]);
 
-  const canAdd = activeMasterKey && canAddSubWallet(activeMasterKey.id);
+  const disabledReason = activeMasterKey ? getAddSubWalletDisabledReason(activeMasterKey.id) : null;
+  const canAdd = activeMasterKey && !disabledReason;
 
   return (
     <LinearGradient
@@ -141,9 +143,16 @@ export function WalletWelcomeScreen(): React.JSX.Element {
             )}
 
             {activeMasterKey && (
-              <Text style={[styles.currentWalletHint, { color: secondaryText }]}>
-                {t('onboarding.currentWallet', { name: activeMasterKey.nickname })}
-              </Text>
+              <View>
+                {!canAdd && (
+                  <Text style={[styles.currentWalletHint, { color: secondaryText, marginBottom: 8 }]}>
+                    {disabledReason}
+                  </Text>
+                )}
+                <Text style={[styles.currentWalletHint, { color: secondaryText }]}>
+                  {t('onboarding.currentWallet', { name: activeMasterKey.nickname })}
+                </Text>
+              </View>
             )}
           </View>
 

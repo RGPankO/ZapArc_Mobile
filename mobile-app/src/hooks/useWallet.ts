@@ -1,7 +1,7 @@
 // useWallet Hook
 // Manages wallet state, operations, and multi-wallet switching
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { storageService } from '../services';
 import * as BreezSparkService from '../services/breezSparkService';
@@ -57,7 +57,7 @@ export interface WalletActions {
   switchWallet: (masterKeyId: string, subWalletIndex: number, pin?: string) => Promise<void>;
 
   // Master key operations
-  deleteMasterKey: (masterKeyId: string, pin: string) => Promise<void>;
+  deleteMasterKey: (masterKeyId: string, pin: string) => Promise<{ activeDeleted: boolean; nextActiveId: string | null }>;
   renameMasterKey: (masterKeyId: string, nickname: string) => Promise<void>;
   renameSubWallet: (masterKeyId: string, index: number, nickname: string) => Promise<void>;
 
@@ -72,6 +72,7 @@ export interface WalletActions {
   // Utility
   getMnemonic: (masterKeyId: string, pin: string) => Promise<string>;
   canAddSubWallet: (masterKeyId: string) => boolean;
+  getAddSubWalletDisabledReason: (masterKeyId: string) => string | null;
 }
 
 // =============================================================================
@@ -87,6 +88,18 @@ export function useWallet(): WalletState & WalletActions {
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [storage, setStorage] = useState<MultiWalletStorage | null>(null);
+
+  // Refs for stable access in callbacks without triggering identity changes
+  const balanceRef = useRef(balance);
+  const transactionsRef = useRef(transactions);
+
+  useEffect(() => {
+    balanceRef.current = balance;
+  }, [balance]);
+
+  useEffect(() => {
+    transactionsRef.current = transactions;
+  }, [transactions]);
 
   // Derived state
   const masterKeys = useMemo(() => storage?.masterKeys ?? [], [storage]);
@@ -401,10 +414,12 @@ export function useWallet(): WalletState & WalletActions {
   // ========================================
 
   const deleteMasterKey = useCallback(
-    async (masterKeyId: string, pin: string): Promise<void> => {
+    async (masterKeyId: string, pin: string): Promise<{ activeDeleted: boolean; nextActiveId: string | null }> => {
       try {
         setIsLoading(true);
         setError(null);
+
+        const isActive = masterKeyId === activeMasterKey?.id;
 
         // Verify PIN first
         const isValidPin = await storageService.verifyMasterKeyPin(
@@ -415,10 +430,28 @@ export function useWallet(): WalletState & WalletActions {
           throw new Error('Invalid PIN');
         }
 
-        await storageService.deleteMasterKey(masterKeyId);
-        await loadWalletData();
+        // If active, disconnect SDK first
+        if (isActive) {
+          await BreezSparkService.disconnectSDK().catch(e => console.warn('⚠️ [useWallet] Failed to disconnect SDK during delete:', e));
+          setIsConnected(false);
+          setBalance(0);
+          setTransactions([]);
+        }
 
-        console.log('✅ [useWallet] Master key deleted:', masterKeyId);
+        await storageService.deleteMasterKey(masterKeyId);
+
+        // Reload data to see changes
+        const storageData = await storageService.loadMultiWalletStorage();
+        setStorage(storageData);
+
+        const nextActiveId = storageData?.activeMasterKeyId || null;
+
+        console.log('✅ [useWallet] Master key deleted:', masterKeyId, {
+          isActiveWasDeleted: isActive,
+          nextActiveId
+        });
+
+        return { activeDeleted: isActive, nextActiveId };
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to delete wallet';
         setError(message);
@@ -427,7 +460,7 @@ export function useWallet(): WalletState & WalletActions {
         setIsLoading(false);
       }
     },
-    [loadWalletData]
+    [activeMasterKey?.id, loadWalletData]
   );
 
   const renameMasterKey = useCallback(
@@ -503,6 +536,16 @@ export function useWallet(): WalletState & WalletActions {
         walletInfo.subWalletIndex,
         walletBalance.balanceSat
       );
+
+      // Update activity flag
+      if (walletInfo) {
+        const hasActivity = walletBalance.balanceSat > 0 || transactionsRef.current.length > 0;
+        storageService.updateSubWalletActivity(
+          walletInfo.masterKeyId,
+          walletInfo.subWalletIndex,
+          hasActivity
+        ).catch(err => console.warn('⚠️ [useWallet] Failed to update activity:', err));
+      }
     } catch (err) {
       console.error('❌ [useWallet] Failed to refresh balance:', err);
       setIsLoading(false);
@@ -561,6 +604,16 @@ export function useWallet(): WalletState & WalletActions {
         walletInfo.subWalletIndex,
         txs
       );
+
+      // Update activity flag
+      if (walletInfo) {
+        const hasActivity = txs.length > 0 || balanceRef.current > 0;
+        storageService.updateSubWalletActivity(
+          walletInfo.masterKeyId,
+          walletInfo.subWalletIndex,
+          hasActivity
+        ).catch(err => console.warn('⚠️ [useWallet] Failed to update activity:', err));
+      }
     } catch (err) {
       console.error('❌ [useWallet] Failed to refresh transactions:', err);
       setIsRefreshing(false);
@@ -718,26 +771,59 @@ export function useWallet(): WalletState & WalletActions {
     []
   );
 
-  const canAddSubWallet = useCallback(
-    (masterKeyId: string): boolean => {
+
+
+  const getAddSubWalletDisabledReason = useCallback(
+    (masterKeyId: string): string | null => {
       const masterKey = masterKeys.find((mk) => mk.id === masterKeyId);
-      if (!masterKey) return false;
+      if (!masterKey) return 'Wallet not found';
 
-      // Check if last sub-wallet has activity
-      const lastSubWallet =
-        masterKey.subWallets[masterKey.subWallets.length - 1];
-      if (lastSubWallet && lastSubWallet.hasActivity === false) {
-        return false; // Can't add if last sub-wallet has no activity
-      }
-
-      // Check if we've reached max sub-wallets
+      // Check limit
       const totalIndices = [
         ...masterKey.subWallets.map((sw) => sw.index),
         ...masterKey.archivedSubWallets.map((sw) => sw.index),
       ];
-      return totalIndices.length < 20;
+      if (totalIndices.length >= 20) {
+        return 'Maximum number of sub-wallets reached';
+      }
+
+      // Check if last sub-wallet has activity
+      const lastSubWallet =
+        masterKey.subWallets[masterKey.subWallets.length - 1];
+      
+      if (!lastSubWallet) return null; // No sub-wallets yet, allowed
+
+      // Check if we are connected to this last sub-wallet
+      const isConnectedToLast = activeWalletInfo &&
+                                activeWalletInfo.masterKeyId === masterKeyId &&
+                                activeWalletInfo.subWalletIndex === lastSubWallet.index;
+
+      if (isConnectedToLast) {
+         // Use real-time state
+         const hasActivity = balance > 0 || transactions.length > 0;
+         if (hasActivity) return null;
+         
+         const name = lastSubWallet.nickname || 'Last sub-wallet';
+         return `${name} must have transactions before adding another`;
+      }
+
+      // Not connected to last sub-wallet - use stored flag
+      // Strict Policy: Only allow if explicitly true
+      if (lastSubWallet.hasActivity === true) {
+        return null;
+      }
+      
+      const name = lastSubWallet.nickname || 'Last sub-wallet';
+      return `${name} must have transactions before adding another`;
     },
-    [masterKeys]
+    [masterKeys, activeWalletInfo, balance, transactions]
+  );
+
+  const canAddSubWallet = useCallback(
+    (masterKeyId: string): boolean => {
+      return getAddSubWalletDisabledReason(masterKeyId) === null;
+    },
+    [getAddSubWalletDisabledReason]
   );
 
   // ========================================
@@ -773,5 +859,6 @@ export function useWallet(): WalletState & WalletActions {
     receivePayment,
     getMnemonic,
     canAddSubWallet,
+    getAddSubWalletDisabledReason,
   };
 }

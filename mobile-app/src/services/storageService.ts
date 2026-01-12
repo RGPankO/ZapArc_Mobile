@@ -584,6 +584,49 @@ class StorageService {
     }
   }
 
+  /**
+   * Update activity status for a sub-wallet
+   */
+  async updateSubWalletActivity(
+    masterKeyId: string,
+    subWalletIndex: number,
+    hasActivity: boolean
+  ): Promise<void> {
+    console.log('🔵 [StorageService] UPDATE_SUB_WALLET_ACTIVITY', {
+      masterKeyId,
+      subWalletIndex,
+      hasActivity,
+    });
+
+    try {
+      const storage = await this.loadMultiWalletStorage();
+      if (!storage) {
+        throw new Error('No storage found');
+      }
+
+      const masterKey = storage.masterKeys.find((mk) => mk.id === masterKeyId);
+      if (!masterKey) {
+        throw new Error('Master key not found');
+      }
+
+      const subWallet = masterKey.subWallets.find((sw) => sw.index === subWalletIndex);
+      if (!subWallet) {
+        throw new Error('Sub-wallet not found');
+      }
+
+      // Only update if changed
+      if (subWallet.hasActivity !== hasActivity) {
+        subWallet.hasActivity = hasActivity;
+        await this.saveMultiWalletStorage(storage);
+        console.log('✅ [StorageService] UPDATE_SUB_WALLET_ACTIVITY SUCCESS');
+      }
+    } catch (error) {
+      console.error('❌ [StorageService] UPDATE_SUB_WALLET_ACTIVITY FAILED', error);
+      // Non-critical, valid to suppress error in some contexts but good to log
+      throw error;
+    }
+  }
+
   // ========================================
   // Active Wallet Operations
   // ========================================
