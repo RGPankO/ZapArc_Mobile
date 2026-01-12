@@ -257,13 +257,31 @@ export default function SendScreen() {
 
           <View style={styles.scannerContainer}>
             <BarCodeScanner
-              onBarCodeScanned={handleBarCodeScanned}
+              onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
               style={StyleSheet.absoluteFillObject}
             />
-            <View style={styles.scannerOverlay}>
-              <Text style={styles.scannerText}>
-                Point your camera at a Lightning QR code
-              </Text>
+            {/* Scan Frame Overlay - matches QRScannerScreen */}
+            <View style={styles.overlay}>
+              <View style={styles.overlayTop} />
+              <View style={styles.overlayMiddle}>
+                <View style={styles.overlaySide} />
+                <View style={styles.scanFrame}>
+                  {/* Corner decorations */}
+                  <View style={[styles.corner, styles.cornerTopLeft]} />
+                  <View style={[styles.corner, styles.cornerTopRight]} />
+                  <View style={[styles.corner, styles.cornerBottomLeft]} />
+                  <View style={[styles.corner, styles.cornerBottomRight]} />
+                  {/* Crosshair */}
+                  <View style={styles.crosshairHorizontal} />
+                  <View style={styles.crosshairVertical} />
+                </View>
+                <View style={styles.overlaySide} />
+              </View>
+              <View style={styles.overlayBottom}>
+                <Text style={styles.scannerText}>
+                  Point your camera at a Lightning QR code
+                </Text>
+              </View>
             </View>
           </View>
         </SafeAreaView>
@@ -582,14 +600,76 @@ const styles = StyleSheet.create({
     flex: 1,
     position: 'relative',
   },
-  scannerOverlay: {
+  // Scanner overlay styles (matching QRScannerScreen)
+  overlay: {
+    flex: 1,
+  },
+  overlayTop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  overlayMiddle: {
+    flexDirection: 'row',
+  },
+  overlaySide: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  scanFrame: {
+    width: 250,
+    height: 250,
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  corner: {
     position: 'absolute',
+    width: 40,
+    height: 40,
+    borderColor: '#FFC107',
+    borderWidth: 3,
+  },
+  cornerTopLeft: {
+    top: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+  },
+  cornerTopRight: {
+    top: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderBottomWidth: 0,
+  },
+  cornerBottomLeft: {
     bottom: 0,
     left: 0,
+    borderRightWidth: 0,
+    borderTopWidth: 0,
+  },
+  cornerBottomRight: {
+    bottom: 0,
     right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 24,
+    borderLeftWidth: 0,
+    borderTopWidth: 0,
+  },
+  crosshairHorizontal: {
+    position: 'absolute',
+    width: 40,
+    height: 2,
+    backgroundColor: 'rgba(255, 193, 7, 0.8)',
+  },
+  crosshairVertical: {
+    position: 'absolute',
+    width: 2,
+    height: 40,
+    backgroundColor: 'rgba(255, 193, 7, 0.8)',
+  },
+  overlayBottom: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     alignItems: 'center',
+    paddingTop: 32,
   },
   scannerText: {
     fontSize: 16,

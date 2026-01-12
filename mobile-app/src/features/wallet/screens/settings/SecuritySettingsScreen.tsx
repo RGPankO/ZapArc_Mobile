@@ -16,13 +16,13 @@ import type { AutoLockTimeout } from '../../../settings/types';
 // Constants
 // =============================================================================
 
-const AUTO_LOCK_OPTIONS: { value: AutoLockTimeout; label: string }[] = [
-  { value: 300, label: '5 minutes' },
-  { value: 900, label: '15 minutes' },
-  { value: 1800, label: '30 minutes' },
-  { value: 3600, label: '1 hour' },
-  { value: 7200, label: '2 hours' },
-  { value: 0, label: 'Never' },
+const AUTO_LOCK_OPTIONS: { value: AutoLockTimeout; labelKey: string }[] = [
+  { value: 300, labelKey: 'settings.fiveMinutes' },
+  { value: 900, labelKey: 'settings.fifteenMinutes' },
+  { value: 1800, labelKey: 'settings.thirtyMinutes' },
+  { value: 3600, labelKey: 'settings.oneHour' },
+  { value: 7200, labelKey: 'settings.twoHours' },
+  { value: 0, labelKey: 'settings.never' },
 ];
 
 // =============================================================================
@@ -87,17 +87,17 @@ export function SecuritySettingsScreen(): React.JSX.Element {
       // Verify biometric before enabling
       try {
         const result = await LocalAuthentication.authenticateAsync({
-          promptMessage: 'Verify to enable biometric authentication',
-          fallbackLabel: 'Use PIN',
+          promptMessage: t('settings.verifyToEnableBiometric'),
+          fallbackLabel: t('settings.usePin'),
         });
 
         if (result.success) {
           setBiometricEnabled(true);
         } else {
-          Alert.alert('Failed', 'Biometric verification failed');
+          Alert.alert(t('settings.failed'), t('settings.biometricVerificationFailed'));
         }
       } catch (err) {
-        Alert.alert('Error', 'Failed to verify biometric');
+        Alert.alert(t('common.error'), t('settings.failedToVerifyBiometric'));
       }
     } else {
       setBiometricEnabled(false);
@@ -114,11 +114,11 @@ export function SecuritySettingsScreen(): React.JSX.Element {
         biometricEnabled,
       });
 
-      Alert.alert('Saved', 'Security settings updated', [
-        { text: 'OK', onPress: () => router.back() },
+      Alert.alert(t('settings.saved'), t('settings.securitySettingsUpdated'), [
+        { text: t('common.ok'), onPress: () => router.back() },
       ]);
     } catch (err) {
-      Alert.alert('Error', 'Failed to save settings');
+      Alert.alert(t('common.error'), t('settings.failedToSaveSettings'));
     } finally {
       setIsSaving(false);
     }
@@ -138,7 +138,7 @@ export function SecuritySettingsScreen(): React.JSX.Element {
             size={24}
             onPress={() => router.back()}
           />
-          <Text style={styles.headerTitle}>{t('security')}</Text>
+          <Text style={styles.headerTitle}>{t('settings.security')}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -146,9 +146,9 @@ export function SecuritySettingsScreen(): React.JSX.Element {
           <View style={styles.content}>
             {/* Auto-Lock Timeout */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Auto-Lock Timeout</Text>
+              <Text style={styles.sectionTitle}>{t('settings.autoLockTimeout')}</Text>
               <Text style={styles.sectionDescription}>
-                Lock wallet after period of inactivity
+                {t('settings.lockWalletAfterInactivity')}
               </Text>
 
               <RadioButton.Group
@@ -164,7 +164,7 @@ export function SecuritySettingsScreen(): React.JSX.Element {
                       color="#FFC107"
                       uncheckedColor="rgba(255, 255, 255, 0.5)"
                     />
-                    <Text style={styles.radioLabel}>{option.label}</Text>
+                    <Text style={styles.radioLabel}>{t(option.labelKey)}</Text>
                   </View>
                 ))}
               </RadioButton.Group>
@@ -172,8 +172,7 @@ export function SecuritySettingsScreen(): React.JSX.Element {
               {autoLockTimeout === 0 && (
                 <View style={styles.warningBox}>
                   <Text style={styles.warningText}>
-                    ⚠️ Disabling auto-lock is not recommended. Your wallet will
-                    remain unlocked until you manually lock it.
+                    ⚠️ {t('settings.disableAutoLockWarning')}
                   </Text>
                 </View>
               )}
@@ -184,12 +183,12 @@ export function SecuritySettingsScreen(): React.JSX.Element {
               <View style={styles.switchRow}>
                 <View style={styles.switchContent}>
                   <Text style={styles.switchTitle}>
-                    {biometricType} Authentication
+                    {t('settings.biometricAuthentication', { type: biometricType })}
                   </Text>
                   <Text style={styles.switchDescription}>
                     {biometricAvailable
-                      ? `Use ${biometricType} to unlock wallet`
-                      : 'Not available on this device'}
+                      ? t('settings.useBiometricToUnlock', { type: biometricType })
+                      : t('settings.notAvailableOnDevice')}
                   </Text>
                 </View>
                 <Switch
@@ -203,12 +202,12 @@ export function SecuritySettingsScreen(): React.JSX.Element {
 
             {/* Info Box */}
             <View style={styles.infoBox}>
-              <Text style={styles.infoTitle}>Security Tips</Text>
+              <Text style={styles.infoTitle}>{t('settings.securityTips')}</Text>
               <Text style={styles.infoText}>
-                • Use a strong PIN that's not easy to guess{'\n'}
-                • Enable biometric authentication for convenience{'\n'}
-                • Set a reasonable auto-lock timeout{'\n'}
-                • Never share your recovery phrase with anyone
+                • {t('settings.securityTip1')}{'\n'}
+                • {t('settings.securityTip2')}{'\n'}
+                • {t('settings.securityTip3')}{'\n'}
+                • {t('settings.securityTip4')}
               </Text>
             </View>
           </View>
@@ -224,7 +223,7 @@ export function SecuritySettingsScreen(): React.JSX.Element {
             style={styles.saveButton}
             labelStyle={styles.saveButtonLabel}
           >
-            Save Changes
+            {t('settings.saveChanges')}
           </Button>
         </View>
       </SafeAreaView>

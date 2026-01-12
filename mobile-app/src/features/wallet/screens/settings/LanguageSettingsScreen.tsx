@@ -41,23 +41,34 @@ export function LanguageSettingsScreen(): React.JSX.Element {
     setIsSaving(true);
 
     try {
+      console.log('🌐 [LanguageSettings] Saving language:', selectedLanguage);
+      
       // Update settings first
       await updateSettings({
         language: selectedLanguage,
       });
+      console.log('✅ [LanguageSettings] Settings updated');
 
       // Apply language change through i18n hook
       if (selectedLanguage === 'auto') {
         await resetToAuto();
-      } else {
+      } else if (selectedLanguage === 'en' || selectedLanguage === 'bg') {
         await setLanguage(selectedLanguage);
       }
+      console.log('✅ [LanguageSettings] Language applied');
 
-      Alert.alert('Saved', 'Language settings updated', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
-    } catch (err) {
-      Alert.alert('Error', 'Failed to save settings');
+      // Small delay to let language change take effect
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Navigate back silently (no Alert to prevent app restart)
+      console.log('🌐 [LanguageSettings] Navigating back');
+      router.back();
+    } catch (error) {
+      console.error('❌ [LanguageSettings] Save failed:', error);
+      console.error('❌ [LanguageSettings] Error details:', JSON.stringify(error));
+      
+      // Only show Alert on error
+      Alert.alert('Error', `Failed to save settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSaving(false);
     }
@@ -77,7 +88,7 @@ export function LanguageSettingsScreen(): React.JSX.Element {
             size={24}
             onPress={() => router.back()}
           />
-          <Text style={[styles.headerTitle, { color: primaryText }]}>{t('language')}</Text>
+          <Text style={[styles.headerTitle, { color: primaryText }]}>{t('settings.language')}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -85,7 +96,7 @@ export function LanguageSettingsScreen(): React.JSX.Element {
           <View style={styles.content}>
             {/* Language Selection */}
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: primaryText }]}>Select Language</Text>
+              <Text style={[styles.sectionTitle, { color: primaryText }]}>{t('settings.selectLanguage')}</Text>
 
               <RadioButton.Group
                 onValueChange={(value) =>
@@ -101,11 +112,10 @@ export function LanguageSettingsScreen(): React.JSX.Element {
                   />
                   <View style={styles.radioContent}>
                     <Text style={[styles.radioTitle, { color: primaryText }]}>
-                      Automatic (Location-based)
+                      {t('settings.automaticLocationBased')}
                     </Text>
                     <Text style={[styles.radioDescription, { color: secondaryText }]}>
-                      Detect language based on your location. Bulgarian in
-                      Bulgaria, English elsewhere.
+                      {t('settings.languageDetectionDescription')}
                     </Text>
                   </View>
                 </View>
@@ -118,7 +128,7 @@ export function LanguageSettingsScreen(): React.JSX.Element {
                   />
                   <View style={styles.radioContent}>
                     <View style={styles.radioTitleRow}>
-                      <Text style={[styles.radioTitle, { color: primaryText }]}>English</Text>
+                      <Text style={[styles.radioTitle, { color: primaryText }]}>{t('settings.english')}</Text>
                       <Text style={styles.flag}>🇬🇧</Text>
                     </View>
                   </View>
@@ -132,7 +142,7 @@ export function LanguageSettingsScreen(): React.JSX.Element {
                   />
                   <View style={styles.radioContent}>
                     <View style={styles.radioTitleRow}>
-                      <Text style={[styles.radioTitle, { color: primaryText }]}>Български</Text>
+                      <Text style={[styles.radioTitle, { color: primaryText }]}>{t('settings.bulgarian')}</Text>
                       <Text style={styles.flag}>🇧🇬</Text>
                     </View>
                   </View>
@@ -142,15 +152,12 @@ export function LanguageSettingsScreen(): React.JSX.Element {
 
             {/* Info Box */}
             <View style={styles.infoBox}>
-              <Text style={styles.infoTitle}>About Language Detection</Text>
+              <Text style={styles.infoTitle}>{t('settings.aboutLanguageDetection')}</Text>
               <Text style={[styles.infoText, { color: secondaryText }]}>
-                When automatic mode is enabled, the app will use your device
-                location to determine the appropriate language. If you're
-                located within Bulgaria, Bulgarian will be used. Otherwise,
-                English will be the default.
+                {t('settings.languageDetectionInfo')}
               </Text>
               <Text style={[styles.infoText, { color: secondaryText, marginTop: 8 }]}>
-                Current language: {currentLanguage === 'en' ? 'English 🇬🇧' : 'Български 🇧🇬'}
+                {t('settings.currentLanguage', { language: currentLanguage === 'en' ? 'English 🇬🇧' : 'Български 🇧🇬' })}
               </Text>
             </View>
           </View>
@@ -166,7 +173,7 @@ export function LanguageSettingsScreen(): React.JSX.Element {
             style={styles.saveButton}
             labelStyle={styles.saveButtonLabel}
           >
-            Save Changes
+            {t('settings.saveChanges')}
           </Button>
         </View>
       </SafeAreaView>

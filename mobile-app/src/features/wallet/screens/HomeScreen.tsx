@@ -19,6 +19,7 @@ import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconC
 import { useWallet } from '../../../hooks/useWallet';
 import { useWalletAuth } from '../../../hooks/useWalletAuth';
 import { useSettings } from '../../../hooks/useSettings';
+import { useLanguage } from '../../../hooks/useLanguage';
 import type { Transaction } from '../types';
 
 // =============================================================================
@@ -48,6 +49,7 @@ export function HomeScreen(): React.JSX.Element {
   } = useWallet();
   const { lock } = useWalletAuth();
   const { settings } = useSettings();
+  const { t } = useLanguage();
 
   const { themeMode } = useAppTheme();
   const gradientColors = getGradientColors(themeMode);
@@ -62,18 +64,26 @@ export function HomeScreen(): React.JSX.Element {
 
   // Currency formatting
   const formatBalance = (sats: number): string => {
-    if (!showBalance) return '••••••';
-    
-    const currency = settings?.currency || 'BTC';
-    
-    if (String(currency).toUpperCase() === 'BTC') {
-      // Convert sats to BTC
-      const btc = sats / 100_000_000;
-      return `₿ ${btc.toFixed(8)}`;
-    } else if (String(currency).toUpperCase() === 'SATS') {
-      return `${sats.toLocaleString()} sats`;
-    } else {
-      return `${sats.toLocaleString()} sats`;
+    try {
+      if (!showBalance) return '••••••';
+
+      // Ensure sats is a valid number
+      const safeSats = typeof sats === 'number' && !isNaN(sats) ? sats : 0;
+
+      const currency = settings?.currency || 'BTC';
+
+      if (String(currency).toUpperCase() === 'BTC') {
+        // Convert sats to BTC
+        const btc = safeSats / 100_000_000;
+        return `₿ ${btc.toFixed(8)}`;
+      } else if (String(currency).toUpperCase() === 'SATS') {
+        return `${safeSats.toLocaleString()} sats`;
+      } else {
+        return `${safeSats.toLocaleString()} sats`;
+      }
+    } catch (err) {
+      console.error('❌ [HomeScreen] formatBalance error:', err);
+      return '0 sats';
     }
   };
 
@@ -148,8 +158,9 @@ export function HomeScreen(): React.JSX.Element {
   // Render transaction item
   const renderTransaction = (tx: Transaction, index: number): React.JSX.Element => {
     const isReceived = tx.type === 'receive';
-    const amount = tx.amount ?? 0; // Transaction type uses 'amount', not 'amountSats'
-    const date = new Date(tx.timestamp).toLocaleDateString();
+    const amount = tx.amount ?? 0;
+    const timestamp = typeof tx.timestamp === 'number' && tx.timestamp > 0 ? tx.timestamp : Date.now();
+    const date = new Date(timestamp).toLocaleDateString();
 
     return (
       <TouchableOpacity
@@ -164,7 +175,7 @@ export function HomeScreen(): React.JSX.Element {
         </View>
         <View style={styles.transactionInfo}>
           <Text style={[styles.transactionDescription, { color: primaryTextColor }]} numberOfLines={1}>
-            {tx.description || (isReceived ? 'Received' : 'Sent')}
+            {tx.description || (isReceived ? t('wallet.received') : t('wallet.sent'))}
           </Text>
           <Text style={[styles.transactionDate, { color: secondaryTextColor }]}>{date}</Text>
         </View>
@@ -174,7 +185,7 @@ export function HomeScreen(): React.JSX.Element {
             isReceived ? styles.amountReceived : styles.amountSent,
           ]}
         >
-          {isReceived ? '+' : '-'}{amount.toLocaleString()} sats
+          {isReceived ? '+' : '-'}{amount.toLocaleString()} {t('wallet.sats')}
         </Text>
       </TouchableOpacity>
     );
@@ -245,7 +256,7 @@ export function HomeScreen(): React.JSX.Element {
         >
           {/* Balance Card */}
           <View style={styles.balanceCard}>
-            <Text style={[styles.balanceLabel, { color: secondaryTextColor }]}>Total Balance</Text>
+            <Text style={[styles.balanceLabel, { color: secondaryTextColor }]}>{t('wallet.balance')}</Text>
             {isLoading && !balance ? (
               <ActivityIndicator color="#FFC107" size="large" />
             ) : (
@@ -253,7 +264,7 @@ export function HomeScreen(): React.JSX.Element {
             )}
             {!showBalance && (
               <TouchableOpacity onPress={() => setShowBalance(true)}>
-                <Text style={styles.tapToReveal}>Tap to reveal</Text>
+                <Text style={styles.tapToReveal}>{t('common.tapToReveal')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -262,25 +273,25 @@ export function HomeScreen(): React.JSX.Element {
           <View style={styles.quickActionsContainer}>
             <QuickAction
               icon="↑"
-              label="Send"
+              label={t('wallet.send')}
               onPress={handleSend}
               color="#FF6B6B"
             />
             <QuickAction
               icon="↓"
-              label="Receive"
+              label={t('wallet.receive')}
               onPress={handleReceive}
               color="#4CAF50"
             />
             <QuickAction
               icon="⬡"
-              label="Scan"
+              label={t('payments.scanQR')}
               onPress={handleScan}
               color="#2196F3"
             />
             <QuickAction
               icon="💡"
-              label="Tip"
+              label={t('payments.tip')}
               onPress={handleCreateTip}
               color="#FFC107"
             />
@@ -288,9 +299,9 @@ export function HomeScreen(): React.JSX.Element {
 
           {/* Recent Transactions */}
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: primaryTextColor }]}>Recent Transactions</Text>
+            <Text style={[styles.sectionTitle, { color: primaryTextColor }]}>{t('wallet.transactions')}</Text>
             <TouchableOpacity onPress={handleViewHistory}>
-              <Text style={styles.seeAllButton}>See All</Text>
+              <Text style={styles.seeAllButton}>{t('common.seeAll')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -298,14 +309,14 @@ export function HomeScreen(): React.JSX.Element {
             {isLoading && transactions.length === 0 ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator color="#FFC107" />
-                <Text style={[styles.loadingText, { color: secondaryTextColor }]}>Loading transactions...</Text>
+                <Text style={[styles.loadingText, { color: secondaryTextColor }]}>{t('common.loading')}</Text>
               </View>
             ) : transactions.length === 0 ? (
               <View style={styles.emptyTransactions}>
                 <Text style={styles.emptyIcon}>📭</Text>
-                <Text style={[styles.emptyText, { color: secondaryTextColor }]}>No transactions yet</Text>
+                <Text style={[styles.emptyText, { color: secondaryTextColor }]}>{t('wallet.noTransactions')}</Text>
                 <Text style={[styles.emptySubtext, { color: secondaryTextColor }]}>
-                  Send or receive Bitcoin to get started
+                  {t('wallet.getStarted')}
                 </Text>
               </View>
             ) : (
@@ -347,7 +358,7 @@ export function HomeScreen(): React.JSX.Element {
           <View style={styles.modalContent}>
             {/* Header */}
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: primaryTextColor }]}>Transaction Details</Text>
+              <Text style={[styles.modalTitle, { color: primaryTextColor }]}>{t('wallet.transactionDetails')}</Text>
               <IconButton
                 icon="close"
                 iconColor={iconColor}
@@ -378,9 +389,9 @@ export function HomeScreen(): React.JSX.Element {
                 tx.status === 'pending' && styles.statusPending,
                 tx.status === 'failed' && styles.statusFailed,
               ]}>
-                {tx.status === 'completed' ? '✓ Completed' :
-                 tx.status === 'pending' ? '⏳ Pending' :
-                 tx.status === 'failed' ? '✕ Failed' : tx.status}
+                {tx.status === 'completed' ? `✓ ${t('wallet.statusCompleted')}` :
+                 tx.status === 'pending' ? `⏳ ${t('wallet.statusPending')}` :
+                 tx.status === 'failed' ? `✕ ${t('wallet.statusFailed')}` : tx.status}
               </Text>
             </View>
 
@@ -388,21 +399,21 @@ export function HomeScreen(): React.JSX.Element {
 
             {/* Details */}
             <View style={styles.detailsContainer}>
-              <DetailRow label="Type" value={isReceived ? 'Received' : 'Sent'} />
+              <DetailRow label={t('wallet.type')} value={isReceived ? t('wallet.received') : t('wallet.sent')} />
               <DetailRow
-                label="Date"
+                label={t('wallet.date')}
                 value={date.toLocaleDateString('en-US', {
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric',
                 })}
               />
-              <DetailRow label="Time" value={formatTime(tx.timestamp)} />
+              <DetailRow label={t('wallet.time')} value={formatTime(tx.timestamp)} />
               {tx.description && (
-                <DetailRow label="Description" value={tx.description} />
+                <DetailRow label={t('payments.description')} value={tx.description} />
               )}
               {tx.feeSats !== undefined && tx.feeSats > 0 && (
-                <DetailRow label="Fee" value={`${tx.feeSats.toLocaleString()} sats`} />
+                <DetailRow label={t('wallet.fee')} value={`${tx.feeSats.toLocaleString()} ${t('wallet.sats')}`} />
               )}
             </View>
 
@@ -413,7 +424,7 @@ export function HomeScreen(): React.JSX.Element {
               style={styles.closeModalButton}
               labelStyle={[styles.closeModalButtonLabel, { color: primaryTextColor }]}
             >
-              Close
+              {t('common.close')}
             </Button>
           </View>
         </View>

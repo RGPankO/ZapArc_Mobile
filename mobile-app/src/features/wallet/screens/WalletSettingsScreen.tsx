@@ -10,16 +10,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../../hooks/useSettings';
 import { useLanguage } from '../../../hooks/useLanguage';
 import { useAppTheme } from '../../../contexts/ThemeContext';
-import { getGradientColors, BRAND_COLOR, getPrimaryTextColor, getSecondaryTextColor } from '../../../utils/theme-helpers';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../utils/theme-helpers';
 
 // =============================================================================
 // Component
 // =============================================================================
 
 export function WalletSettingsScreen(): React.JSX.Element {
-  const { settings } = useSettings();
-  const { t, language } = useLanguage();
-  const { themeMode, theme } = useAppTheme();
+  const { settings, isLoading: settingsLoading } = useSettings();
+  const { currentLanguage, t } = useLanguage();
+  const { themeMode } = useAppTheme();
 
   const gradientColors = getGradientColors(themeMode);
   const primaryTextColor = getPrimaryTextColor(themeMode);
@@ -27,32 +27,68 @@ export function WalletSettingsScreen(): React.JSX.Element {
 
   // Format currency display
   const getCurrencyDisplay = (): string => {
-    const currency = settings?.currency || 'sats';
+    if (!settings) return 'sats';
+    const currency = settings.currency || 'sats';
     const map: Record<string, string> = {
-      sats: 'Satoshis (sats)',
-      btc: 'Bitcoin (BTC)',
-      usd: 'US Dollar (USD)',
-      eur: 'Euro (EUR)',
-      bgn: 'Bulgarian Lev (BGN)',
+      btc: 'BTC',
+      sats: 'Satoshis',
+      usd: 'USD',
+      eur: 'EUR',
     };
     return map[currency] || currency;
   };
 
   // Format language display
   const getLanguageDisplay = (): string => {
-    if (settings?.language === 'auto') {
-      return language === 'bg' ? 'Auto (Bulgarian)' : 'Auto (English)';
+    if (!settings) return t('settings.english');
+
+    try {
+      const lang = currentLanguage || 'en';
+      const langName = lang === 'bg' ? t('settings.bulgarian') : t('settings.english');
+
+      if (settings.language === 'auto') {
+        return `${t('common.auto')} (${langName})`;
+      }
+      return langName;
+    } catch (err) {
+      console.error('❌ [WalletSettings] getLanguageDisplay error:', err);
+      return t('settings.english');
     }
-    return language === 'bg' ? 'Bulgarian' : 'English';
   };
 
   // Format auto-lock display
   const getAutoLockDisplay = (): string => {
-    const timeout = settings?.autoLockTimeout || 900;
-    if (timeout === 0) return 'Never';
-    if (timeout < 60) return `${timeout} seconds`;
-    return `${timeout / 60} minutes`;
+    if (!settings) return `15 ${t('common.minutes')}`;
+
+    try {
+      const timeout = settings.autoLockTimeout || 900;
+      if (timeout < 60) return `${timeout} ${t('common.seconds')}`;
+      return `${timeout / 60} ${t('common.minutes')}`;
+    } catch (err) {
+      console.error('❌ [WalletSettings] getAutoLockDisplay error:', err);
+      return `15 ${t('common.minutes')}`;
+    }
   };
+
+  // Show loading state if settings not loaded yet
+  if (settingsLoading || !settings) {
+    return (
+      <LinearGradient colors={gradientColors} style={styles.gradient}>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.header}>
+            <IconButton
+              icon="arrow-left"
+              iconColor={primaryTextColor}
+              size={24}
+              onPress={() => router.back()}
+            />
+            <Text style={[styles.headerTitle, { color: primaryTextColor }]}>{t('settings.title')}</Text>
+            <View style={styles.headerSpacer} />
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
+    );
+  }
 
   return (
     <LinearGradient
@@ -68,21 +104,21 @@ export function WalletSettingsScreen(): React.JSX.Element {
             size={24}
             onPress={() => router.back()}
           />
-          <Text style={[styles.headerTitle, { color: primaryTextColor }]}>{t('settings')}</Text>
+          <Text style={[styles.headerTitle, { color: primaryTextColor }]}>{t('settings.title')}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
         <ScrollView style={styles.scrollView}>
           {/* Wallet Configuration */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>Wallet Configuration</Text>
+            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>{t('settings.walletConfiguration')}</Text>
 
             <List.Item
-              title="Wallet Type"
+              title={t('settings.walletType')}
               description={
                 settings?.useBuiltInWallet
-                  ? 'Built-in Wallet (Breez SDK)'
-                  : 'Custom LNURL'
+                  ? t('settings.builtInWallet')
+                  : t('settings.customLnurl')
               }
               left={(props) => (
                 <List.Icon {...props} icon="wallet" color="#FFC107" />
@@ -99,8 +135,8 @@ export function WalletSettingsScreen(): React.JSX.Element {
             <Divider style={styles.divider} />
 
             <List.Item
-              title="Default Tip Amounts"
-              description={`${settings?.defaultPostingAmounts?.join(', ') || '100, 500, 1000'} sats`}
+              title={t('settings.defaultTipAmounts')}
+              description={`${settings?.defaultPostingAmounts?.join(', ') || '100, 500, 1000'} ${t('wallet.sats')}`}
               left={(props) => (
                 <List.Icon {...props} icon="currency-btc" color="#FFC107" />
               )}
@@ -116,7 +152,7 @@ export function WalletSettingsScreen(): React.JSX.Element {
             <Divider style={styles.divider} />
 
             <List.Item
-              title="Display Currency"
+              title={t('settings.displayCurrency')}
               description={getCurrencyDisplay()}
               left={(props) => (
                 <List.Icon {...props} icon="cash" color="#FFC107" />
@@ -133,10 +169,10 @@ export function WalletSettingsScreen(): React.JSX.Element {
 
           {/* Language & Region */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>{t('language')}</Text>
+            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>{t('settings.languageRegion')}</Text>
 
             <List.Item
-              title={t('language')}
+              title={t('settings.language')}
               description={getLanguageDisplay()}
               left={(props) => (
                 <List.Icon {...props} icon="translate" color="#FFC107" />
@@ -153,10 +189,10 @@ export function WalletSettingsScreen(): React.JSX.Element {
 
           {/* Security */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>{t('security')}</Text>
+            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>{t('settings.security')}</Text>
 
             <List.Item
-              title="Auto-Lock Timeout"
+              title={t('settings.autoLockTimeout')}
               description={getAutoLockDisplay()}
               left={(props) => (
                 <List.Icon {...props} icon="timer" color="#FFC107" />
@@ -173,9 +209,9 @@ export function WalletSettingsScreen(): React.JSX.Element {
             <Divider style={styles.divider} />
 
             <List.Item
-              title="Biometric Authentication"
+              title={t('settings.biometric')}
               description={
-                settings?.biometricEnabled ? 'Enabled' : 'Disabled'
+                settings?.biometricEnabled ? t('common.enabled') : t('common.disabled')
               }
               left={(props) => (
                 <List.Icon {...props} icon="fingerprint" color="#FFC107" />
@@ -192,11 +228,11 @@ export function WalletSettingsScreen(): React.JSX.Element {
 
           {/* Backup & Recovery */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>Backup & Recovery</Text>
+            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>{t('settings.backupRecovery')}</Text>
 
             <List.Item
-              title="View Recovery Phrase"
-              description="Backup your wallet seed phrase"
+              title={t('wallet.viewRecoveryPhrase')}
+              description={t('wallet.backupSeedPhrase')}
               left={(props) => (
                 <List.Icon {...props} icon="key" color="#FFC107" />
               )}
@@ -212,11 +248,11 @@ export function WalletSettingsScreen(): React.JSX.Element {
 
           {/* App Settings */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>App Settings</Text>
+            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>{t('settings.appSettings')}</Text>
 
             <List.Item
-              title="Theme"
-              description="Dark mode and display settings"
+              title={t('settings.theme')}
+              description={t('settings.darkModeSettings')}
               left={(props) => (
                 <List.Icon {...props} icon="theme-light-dark" color="#FFC107" />
               )}
@@ -232,8 +268,8 @@ export function WalletSettingsScreen(): React.JSX.Element {
             <Divider style={styles.divider} />
 
             <List.Item
-              title="Notifications"
-              description="Manage notification preferences"
+              title={t('settings.notifications')}
+              description={t('settings.manageNotifications')}
               left={(props) => (
                 <List.Icon {...props} icon="bell" color="#FFC107" />
               )}
@@ -245,14 +281,31 @@ export function WalletSettingsScreen(): React.JSX.Element {
               descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
               style={styles.listItem}
             />
+
+            <Divider style={styles.divider} />
+
+            <List.Item
+              title={t('settings.language')}
+              description={`${t('settings.english')}, ${t('settings.bulgarian')}`}
+              left={(props) => (
+                <List.Icon {...props} icon="translate" color="#FFC107" />
+              )}
+              right={(props) => (
+                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
+              )}
+              onPress={() => router.push('/wallet/settings/language')}
+              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
+              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
+              style={styles.listItem}
+            />
           </View>
 
           {/* About */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>About</Text>
+            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>{t('settings.about')}</Text>
 
             <List.Item
-              title="Version"
+              title={t('settings.version')}
               description="1.0.0"
               left={(props) => (
                 <List.Icon {...props} icon="information" color="#FFC107" />

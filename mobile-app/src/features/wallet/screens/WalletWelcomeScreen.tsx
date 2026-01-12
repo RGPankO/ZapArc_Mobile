@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useWallet } from '../../../hooks/useWallet';
+import { useLanguage } from '../../../hooks/useLanguage';
 import { useAppTheme } from '../../../contexts/ThemeContext';
 import {
   getGradientColors,
@@ -21,6 +22,7 @@ const LIGHTNING_ICON = '⚡';
 
 export function WalletWelcomeScreen(): React.JSX.Element {
   const { activeMasterKey, addSubWallet, canAddSubWallet } = useWallet();
+  const { t } = useLanguage();
   const { themeMode, theme } = useAppTheme();
 
   // Get theme colors
@@ -59,11 +61,11 @@ export function WalletWelcomeScreen(): React.JSX.Element {
       const nickname = subWalletName.trim() || undefined;
       await addSubWallet(activeMasterKey.id, nickname);
       setShowAddSubWalletModal(false);
-      Alert.alert('Success', 'Sub-wallet created successfully');
+      Alert.alert(t('common.success'), t('onboarding.subWalletCreated'));
       router.replace('/wallet/home');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to add sub-wallet';
-      Alert.alert('Error', message);
+      const message = err instanceof Error ? err.message : t('onboarding.subWalletFailed');
+      Alert.alert(t('common.error'), message);
     } finally {
       setIsAdding(false);
     }
@@ -85,12 +87,12 @@ export function WalletWelcomeScreen(): React.JSX.Element {
             </View>
             
             <Text style={[styles.title, { color: primaryText }]}>
-              {activeMasterKey ? 'Set Up Your Wallet' : 'Zap Arc'}
+              {activeMasterKey ? t('onboarding.setupWallet') : 'Zap Arc'}
             </Text>
             <Text style={[styles.subtitle, { color: secondaryText }]}>
               {activeMasterKey
-                ? 'Choose how you want to set up your wallet'
-                : 'Your Lightning Network Wallet'}
+                ? t('onboarding.chooseSetup')
+                : t('onboarding.subtitle')}
             </Text>
           </View>
 
@@ -103,7 +105,7 @@ export function WalletWelcomeScreen(): React.JSX.Element {
               contentStyle={styles.buttonContent}
               labelStyle={styles.buttonLabel}
             >
-              Create New Wallet
+              {t('onboarding.createNew')}
             </Button>
 
             <Button
@@ -113,7 +115,7 @@ export function WalletWelcomeScreen(): React.JSX.Element {
               contentStyle={styles.buttonContent}
               labelStyle={[styles.importButtonLabel, { color: primaryText }]}
             >
-              Import Existing Wallet
+              {t('onboarding.importExisting')}
             </Button>
 
             {/* Add Sub-Wallet Button - only show if logged in */}
@@ -134,13 +136,13 @@ export function WalletWelcomeScreen(): React.JSX.Element {
                   !canAdd && styles.addSubWalletButtonLabelDisabled,
                 ]}
               >
-                Add Sub-Wallet
+                {t('onboarding.addSubWallet')}
               </Button>
             )}
-            
+
             {activeMasterKey && (
               <Text style={[styles.currentWalletHint, { color: secondaryText }]}>
-                Current wallet: {activeMasterKey.nickname}
+                {t('onboarding.currentWallet', { name: activeMasterKey.nickname })}
               </Text>
             )}
           </View>
@@ -153,7 +155,7 @@ export function WalletWelcomeScreen(): React.JSX.Element {
               style={styles.backButton}
               labelStyle={[styles.backButtonLabel, { color: secondaryText }]}
             >
-              Back
+              {t('common.back')}
             </Button>
           )}
 
@@ -161,7 +163,7 @@ export function WalletWelcomeScreen(): React.JSX.Element {
           {!activeMasterKey && (
             <View style={styles.footer}>
               <Text style={[styles.footerText, { color: secondaryText }]}>
-                By continuing, you agree to our Terms of Service
+                {t('onboarding.termsAgreement')}
               </Text>
             </View>
           )}
@@ -175,18 +177,18 @@ export function WalletWelcomeScreen(): React.JSX.Element {
             style={[styles.dialog, { backgroundColor: dialogBg }]}
           >
             <Dialog.Title style={[styles.dialogTitle, { color: primaryText }]}>
-              Name Your Sub-Wallet
+              {t('onboarding.nameSubWallet')}
             </Dialog.Title>
             <Dialog.Content>
               <Text style={[styles.dialogText, { color: secondaryText }]}>
-                Create a new sub-wallet under "{activeMasterKey?.nickname}"
+                {t('onboarding.createSubWalletUnder', { name: activeMasterKey?.nickname || '' })}
               </Text>
 
               <RNTextInput
                 style={[styles.nameInput, { color: primaryText }]}
                 value={subWalletName}
                 onChangeText={setSubWalletName}
-                placeholder="Sub-Wallet name"
+                placeholder={t('onboarding.subWalletName')}
                 placeholderTextColor={secondaryText}
                 autoFocus
               />
@@ -196,14 +198,14 @@ export function WalletWelcomeScreen(): React.JSX.Element {
                 onPress={() => setShowAddSubWalletModal(false)}
                 labelStyle={[styles.cancelButtonLabel, { color: secondaryText }]}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 onPress={handleConfirmAddSubWallet}
                 disabled={!subWalletName.trim() || isAdding}
                 loading={isAdding}
               >
-                Create
+                {t('onboarding.create')}
               </Button>
             </Dialog.Actions>
           </Dialog>

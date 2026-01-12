@@ -248,6 +248,9 @@ export function QRScannerScreen(): React.JSX.Element {
                   <View style={[styles.corner, styles.cornerTopRight]} />
                   <View style={[styles.corner, styles.cornerBottomLeft]} />
                   <View style={[styles.corner, styles.cornerBottomRight]} />
+                  {/* Crosshair for easy aiming */}
+                  <View style={styles.crosshairHorizontal} />
+                  <View style={styles.crosshairVertical} />
                 </View>
                 <View style={styles.overlaySide} />
               </View>
@@ -484,6 +487,26 @@ const styles = StyleSheet.create({
     right: 0,
     borderLeftWidth: 0,
     borderTopWidth: 0,
+  },
+  crosshairHorizontal: {
+    position: 'absolute',
+    width: 40,
+    height: 2,
+    backgroundColor: 'rgba(255, 193, 7, 0.8)',
+    top: '50%',
+    left: '50%',
+    marginLeft: -20,
+    marginTop: -1,
+  },
+  crosshairVertical: {
+    position: 'absolute',
+    width: 2,
+    height: 40,
+    backgroundColor: 'rgba(255, 193, 7, 0.8)',
+    top: '50%',
+    left: '50%',
+    marginLeft: -1,
+    marginTop: -20,
   },
   overlayBottom: {
     flex: 1,

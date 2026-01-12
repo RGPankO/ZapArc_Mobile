@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useWalletAuth } from '../../../hooks/useWalletAuth';
+import { useLanguage } from '../../../hooks/useLanguage';
 import { useAppTheme } from '../../../contexts/ThemeContext';
 import {
   getGradientColors,
@@ -39,6 +40,7 @@ const KEYPAD = [
 // =============================================================================
 
 export function PinEntryScreen(): React.JSX.Element {
+  const { t } = useLanguage();
   const { themeMode } = useAppTheme();
   
   // Get theme colors
@@ -136,7 +138,7 @@ export function PinEntryScreen(): React.JSX.Element {
         if (success) {
           router.replace('/wallet/home');
         } else {
-          setError('Incorrect PIN');
+          setError(t('auth.incorrectPin'));
           setAttempts((prev) => prev + 1);
           shake();
           setPin('');
@@ -147,14 +149,14 @@ export function PinEntryScreen(): React.JSX.Element {
         if (success) {
           router.replace('/wallet/home');
         } else {
-          setError('Incorrect PIN');
+          setError(t('auth.incorrectPin'));
           setAttempts((prev) => prev + 1);
           shake();
           setPin('');
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unlock failed');
+      setError(err instanceof Error ? err.message : t('auth.unlockFailed'));
       shake();
       setPin('');
     }
@@ -165,7 +167,7 @@ export function PinEntryScreen(): React.JSX.Element {
       // Biometric can only unlock current wallet, not switch to different one
       if (targetMasterKeyId) {
         // Cannot use biometric for switching wallets - need PIN
-        setError('Please enter PIN to switch wallets');
+        setError(t('auth.enterPinToSwitch'));
         return;
       }
       
@@ -200,13 +202,13 @@ export function PinEntryScreen(): React.JSX.Element {
   const getBiometricLabel = () => {
     switch (biometricType) {
       case 'facial':
-        return 'Use Face ID';
+        return t('auth.useFaceId');
       case 'fingerprint':
-        return 'Use Fingerprint';
+        return t('auth.useFingerprint');
       case 'iris':
-        return 'Use Iris Scan';
+        return t('auth.useIrisScan');
       default:
-        return 'Use Biometric';
+        return t('auth.useBiometric');
     }
   };
 
@@ -222,7 +224,7 @@ export function PinEntryScreen(): React.JSX.Element {
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.title, { color: primaryText }]}>Unlock Wallet</Text>
+          <Text style={[styles.title, { color: primaryText }]}>{t('auth.unlockWallet')}</Text>
           {activeWalletInfo && (
             <Text style={[styles.walletInfo, { color: secondaryText }]}>
               {activeWalletInfo.masterKeyNickname} • {activeWalletInfo.subWalletNickname}
@@ -258,7 +260,7 @@ export function PinEntryScreen(): React.JSX.Element {
           {/* Attempts Warning */}
           {attempts >= 3 && (
             <Text style={styles.warningText}>
-              {5 - attempts} attempts remaining
+              {t('auth.attemptsRemaining', { count: 5 - attempts })}
             </Text>
           )}
         </View>
@@ -336,7 +338,7 @@ export function PinEntryScreen(): React.JSX.Element {
           style={styles.switchWalletButton}
           onPress={() => router.push('/wallet/select')}
         >
-          <Text style={[styles.switchWalletText, { color: secondaryText }]}>Switch Wallet</Text>
+          <Text style={[styles.switchWalletText, { color: secondaryText }]}>{t('auth.switchWallet')}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     </LinearGradient>

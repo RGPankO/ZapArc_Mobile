@@ -190,8 +190,9 @@ export async function initializeSDK(
 
     _isInitialized = true;
     
-    // Setup event listeners for real-time updates
-    await setupEventListeners();
+    // NOTE: Event listeners DISABLED - addEventListener causes uncatchable native crashes
+    // TODO: Revisit when Breez SDK Spark has proper event listener documentation
+    // For now, users must pull-to-refresh to see new transactions
     
     console.log('✅ [BreezSparkService] Breez SDK initialized successfully');
     console.log('✅ [BreezSparkService] sdkInstance:', !!sdkInstance);
@@ -269,45 +270,74 @@ export function onPaymentReceived(callback: PaymentEventCallback): () => void {
  * Called internally after SDK initialization
  */
 async function setupEventListeners(): Promise<void> {
-  if (!sdkInstance || !_isNativeAvailable) return;
+  if (!sdkInstance || !_isNativeAvailable || !BreezSDK) return;
 
   try {
+    // Log available methods for debugging
+    console.log('🔵 [BreezSparkService] sdkInstance methods:', Object.keys(sdkInstance || {}).slice(0, 30));
+    console.log('🔵 [BreezSparkService] BreezSDK methods:', Object.keys(BreezSDK || {}).slice(0, 30));
+    
     // Unsubscribe from previous listener if exists
     if (eventListenerUnsubscribe) {
-      eventListenerUnsubscribe();
+      try {
+        eventListenerUnsubscribe();
+      } catch (e) {
+        console.warn('⚠️ [BreezSparkService] Error unsubscribing:', e);
+      }
+      eventListenerUnsubscribe = null;
     }
 
-    // Subscribe to SDK events
-    // The Breez SDK emits events for payments
-    eventListenerUnsubscribe = await sdkInstance.addEventListener((event: any) => {
-      console.log('📡 [BreezSparkService] SDK Event received:', event?.type || 'unknown');
+    // Event handler function
+    const handleEvent = (event: unknown): void => {
+      try {
+        const evt = event as { type?: string; details?: Record<string, unknown> };
+        console.log('📡 [BreezSparkService] SDK Event received:', evt?.type || 'unknown');
 
-      // Handle payment received event
-      if (event?.type === 'paymentSucceeded' || event?.type === 'invoicePaid') {
-        const payment: TransactionInfo = {
-          id: event.details?.paymentId || String(Date.now()),
-          type: 'receive',
-          amountSat: Number(event.details?.amountSat || 0),
-          feeSat: Number(event.details?.feeSat || 0),
-          status: 'completed',
-          timestamp: Date.now(),
-          description: event.details?.description,
-        };
+        // Handle payment received event
+        if (evt?.type === 'paymentSucceeded' || evt?.type === 'invoicePaid' || evt?.type === 'PaymentSucceeded') {
+          const payment: TransactionInfo = {
+            id: String(evt.details?.paymentId || Date.now()),
+            type: 'receive',
+            amountSat: Number(evt.details?.amountSat || 0),
+            feeSat: Number(evt.details?.feeSat || 0),
+            status: 'completed',
+            timestamp: Date.now(),
+            description: String(evt.details?.description || ''),
+          };
 
-        console.log('💰 [BreezSparkService] Payment received event:', payment);
+          console.log('💰 [BreezSparkService] Payment received event:', payment);
 
-        // Notify all listeners
-        paymentEventListeners.forEach((listener) => {
-          try {
-            listener(payment);
-          } catch (err) {
-            console.error('❌ [BreezSparkService] Event listener error:', err);
-          }
-        });
+          // Notify all listeners
+          paymentEventListeners.forEach((listener) => {
+            try {
+              listener(payment);
+            } catch (err) {
+              console.error('❌ [BreezSparkService] Event listener error:', err);
+            }
+          });
+        }
+      } catch (handlerError) {
+        console.error('❌ [BreezSparkService] Event handler error:', handlerError);
       }
-    });
+    };
 
-    console.log('✅ [BreezSparkService] Event listeners setup complete');
+    // Try module-level addEventListener first (some SDKs use this pattern)
+    if (typeof BreezSDK.addEventListener === 'function') {
+      console.log('🔵 [BreezSparkService] Using BreezSDK.addEventListener');
+      eventListenerUnsubscribe = await BreezSDK.addEventListener(handleEvent);
+      console.log('✅ [BreezSparkService] Event listeners setup via BreezSDK.addEventListener');
+      return;
+    }
+
+    // Try instance-level addEventListener
+    if (sdkInstance && typeof sdkInstance.addEventListener === 'function') {
+      console.log('🔵 [BreezSparkService] Using sdkInstance.addEventListener');
+      eventListenerUnsubscribe = await sdkInstance.addEventListener(handleEvent);
+      console.log('✅ [BreezSparkService] Event listeners setup via sdkInstance.addEventListener');
+      return;
+    }
+
+    console.warn('⚠️ [BreezSparkService] No addEventListener method found on SDK');
   } catch (error) {
     console.warn('⚠️ [BreezSparkService] Failed to setup event listeners:', error);
     // Don't fail initialization if events don't work

@@ -2,6 +2,7 @@
 // Manages wallet state, operations, and multi-wallet switching
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { storageService } from '../services';
 import * as BreezSparkService from '../services/breezSparkService';
 import * as WalletCache from '../services/walletCacheService';
@@ -161,10 +162,24 @@ export function useWallet(): WalletState & WalletActions {
           pin
         );
 
+        // Store PIN for biometric unlock if biometric is available
+        try {
+          const hasHardware = await LocalAuthentication.hasHardwareAsync();
+          const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+          if (hasHardware && isEnrolled) {
+            await storageService.storeBiometricPin(masterKeyId, pin);
+            console.log('✅ [useWallet] PIN stored for biometric unlock');
+          }
+        } catch (biometricError) {
+          console.warn('⚠️ [useWallet] Failed to store biometric PIN:', biometricError);
+        }
+
         // Initialize Breez SDK with the new wallet's mnemonic (sub-wallet index 0)
+        let sdkInitialized = false;
         try {
           const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, 0);
           await BreezSparkService.initializeSDK(derivedMnemonic);
+          sdkInitialized = true;
           console.log('✅ [useWallet] Breez SDK initialized for new wallet');
         } catch (sdkError) {
           // Log SDK error but don't fail creation - SDK may not be available in Expo Go
@@ -172,6 +187,12 @@ export function useWallet(): WalletState & WalletActions {
         }
 
         await loadWalletData();
+
+        // Mark as connected if SDK initialized - balance will be fetched by polling effect
+        if (sdkInitialized) {
+          setIsConnected(true);
+        }
+
         console.log('✅ [useWallet] Master key created:', masterKeyId);
 
         return masterKeyId;
@@ -210,10 +231,24 @@ export function useWallet(): WalletState & WalletActions {
           pin
         );
 
+        // Store PIN for biometric unlock if biometric is available
+        try {
+          const hasHardware = await LocalAuthentication.hasHardwareAsync();
+          const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+          if (hasHardware && isEnrolled) {
+            await storageService.storeBiometricPin(masterKeyId, pin);
+            console.log('✅ [useWallet] PIN stored for biometric unlock');
+          }
+        } catch (biometricError) {
+          console.warn('⚠️ [useWallet] Failed to store biometric PIN:', biometricError);
+        }
+
         // Initialize Breez SDK with the imported wallet's mnemonic (sub-wallet index 0)
+        let sdkInitialized = false;
         try {
           const derivedMnemonic = deriveSubWalletMnemonic(normalizedMnemonic, 0);
           await BreezSparkService.initializeSDK(derivedMnemonic);
+          sdkInitialized = true;
           console.log('✅ [useWallet] Breez SDK initialized for imported wallet');
         } catch (sdkError) {
           // Log SDK error but don't fail import - SDK may not be available in Expo Go
@@ -221,6 +256,12 @@ export function useWallet(): WalletState & WalletActions {
         }
 
         await loadWalletData();
+
+        // Mark as connected if SDK initialized - balance will be fetched by polling effect
+        if (sdkInitialized) {
+          setIsConnected(true);
+        }
+
         console.log('✅ [useWallet] Master key imported:', masterKeyId);
 
         return masterKeyId;
@@ -420,6 +461,7 @@ export function useWallet(): WalletState & WalletActions {
   const refreshBalance = useCallback(async (): Promise<void> => {
     try {
       const walletInfo = await storageService.getActiveWalletInfo();
+
       if (!walletInfo) {
         setBalance(0);
         setIsLoading(false);
@@ -434,16 +476,14 @@ export function useWallet(): WalletState & WalletActions {
 
       if (cached) {
         setBalance(cached.balance);
-        setIsLoading(false); // Have data, no need to show loader
-        setIsRefreshing(true); // But indicate we're refreshing in background
+        setIsLoading(false);
+        setIsRefreshing(true);
       } else {
-        // No cache, show full loader
         setIsLoading(true);
       }
 
       // Fetch fresh data from SDK
       if (!BreezSparkService.isSDKInitialized()) {
-        // If SDK not initialized and we have cache, keep using it
         if (!cached) {
           setBalance(0);
           setIsLoading(false);
@@ -530,22 +570,10 @@ export function useWallet(): WalletState & WalletActions {
   // ========================================
   // Real-time Payment Event Listener
   // ========================================
-
-  useEffect(() => {
-    // Subscribe to payment events for automatic balance updates
-    const unsubscribe = BreezSparkService.onPaymentReceived(async (payment) => {
-      console.log('💰 [useWallet] Payment event received:', payment);
-      
-      // Refresh balance and transactions automatically
-      await Promise.all([refreshBalance(), refreshTransactions()]);
-      
-      console.log('✅ [useWallet] Balance and transactions refreshed after payment');
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [refreshBalance, refreshTransactions]);
+  
+  // NOTE: Disabled - The SDK addEventListener was causing native crashes
+  // Real-time payment updates will be reimplemented when proper Breez SDK event API is available
+  // For now, users need to pull-to-refresh manually to see new transactions
 
   // ========================================
   // SDK Connection StatusSync
@@ -555,34 +583,59 @@ export function useWallet(): WalletState & WalletActions {
   // This ensures balance loads after SDK becomes available
   useEffect(() => {
     let isMounted = true;
+    let interval: number | null = null;
 
     const checkAndSync = async (): Promise<void> => {
-      const sdkInitialized = BreezSparkService.isSDKInitialized();
+      try {
+        if (!isMounted) return;
+        
+        const sdkInitialized = BreezSparkService.isSDKInitialized();
 
-      if (sdkInitialized && !isConnected && isMounted) {
-        setIsConnected(true);
-        // Refresh balance and transactions when SDK becomes available
-        await refreshBalance();
-        await refreshTransactions();
-      } else if (!sdkInitialized && isConnected && isMounted) {
-        console.log('⚠️ [useWallet] SDK disconnected');
-        setIsConnected(false);
+        if (sdkInitialized && !isConnected && isMounted) {
+          setIsConnected(true);
+          // Refresh balance and transactions when SDK becomes available
+          try {
+            await refreshBalance();
+            await refreshTransactions();
+          } catch (refreshError) {
+            console.error('❌ [useWallet] Refresh error in SDK sync:', refreshError);
+          }
+        } else if (!sdkInitialized && isConnected && isMounted) {
+          console.log('⚠️ [useWallet] SDK disconnected');
+          setIsConnected(false);
+        }
+      } catch (error) {
+        console.error('❌ [useWallet] SDK sync check error:', error);
       }
     };
 
-    // Initial check
-    checkAndSync();
+    // Initial check with error handling
+    checkAndSync().catch(err => {
+      console.error('❌ [useWallet] Initial SDK sync error:', err);
+    });
 
     // Poll every 500ms until SDK is initialized
-    const interval = global.setInterval(() => {
-      if (!isConnected && isMounted) {
-        checkAndSync();
-      }
-    }, 500);
+    try {
+      interval = global.setInterval(() => {
+        if (!isConnected && isMounted) {
+          checkAndSync().catch(err => {
+            console.error('❌ [useWallet] Polling SDK sync error:', err);
+          });
+        }
+      }, 500);
+    } catch (error) {
+      console.error('❌ [useWallet] Failed to start SDK polling:', error);
+    }
 
     return (): void => {
       isMounted = false;
-      global.clearInterval(interval);
+      if (interval) {
+        try {
+          global.clearInterval(interval);
+        } catch (error) {
+          console.error('❌ [useWallet] Interval cleanup error:', error);
+        }
+      }
     };
   }, [isConnected, refreshBalance, refreshTransactions]);
 

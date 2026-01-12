@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '../../../contexts/ThemeContext';
 import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor } from '../../../utils/theme-helpers';
 import { useWallet } from '../../../hooks/useWallet';
+import { useLanguage } from '../../../hooks/useLanguage';
 import type { Transaction } from '../types';
 
 // =============================================================================
@@ -31,6 +32,7 @@ type FilterType = 'all' | 'sent' | 'received';
 
 export function TransactionHistoryScreen(): React.JSX.Element {
   const { transactions, refreshTransactions, isLoading } = useWallet();
+  const { t } = useLanguage();
 
   const { themeMode } = useAppTheme();
   const gradientColors = getGradientColors(themeMode);
@@ -120,7 +122,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
 
         <View style={styles.transactionInfo}>
           <Text style={[styles.transactionDescription, { color: primaryTextColor }]} numberOfLines={1}>
-            {tx.description || (isReceived ? 'Received payment' : 'Sent payment')}
+            {tx.description || (isReceived ? t('wallet.receivedPayment') : t('wallet.sentPayment'))}
           </Text>
           <Text style={[styles.transactionTime, { color: secondaryTextColor }]}>{formatTime(tx.timestamp)}</Text>
         </View>
@@ -134,7 +136,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
           >
             {isReceived ? '+' : '-'}{(tx.amount ?? 0).toLocaleString()}
           </Text>
-          <Text style={[styles.transactionAmountUnit, { color: secondaryTextColor }]}>sats</Text>
+          <Text style={[styles.transactionAmountUnit, { color: secondaryTextColor }]}>{t('wallet.sats')}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -166,7 +168,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
           <View style={styles.modalContent}>
             {/* Header */}
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: primaryTextColor }]}>Transaction Details</Text>
+              <Text style={[styles.modalTitle, { color: primaryTextColor }]}>{t('wallet.transactionDetails')}</Text>
               <IconButton
                 icon="close"
                 iconColor={iconColor}
@@ -193,10 +195,10 @@ export function TransactionHistoryScreen(): React.JSX.Element {
                   isReceived ? styles.amountReceived : styles.amountSent,
                 ]}
               >
-                {isReceived ? '+' : '-'}{(tx.amount ?? 0).toLocaleString()} sats
+                {isReceived ? '+' : '-'}{(tx.amount ?? 0).toLocaleString()} {t('wallet.sats')}
               </Text>
               <Text style={styles.modalStatus}>
-                {tx.status === 'completed' ? '✓ Completed' : tx.status}
+                {tx.status === 'completed' ? `✓ ${t('wallet.statusCompleted')}` : tx.status}
               </Text>
             </View>
 
@@ -204,25 +206,25 @@ export function TransactionHistoryScreen(): React.JSX.Element {
 
             {/* Details */}
             <View style={styles.detailsContainer}>
-              <DetailRow label="Type" value={isReceived ? 'Received' : 'Sent'} />
+              <DetailRow label={t('wallet.type')} value={isReceived ? t('wallet.received') : t('wallet.sent')} />
               <DetailRow
-                label="Date"
+                label={t('wallet.date')}
                 value={date.toLocaleDateString('en-US', {
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric',
                 })}
               />
-              <DetailRow label="Time" value={formatTime(tx.timestamp)} />
+              <DetailRow label={t('wallet.time')} value={formatTime(tx.timestamp)} />
               {tx.description && (
-                <DetailRow label="Description" value={tx.description} />
+                <DetailRow label={t('payments.description')} value={tx.description} />
               )}
               {tx.feeSats !== undefined && tx.feeSats > 0 && (
-                <DetailRow label="Fee" value={`${tx.feeSats.toLocaleString()} sats`} />
+                <DetailRow label={t('wallet.fee')} value={`${tx.feeSats.toLocaleString()} ${t('wallet.sats')}`} />
               )}
               {tx.paymentHash && (
                 <DetailRow
-                  label="Payment Hash"
+                  label={t('wallet.paymentHash')}
                   value={`${tx.paymentHash.slice(0, 16)}...`}
                   copyable
                   fullValue={tx.paymentHash}
@@ -237,7 +239,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
               style={styles.closeModalButton}
               labelStyle={[styles.closeModalButtonLabel, { color: primaryTextColor }]}
             >
-              Close
+              {t('common.close')}
             </Button>
           </View>
         </View>
@@ -259,7 +261,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
             size={24}
             onPress={() => router.back()}
           />
-          <Text style={[styles.headerTitle, { color: primaryTextColor }]}>Transaction History</Text>
+          <Text style={[styles.headerTitle, { color: primaryTextColor }]}>{t('wallet.transactionHistory')}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -274,7 +276,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
               filter === 'all' && styles.filterChipTextActive,
             ]}
           >
-            All
+            {t('common.all')}
           </Chip>
           <Chip
             selected={filter === 'received'}
@@ -285,7 +287,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
               filter === 'received' && styles.filterChipTextActive,
             ]}
           >
-            Received
+            {t('wallet.receivedPlural')}
           </Chip>
           <Chip
             selected={filter === 'sent'}
@@ -296,7 +298,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
               filter === 'sent' && styles.filterChipTextActive,
             ]}
           >
-            Sent
+            {t('wallet.sentPlural')}
           </Chip>
         </View>
 
@@ -304,11 +306,11 @@ export function TransactionHistoryScreen(): React.JSX.Element {
         {filteredTransactions.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>📭</Text>
-            <Text style={[styles.emptyTitle, { color: primaryTextColor }]}>No Transactions</Text>
+            <Text style={[styles.emptyTitle, { color: primaryTextColor }]}>{t('wallet.noTransactions')}</Text>
             <Text style={[styles.emptySubtitle, { color: secondaryTextColor }]}>
               {filter === 'all'
-                ? 'Your transaction history will appear here'
-                : `No ${filter} transactions found`}
+                ? t('wallet.historyWillAppear')
+                : t('wallet.noTransactionsFound', { filter: filter === 'received' ? t('wallet.received').toLowerCase() : t('wallet.sent').toLowerCase() })}
             </Text>
           </View>
         ) : (

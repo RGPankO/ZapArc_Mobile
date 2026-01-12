@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '../../../../contexts/ThemeContext';
+import { useLanguage } from '../../../../hooks/useLanguage';
 
 // =============================================================================
 // Component
@@ -15,6 +16,7 @@ import { useAppTheme } from '../../../../contexts/ThemeContext';
 
 export function ThemeSettingsScreen(): React.JSX.Element {
   const { themeMode, toggleTheme, theme } = useAppTheme();
+  const { t } = useLanguage();
 
   // Dynamic gradient colors based on theme
   const gradientColors = themeMode === 'dark'
@@ -36,7 +38,7 @@ export function ThemeSettingsScreen(): React.JSX.Element {
             onPress={() => router.back()}
           />
           <Text style={[styles.headerTitle, { color: theme.colors.onBackground }]}>
-            Theme
+            {t('settings.theme')}
           </Text>
           <View style={styles.headerSpacer} />
         </View>
@@ -45,8 +47,8 @@ export function ThemeSettingsScreen(): React.JSX.Element {
           <View style={styles.settingsList}>
             {/* Dark Mode Toggle */}
             <List.Item
-              title="Dark Mode"
-              description="Use dark theme throughout the app"
+              title={t('settings.darkMode')}
+              description={t('settings.useDarkTheme')}
               left={(props) => (
                 <List.Icon {...props} icon="theme-light-dark" color="#FFC107" />
               )}
