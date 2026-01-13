@@ -18,8 +18,8 @@ import { useAppTheme } from '../../../contexts/ThemeContext';
 import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor } from '../../../utils/theme-helpers';
 import { useWallet } from '../../../hooks/useWallet';
 import { useWalletAuth } from '../../../hooks/useWalletAuth';
-import { useSettings } from '../../../hooks/useSettings';
 import { useLanguage } from '../../../hooks/useLanguage';
+import { useCurrency } from '../../../hooks/useCurrency';
 import { onPaymentReceived } from '../../../services/breezSparkService';
 import type { Transaction } from '../types';
 
@@ -49,8 +49,8 @@ export function HomeScreen(): React.JSX.Element {
     activeWalletInfo,
   } = useWallet();
   const { lock } = useWalletAuth();
-  const { settings } = useSettings();
   const { t } = useLanguage();
+  const { format, formatTx, refreshSettings } = useCurrency();
 
   const { themeMode } = useAppTheme();
   const gradientColors = getGradientColors(themeMode);
@@ -63,29 +63,9 @@ export function HomeScreen(): React.JSX.Element {
   const [showBalance, setShowBalance] = useState(true);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
-  // Currency formatting
-  const formatBalance = (sats: number): string => {
-    try {
-      if (!showBalance) return '••••••';
-
-      // Ensure sats is a valid number
-      const safeSats = typeof sats === 'number' && !isNaN(sats) ? sats : 0;
-
-      const currency = settings?.currency || 'BTC';
-
-      if (String(currency).toUpperCase() === 'BTC') {
-        // Convert sats to BTC
-        const btc = safeSats / 100_000_000;
-        return `₿ ${btc.toFixed(8)}`;
-      } else if (String(currency).toUpperCase() === 'SATS') {
-        return `${safeSats.toLocaleString()} sats`;
-      } else {
-        return `${safeSats.toLocaleString()} sats`;
-      }
-    } catch (err) {
-      console.error('❌ [HomeScreen] formatBalance error:', err);
-      return '0 sats';
-    }
+  // Currency formatting using the useCurrency hook
+  const getFormattedBalance = (sats: number) => {
+    return format(sats, { hideBalance: !showBalance });
   };
 
   // Refresh handler (for manual pull-to-refresh)
@@ -137,14 +117,17 @@ export function HomeScreen(): React.JSX.Element {
     };
   }, [refreshBalance, refreshTransactions]);
 
-  // Refresh transactions when screen comes into focus
-  // This ensures the transaction list updates when returning from payment screen
+  // Refresh transactions and settings when screen comes into focus
+  // This ensures the transaction list and currency display updates when returning from other screens
   useFocusEffect(
     useCallback(() => {
+      // Always refresh settings when screen comes into focus
+      refreshSettings();
+      
       if (isConnected && !isLoading) {
         refreshTransactions();
       }
-    }, [isConnected, isLoading, refreshTransactions])
+    }, [isConnected, isLoading, refreshTransactions, refreshSettings])
   );
 
   // Navigation handlers
@@ -187,6 +170,7 @@ export function HomeScreen(): React.JSX.Element {
     const amount = tx.amount ?? 0;
     const timestamp = typeof tx.timestamp === 'number' && tx.timestamp > 0 ? tx.timestamp : Date.now();
     const date = new Date(timestamp).toLocaleDateString();
+    const formattedTx = formatTx(amount, isReceived);
 
     return (
       <TouchableOpacity
@@ -205,14 +189,21 @@ export function HomeScreen(): React.JSX.Element {
           </Text>
           <Text style={[styles.transactionDate, { color: secondaryTextColor }]}>{date}</Text>
         </View>
-        <Text
-          style={[
-            styles.transactionAmount,
-            isReceived ? styles.amountReceived : styles.amountSent,
-          ]}
-        >
-          {isReceived ? '+' : '-'}{amount.toLocaleString()} {t('wallet.sats')}
-        </Text>
+        <View style={styles.transactionAmountContainer}>
+          <Text
+            style={[
+              styles.transactionAmount,
+              isReceived ? styles.amountReceived : styles.amountSent,
+            ]}
+          >
+            {formattedTx.primary}
+          </Text>
+          {formattedTx.secondaryCompact && (
+            <Text style={[styles.transactionAmountSecondary, { color: secondaryTextColor }]}>
+              {formattedTx.secondaryCompact}
+            </Text>
+          )}
+        </View>
       </TouchableOpacity>
     );
   };
@@ -286,7 +277,16 @@ export function HomeScreen(): React.JSX.Element {
             {isLoading && !balance ? (
               <ActivityIndicator color="#FFC107" size="large" />
             ) : (
-              <Text style={[styles.balanceAmount, { color: primaryTextColor }]}>{formatBalance(balance)}</Text>
+              <>
+                <Text style={[styles.balanceAmount, { color: primaryTextColor }]}>
+                  {getFormattedBalance(balance).primary}
+                </Text>
+                {showBalance && getFormattedBalance(balance).secondary && (
+                  <Text style={[styles.balanceSecondary, { color: secondaryTextColor }]}>
+                    {getFormattedBalance(balance).secondary}
+                  </Text>
+                )}
+              </>
             )}
             {!showBalance && (
               <TouchableOpacity onPress={() => setShowBalance(true)}>
@@ -406,8 +406,13 @@ export function HomeScreen(): React.JSX.Element {
                   isReceived ? styles.amountReceived : styles.amountSent,
                 ]}
               >
-                {isReceived ? '+' : '-'}{(tx.amount ?? 0).toLocaleString()} sats
+                {formatTx(tx.amount ?? 0, isReceived).primary}
               </Text>
+              {formatTx(tx.amount ?? 0, isReceived).secondary && (
+                <Text style={[styles.modalAmountSecondary, { color: secondaryTextColor }]}>
+                  {formatTx(tx.amount ?? 0, isReceived).secondary}
+                </Text>
+              )}
               <Text style={[
                 styles.modalStatus,
                 { color: secondaryTextColor },
@@ -415,9 +420,9 @@ export function HomeScreen(): React.JSX.Element {
                 tx.status === 'pending' && styles.statusPending,
                 tx.status === 'failed' && styles.statusFailed,
               ]}>
-                {tx.status === 'completed' ? `✓ ${t('wallet.statusCompleted')}` :
-                 tx.status === 'pending' ? `⏳ ${t('wallet.statusPending')}` :
-                 tx.status === 'failed' ? `✕ ${t('wallet.statusFailed')}` : tx.status}
+                {tx.status === 'completed' ? `\u2713 ${t('wallet.statusCompleted')}` :
+                 tx.status === 'pending' ? `\u23F3 ${t('wallet.statusPending')}` :
+                 tx.status === 'failed' ? `\u2715 ${t('wallet.statusFailed')}` : tx.status}
               </Text>
             </View>
 
@@ -563,6 +568,10 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: 'bold',
   },
+  balanceSecondary: {
+    fontSize: 14,
+    marginTop: 4,
+  },
   tapToReveal: {
     fontSize: 12,
     color: '#FFC107',
@@ -664,9 +673,16 @@ const styles = StyleSheet.create({
   transactionDate: {
     fontSize: 12,
   },
+  transactionAmountContainer: {
+    alignItems: 'flex-end',
+  },
   transactionAmount: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  transactionAmountSecondary: {
+    fontSize: 11,
+    marginTop: 2,
   },
   amountReceived: {
     color: '#4CAF50',
@@ -717,6 +733,10 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 4,
+  },
+  modalAmountSecondary: {
+    fontSize: 14,
+    marginBottom: 8,
   },
   modalStatus: {
     fontSize: 14,

@@ -77,11 +77,11 @@ export function PinEntryScreen(): React.JSX.Element {
   // ========================================
 
   useEffect(() => {
-    // Try biometric on mount if available
-    if (biometricAvailable) {
+    // Try biometric on mount if available, but not when switching wallets
+    if (biometricAvailable && !targetMasterKeyId) {
       handleBiometricUnlock();
     }
-  }, [biometricAvailable]);
+  }, [biometricAvailable, targetMasterKeyId]);
 
   // Auto-submit when PIN is complete
   useEffect(() => {
@@ -336,7 +336,7 @@ export function PinEntryScreen(): React.JSX.Element {
         {/* Switch Wallet Button */}
         <TouchableOpacity
           style={styles.switchWalletButton}
-          onPress={() => router.push('/wallet/select')}
+          onPress={() => router.push('/wallet/selection')}
         >
           <Text style={[styles.switchWalletText, { color: secondaryText }]}>{t('auth.switchWallet')}</Text>
         </TouchableOpacity>

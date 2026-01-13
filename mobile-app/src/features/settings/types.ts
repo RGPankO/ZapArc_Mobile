@@ -12,7 +12,11 @@ export interface UserSettings {
   // Language and Localization
   language: 'en' | 'bg' | 'auto'; // 'auto' = detect from location
   isLocationBased: boolean;
-  currency: CurrencyCode;
+  
+  // Currency Display Settings
+  currency: CurrencyCode; // @deprecated - kept for backwards compatibility, use primaryDenomination
+  primaryDenomination: PrimaryDenomination; // How to display Bitcoin amounts (sats or btc)
+  secondaryFiatCurrency: FiatCurrency; // Which fiat currency to show as secondary (usd or eur)
 
   // Wallet Configuration
   useBuiltInWallet: boolean; // true = Breez SDK, false = custom LNURL
@@ -36,9 +40,19 @@ export interface UserSettings {
 }
 
 /**
- * Supported currency codes for display
+ * Supported currency codes for display (legacy, kept for backwards compatibility)
  */
-export type CurrencyCode = 'sats' | 'btc' | 'usd' | 'eur' | 'bgn';
+export type CurrencyCode = 'sats' | 'btc' | 'usd' | 'eur';
+
+/**
+ * Primary denomination for Bitcoin display
+ */
+export type PrimaryDenomination = 'sats' | 'btc';
+
+/**
+ * Fiat currency for secondary conversion display
+ */
+export type FiatCurrency = 'usd' | 'eur';
 
 /**
  * Theme mode options
@@ -125,7 +139,9 @@ export interface LocationData {
 export const DEFAULT_USER_SETTINGS: UserSettings = {
   language: 'en',
   isLocationBased: true,
-  currency: 'sats',
+  currency: 'sats', // Legacy field, kept for backwards compatibility
+  primaryDenomination: 'sats', // Default to satoshis
+  secondaryFiatCurrency: 'usd', // Default to USD for fiat conversion
   useBuiltInWallet: true,
   defaultPostingAmounts: [100, 500, 1000],
   defaultTippingAmounts: [100, 500, 1000],

@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useWallet } from '../../../hooks/useWallet';
+import { useCurrency } from '../../../hooks/useCurrency';
 
 // =============================================================================
 // Types
@@ -36,6 +37,7 @@ export function PaymentConfirmationScreen(): React.JSX.Element {
   }>();
 
   const { balance, sendPayment } = useWallet();
+  const { format } = useCurrency();
 
   // State
   const [status, setStatus] = useState<PaymentStatus>('confirming');
@@ -146,8 +148,13 @@ export function PaymentConfirmationScreen(): React.JSX.Element {
             </View>
             <Text style={styles.successTitle}>Payment Sent!</Text>
             <Text style={styles.successAmount}>
-              {formatSats(paymentInfo.amount)} sats
+              {format(paymentInfo.amount).primary}
             </Text>
+            {format(paymentInfo.amount).secondary && (
+              <Text style={styles.successAmountSecondary}>
+                {format(paymentInfo.amount).secondary}
+              </Text>
+            )}
             <Text style={styles.successSubtext}>
               Your payment has been successfully sent
             </Text>
@@ -231,9 +238,13 @@ export function PaymentConfirmationScreen(): React.JSX.Element {
           <View style={styles.amountCard}>
             <Text style={styles.amountLabel}>You're sending</Text>
             <Text style={styles.amountValue}>
-              {formatSats(paymentInfo.amount)}
+              {format(paymentInfo.amount).primary}
             </Text>
-            <Text style={styles.amountUnit}>sats</Text>
+            {format(paymentInfo.amount).secondary && (
+              <Text style={styles.amountSecondary}>
+                {format(paymentInfo.amount).secondary}
+              </Text>
+            )}
           </View>
 
           <View style={styles.detailsCard}>
@@ -377,10 +388,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFC107',
   },
-  amountUnit: {
-    fontSize: 16,
+  amountSecondary: {
+    fontSize: 14,
     color: 'rgba(255, 255, 255, 0.6)',
-    marginTop: 4,
+    marginTop: 8,
   },
   detailsCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -503,6 +514,11 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     color: '#FFC107',
+    marginBottom: 4,
+  },
+  successAmountSecondary: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
     marginBottom: 8,
   },
   successSubtext: {

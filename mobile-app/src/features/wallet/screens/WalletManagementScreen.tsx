@@ -242,11 +242,8 @@ export function WalletManagementScreen(): React.JSX.Element {
 
         if (activeDeleted) {
           if (nextActiveId) {
-            // Switch to the new active wallet's unlock screen
-            router.replace({
-              pathname: '/wallet/unlock',
-              params: { masterKeyId: nextActiveId, subWalletIndex: '0' },
-            });
+            // Show wallet selection screen to choose another wallet
+            router.replace('/wallet/selection');
           } else {
             // No wallets left, go to welcome
             router.replace('/wallet/welcome');

@@ -1,7 +1,7 @@
 // Wallet Selection Screen
 // Hierarchical wallet list with master keys and sub-wallets
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -31,18 +31,19 @@ export function WalletSelectionScreen(): React.JSX.Element {
   const iconColor = getIconColor(themeMode);
 
   const { masterKeys, activeWalletInfo } = useWallet();
-  const { selectWallet, selectSubWallet, currentMasterKeyId } = useWalletAuth();
+  const { selectSubWallet, currentMasterKeyId, isUnlocked } = useWalletAuth();
 
-  // State
-  const [expandedMasterKeys, setExpandedMasterKeys] = useState<Set<string>>(
-    new Set([currentMasterKeyId || ''])
-  );
-  const [pinInput, setPinInput] = useState('');
-  const [selectedMasterKey, setSelectedMasterKey] = useState<string | null>(null);
-  const [selectedSubWalletIndex, setSelectedSubWalletIndex] = useState<number | null>(null);
-  const [showPinModal, setShowPinModal] = useState(false);
+  // State - expand all master keys by default
+  const [expandedMasterKeys, setExpandedMasterKeys] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Expand all master keys when they load
+  useEffect(() => {
+    if (masterKeys.length > 0) {
+      setExpandedMasterKeys(new Set(masterKeys.map((mk) => mk.id)));
+    }
+  }, [masterKeys]);
 
   // ========================================
   // Toggle Master Key Expansion
@@ -66,15 +67,17 @@ export function WalletSelectionScreen(): React.JSX.Element {
 
   const handleSelectWallet = useCallback(
     async (masterKeyId: string, subWalletIndex: number) => {
-      // Check if this is a different master key that requires PIN
-      if (masterKeyId !== currentMasterKeyId) {
-        setSelectedMasterKey(masterKeyId);
-        setSelectedSubWalletIndex(subWalletIndex);
-        setShowPinModal(true);
+      // Always require PIN if not unlocked, or if switching to a different master key
+      if (!isUnlocked || masterKeyId !== currentMasterKeyId) {
+        // Navigate to unlock page with selected wallet
+        router.replace({
+          pathname: '/wallet/unlock',
+          params: { masterKeyId, subWalletIndex: subWalletIndex.toString() },
+        });
         return;
       }
 
-      // Same master key - use selectSubWallet which will reinitialize SDK
+      // Same master key and already unlocked - use selectSubWallet which will reinitialize SDK
       try {
         setIsLoading(true);
         const success = await selectSubWallet(subWalletIndex);
@@ -88,36 +91,8 @@ export function WalletSelectionScreen(): React.JSX.Element {
         setIsLoading(false);
       }
     },
-    [currentMasterKeyId, selectSubWallet]
+    [isUnlocked, currentMasterKeyId, selectSubWallet]
   );
-
-  const handlePinSubmit = useCallback(async () => {
-    if (!selectedMasterKey || selectedSubWalletIndex === null) return;
-
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const success = await selectWallet(
-        selectedMasterKey,
-        selectedSubWalletIndex,
-        pinInput
-      );
-
-      if (success) {
-        setShowPinModal(false);
-        router.replace('/wallet/home');
-      } else {
-        setError('Incorrect PIN');
-        setPinInput('');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to select wallet');
-      setPinInput('');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [selectedMasterKey, selectedSubWalletIndex, pinInput, selectWallet]);
 
   // ========================================
   // Render Master Key
@@ -220,97 +195,6 @@ export function WalletSelectionScreen(): React.JSX.Element {
   };
 
   // ========================================
-  // PIN Modal
-  // ========================================
-
-  const renderPinModal = () => {
-    if (!showPinModal) return null;
-
-    const masterKey = masterKeys.find((mk) => mk.id === selectedMasterKey);
-
-    return (
-      <View style={styles.pinModalOverlay}>
-        <View style={styles.pinModalContent}>
-          <Text style={[styles.pinModalTitle, { color: primaryTextColor }]}>Enter PIN</Text>
-          <Text style={[styles.pinModalSubtitle, { color: secondaryTextColor }]}>
-            Unlock {masterKey?.nickname || 'wallet'}
-          </Text>
-
-          {error && (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          )}
-
-          <View style={styles.pinInputContainer}>
-            {/* Simple PIN input for demo - use proper PIN component in production */}
-            <View style={styles.pinDotsContainer}>
-              {Array(6)
-                .fill(0)
-                .map((_, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.pinDot,
-                      i < pinInput.length && styles.pinDotFilled,
-                    ]}
-                  />
-                ))}
-            </View>
-
-            {/* Simple keypad */}
-            <View style={styles.miniKeypad}>
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '←'].map(
-                (key, i) => (
-                  <TouchableOpacity
-                    key={`keypad-${i}-${key}`}
-                    style={[styles.miniKeypadKey, key === '' && styles.miniKeypadKeyEmpty]}
-                    onPress={() => {
-                      if (key === '←') {
-                        setPinInput((p) => p.slice(0, -1));
-                      } else if (key && pinInput.length < 6) {
-                        setPinInput((p) => p + key);
-                      }
-                    }}
-                    disabled={key === ''}
-                  >
-                    <Text style={[styles.miniKeypadKeyText, { color: primaryTextColor }]}>{key}</Text>
-                  </TouchableOpacity>
-                )
-              )}
-            </View>
-          </View>
-
-          <View style={styles.pinModalButtons}>
-            <Button
-              mode="outlined"
-              onPress={() => {
-                setShowPinModal(false);
-                setPinInput('');
-                setError(null);
-              }}
-              style={styles.cancelPinButton}
-              labelStyle={[styles.cancelPinButtonLabel, { color: secondaryTextColor }]}
-            >
-              Cancel
-            </Button>
-            <Button
-              mode="contained"
-              onPress={handlePinSubmit}
-              disabled={pinInput.length < 6 || isLoading}
-              loading={isLoading}
-              style={styles.confirmPinButton}
-              labelStyle={styles.confirmPinButtonLabel}
-            >
-              Unlock
-            </Button>
-          </View>
-        </View>
-      </View>
-    );
-  };
-
-  // ========================================
   // Render
   // ========================================
 
@@ -354,9 +238,6 @@ export function WalletSelectionScreen(): React.JSX.Element {
             </Button>
           </View>
         )}
-
-        {/* PIN Modal */}
-        {renderPinModal()}
       </SafeAreaView>
     </LinearGradient>
   );
@@ -525,103 +406,5 @@ const styles = StyleSheet.create({
   },
   createWalletButton: {
     backgroundColor: '#FFC107',
-  },
-  pinModalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  pinModalContent: {
-    backgroundColor: '#1a1a2e',
-    borderRadius: 24,
-    padding: 24,
-    width: '100%',
-    maxWidth: 320,
-  },
-  pinModalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  pinModalSubtitle: {
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  errorBox: {
-    backgroundColor: 'rgba(244, 67, 54, 0.2)',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: '#F44336',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  pinInputContainer: {
-    marginBottom: 24,
-  },
-  pinDotsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
-    marginBottom: 24,
-  },
-  pinDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  pinDotFilled: {
-    backgroundColor: '#FFC107',
-    borderColor: '#FFC107',
-  },
-  miniKeypad: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  miniKeypadKey: {
-    width: 60,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  miniKeypadKeyEmpty: {
-    backgroundColor: 'transparent',
-  },
-  miniKeypadKeyText: {
-    fontSize: 20,
-    fontWeight: '500',
-  },
-  pinModalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  cancelPinButton: {
-    flex: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  cancelPinButtonLabel: {
-  },
-  confirmPinButton: {
-    flex: 1,
-    backgroundColor: '#FFC107',
-  },
-  confirmPinButtonLabel: {
-    color: '#1a1a2e',
   },
 });

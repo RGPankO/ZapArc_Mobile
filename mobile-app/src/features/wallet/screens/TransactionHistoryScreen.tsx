@@ -18,6 +18,7 @@ import { useAppTheme } from '../../../contexts/ThemeContext';
 import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor } from '../../../utils/theme-helpers';
 import { useWallet } from '../../../hooks/useWallet';
 import { useLanguage } from '../../../hooks/useLanguage';
+import { useCurrency } from '../../../hooks/useCurrency';
 import type { Transaction } from '../types';
 
 // =============================================================================
@@ -33,6 +34,7 @@ type FilterType = 'all' | 'sent' | 'received';
 export function TransactionHistoryScreen(): React.JSX.Element {
   const { transactions, refreshTransactions, isLoading } = useWallet();
   const { t } = useLanguage();
+  const { formatTx, refreshSettings } = useCurrency();
 
   const { themeMode } = useAppTheme();
   const gradientColors = getGradientColors(themeMode);
@@ -85,11 +87,12 @@ export function TransactionHistoryScreen(): React.JSX.Element {
     }
   }, [refreshTransactions]);
 
-  // Refresh transactions when screen comes into focus
+  // Refresh transactions and settings when screen comes into focus
   useFocusEffect(
     useCallback(() => {
+      refreshSettings();
       refreshTransactions();
-    }, [refreshTransactions])
+    }, [refreshTransactions, refreshSettings])
   );
 
   // Format time
@@ -103,6 +106,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
   // Render transaction item
   const renderTransaction = (tx: Transaction): React.JSX.Element => {
     const isReceived = tx.type === 'receive';
+    const formattedAmount = formatTx(tx.amount ?? 0, isReceived);
 
     return (
       <TouchableOpacity
@@ -134,9 +138,13 @@ export function TransactionHistoryScreen(): React.JSX.Element {
               isReceived ? styles.amountReceived : styles.amountSent,
             ]}
           >
-            {isReceived ? '+' : '-'}{(tx.amount ?? 0).toLocaleString()}
+            {formattedAmount.primary}
           </Text>
-          <Text style={[styles.transactionAmountUnit, { color: secondaryTextColor }]}>{t('wallet.sats')}</Text>
+          {formattedAmount.secondaryCompact && (
+            <Text style={[styles.transactionAmountSecondary, { color: secondaryTextColor }]}>
+              {formattedAmount.secondaryCompact}
+            </Text>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -195,10 +203,15 @@ export function TransactionHistoryScreen(): React.JSX.Element {
                   isReceived ? styles.amountReceived : styles.amountSent,
                 ]}
               >
-                {isReceived ? '+' : '-'}{(tx.amount ?? 0).toLocaleString()} {t('wallet.sats')}
+                {formatTx(tx.amount ?? 0, isReceived).primary}
               </Text>
+              {formatTx(tx.amount ?? 0, isReceived).secondary && (
+                <Text style={[styles.modalAmountSecondary, { color: secondaryTextColor }]}>
+                  {formatTx(tx.amount ?? 0, isReceived).secondary}
+                </Text>
+              )}
               <Text style={styles.modalStatus}>
-                {tx.status === 'completed' ? `✓ ${t('wallet.statusCompleted')}` : tx.status}
+                {tx.status === 'completed' ? `\u2713 ${t('wallet.statusCompleted')}` : tx.status}
               </Text>
             </View>
 
@@ -493,8 +506,9 @@ const styles = StyleSheet.create({
   amountSent: {
     color: '#FF6B6B',
   },
-  transactionAmountUnit: {
+  transactionAmountSecondary: {
     fontSize: 11,
+    marginTop: 2,
   },
   emptyContainer: {
     flex: 1,
@@ -556,6 +570,10 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 4,
+  },
+  modalAmountSecondary: {
+    fontSize: 14,
+    marginBottom: 8,
   },
   modalStatus: {
     fontSize: 14,

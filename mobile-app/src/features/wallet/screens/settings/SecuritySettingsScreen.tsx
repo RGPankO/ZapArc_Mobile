@@ -1,29 +1,15 @@
 // Security Settings Screen
-// Configure auto-lock timeout and biometric authentication
+// Configure biometric authentication (fingerprint/Face ID)
 
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Text, RadioButton, Switch, Button, IconButton } from 'react-native-paper';
+import { Text, Switch, Button, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useSettings } from '../../../../hooks/useSettings';
 import { useLanguage } from '../../../../hooks/useLanguage';
-import type { AutoLockTimeout } from '../../../settings/types';
-
-// =============================================================================
-// Constants
-// =============================================================================
-
-const AUTO_LOCK_OPTIONS: { value: AutoLockTimeout; labelKey: string }[] = [
-  { value: 300, labelKey: 'settings.fiveMinutes' },
-  { value: 900, labelKey: 'settings.fifteenMinutes' },
-  { value: 1800, labelKey: 'settings.thirtyMinutes' },
-  { value: 3600, labelKey: 'settings.oneHour' },
-  { value: 7200, labelKey: 'settings.twoHours' },
-  { value: 0, labelKey: 'settings.never' },
-];
 
 // =============================================================================
 // Component
@@ -34,7 +20,6 @@ export function SecuritySettingsScreen(): React.JSX.Element {
   const { t } = useLanguage();
 
   // State
-  const [autoLockTimeout, setAutoLockTimeout] = useState<AutoLockTimeout>(900);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState<string>('Biometric');
@@ -76,10 +61,17 @@ export function SecuritySettingsScreen(): React.JSX.Element {
   // Load settings on mount
   useEffect(() => {
     if (settings) {
-      setAutoLockTimeout(settings.autoLockTimeout || 900);
       setBiometricEnabled(settings.biometricEnabled || false);
     }
   }, [settings]);
+
+  // Get biometric icon
+  const getBiometricIcon = (): string => {
+    if (biometricType === 'Face ID') {
+      return 'face-recognition';
+    }
+    return 'fingerprint';
+  };
 
   // Handle biometric toggle
   const handleBiometricToggle = async (enabled: boolean): Promise<void> => {
@@ -96,7 +88,7 @@ export function SecuritySettingsScreen(): React.JSX.Element {
         } else {
           Alert.alert(t('settings.failed'), t('settings.biometricVerificationFailed'));
         }
-      } catch (err) {
+      } catch {
         Alert.alert(t('common.error'), t('settings.failedToVerifyBiometric'));
       }
     } else {
@@ -110,14 +102,13 @@ export function SecuritySettingsScreen(): React.JSX.Element {
 
     try {
       await updateSettings({
-        autoLockTimeout,
         biometricEnabled,
       });
 
       Alert.alert(t('settings.saved'), t('settings.securitySettingsUpdated'), [
-        { text: t('common.ok'), onPress: () => router.back() },
+        { text: t('common.ok'), onPress: (): void => router.back() },
       ]);
-    } catch (err) {
+    } catch {
       Alert.alert(t('common.error'), t('settings.failedToSaveSettings'));
     } finally {
       setIsSaving(false);
@@ -144,47 +135,22 @@ export function SecuritySettingsScreen(): React.JSX.Element {
 
         <ScrollView style={styles.scrollView}>
           <View style={styles.content}>
-            {/* Auto-Lock Timeout */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{t('settings.autoLockTimeout')}</Text>
-              <Text style={styles.sectionDescription}>
-                {t('settings.lockWalletAfterInactivity')}
-              </Text>
-
-              <RadioButton.Group
-                onValueChange={(value) =>
-                  setAutoLockTimeout(parseInt(value, 10) as AutoLockTimeout)
-                }
-                value={autoLockTimeout.toString()}
-              >
-                {AUTO_LOCK_OPTIONS.map((option) => (
-                  <View style={styles.radioItem} key={option.value}>
-                    <RadioButton.Android
-                      value={option.value.toString()}
-                      color="#FFC107"
-                      uncheckedColor="rgba(255, 255, 255, 0.5)"
-                    />
-                    <Text style={styles.radioLabel}>{t(option.labelKey)}</Text>
-                  </View>
-                ))}
-              </RadioButton.Group>
-
-              {autoLockTimeout === 0 && (
-                <View style={styles.warningBox}>
-                  <Text style={styles.warningText}>
-                    ⚠️ {t('settings.disableAutoLockWarning')}
-                  </Text>
-                </View>
-              )}
-            </View>
-
             {/* Biometric Authentication */}
             <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <IconButton
+                  icon={getBiometricIcon()}
+                  iconColor="#FFC107"
+                  size={28}
+                  style={styles.sectionIcon}
+                />
+                <Text style={styles.sectionTitle}>
+                  {biometricType === 'Fingerprint' ? t('settings.fingerprintUnlock') : t('settings.faceIdUnlock')}
+                </Text>
+              </View>
+              
               <View style={styles.switchRow}>
                 <View style={styles.switchContent}>
-                  <Text style={styles.switchTitle}>
-                    {t('settings.biometricAuthentication', { type: biometricType })}
-                  </Text>
                   <Text style={styles.switchDescription}>
                     {biometricAvailable
                       ? t('settings.useBiometricToUnlock', { type: biometricType })
@@ -198,6 +164,14 @@ export function SecuritySettingsScreen(): React.JSX.Element {
                   color="#FFC107"
                 />
               </View>
+
+              {!biometricAvailable && (
+                <View style={styles.warningBox}>
+                  <Text style={styles.warningText}>
+                    ⚠️ {t('settings.biometricNotEnrolled')}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Info Box */}
@@ -268,6 +242,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionIcon: {
+    margin: 0,
+    marginRight: 4,
   },
   sectionTitle: {
     fontSize: 16,
