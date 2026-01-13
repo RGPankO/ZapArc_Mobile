@@ -1,7 +1,7 @@
 // Wallet Creation Screen
 // Multi-step wallet creation: Generate → Backup → Verify → PIN
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -10,13 +10,12 @@ import {
   Alert,
   BackHandler,
 } from 'react-native';
-import { Modal } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Button, Text, TextInput, ProgressBar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { generateMnemonic } from '../../../utils/mnemonic';
+import { generateMnemonic, generateMasterKeyNickname } from '../../../utils/mnemonic';
 import { useWallet } from '../../../hooks/useWallet';
 
 // =============================================================================
@@ -35,7 +34,7 @@ interface MnemonicWord {
 // =============================================================================
 
 export function WalletCreationScreen(): React.JSX.Element {
-  const { createMasterKey } = useWallet();
+  const { createMasterKey, masterKeys } = useWallet();
 
   // State
   const [currentStep, setCurrentStep] = useState<CreationStep>('generate');
@@ -49,11 +48,18 @@ export function WalletCreationScreen(): React.JSX.Element {
   const [pasteText, setPasteText] = useState('');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
-  const [walletName, setWalletName] = useState('Sub-Wallet 1');
-  const [showNameModal, setShowNameModal] = useState(true);
+  const [walletName, setWalletName] = useState(generateMasterKeyNickname(masterKeys.length + 1));
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showMnemonic, setShowMnemonic] = useState(false);
+
+  // Handle wallet name update when masterKeys load (if name hasn't been changed yet)
+  const nameChangedRef = useRef(false);
+  useEffect(() => {
+    if (!nameChangedRef.current && masterKeys.length > 0) {
+      setWalletName(generateMasterKeyNickname(masterKeys.length + 1));
+    }
+  }, [masterKeys.length]);
 
   // Progress calculation
   const progress = useMemo(() => {
@@ -524,6 +530,20 @@ export function WalletCreationScreen(): React.JSX.Element {
       <View style={styles.pinInputs}>
         <TextInput
           mode="outlined"
+          label="Wallet Name"
+          value={walletName}
+          onChangeText={(text) => {
+            setWalletName(text);
+            nameChangedRef.current = true;
+          }}
+          style={styles.pinInput}
+          outlineColor="rgba(255, 255, 255, 0.3)"
+          activeOutlineColor="#FFC107"
+          textColor="#FFFFFF"
+        />
+
+        <TextInput
+          mode="outlined"
           label="Enter PIN"
           value={pin}
           onChangeText={setPin}
@@ -647,44 +667,6 @@ export function WalletCreationScreen(): React.JSX.Element {
         {/* Content */}
         {renderCurrentStep()}
 
-        {/* Wallet Name Modal */}
-        <Modal
-          visible={showNameModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowNameModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Name Your Wallet</Text>
-              <Text style={styles.modalDescription}>
-                Choose a name for your first sub-wallet. You can change this later.
-              </Text>
-
-              <TextInput
-                mode="outlined"
-                label="Wallet Name"
-                value={walletName}
-                onChangeText={setWalletName}
-                autoFocus
-                style={styles.nameInput}
-                outlineColor="rgba(255, 255, 255, 0.3)"
-                activeOutlineColor="#FFC107"
-                textColor="#FFFFFF"
-              />
-
-              <Button
-                mode="contained"
-                onPress={() => setShowNameModal(false)}
-                style={styles.modalButton}
-                buttonColor="#FFC107"
-                textColor="#1a1a2e"
-              >
-                Continue
-              </Button>
-            </View>
-          </View>
-        </Modal>
       </SafeAreaView>
     </LinearGradient>
   );

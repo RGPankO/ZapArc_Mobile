@@ -1,22 +1,22 @@
 // Wallet Import Screen
 // Import existing wallet using 12 or 24-word mnemonic phrase
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import { Button, Text, TextInput, useTheme, ProgressBar } from 'react-native-paper';
+import { Button, Text, TextInput, ProgressBar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  validateMnemonic,
   validateMnemonicForImport,
   normalizeMnemonic,
   getWordCount,
+  generateMasterKeyNickname,
 } from '../../../utils/mnemonic';
 import { useWallet } from '../../../hooks/useWallet';
 
@@ -31,14 +31,14 @@ type ImportStep = 'input' | 'pin' | 'complete';
 // =============================================================================
 
 export function WalletImportScreen(): React.JSX.Element {
-  const theme = useTheme();
-  const { importMasterKey } = useWallet();
+  const { importMasterKey, masterKeys } = useWallet();
 
   // State
   const [currentStep, setCurrentStep] = useState<ImportStep>('input');
   const [mnemonic, setMnemonic] = useState('');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
+  const [walletName, setWalletName] = useState(generateMasterKeyNickname(masterKeys.length + 1));
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,6 +56,14 @@ export function WalletImportScreen(): React.JSX.Element {
   const wordCount = useMemo(() => {
     return getWordCount(mnemonic);
   }, [mnemonic]);
+
+  // Handle wallet name update when masterKeys load (if name hasn't been changed yet)
+  const nameChangedRef = useRef(false);
+  useEffect(() => {
+    if (!nameChangedRef.current && masterKeys.length > 0) {
+      setWalletName(generateMasterKeyNickname(masterKeys.length + 1));
+    }
+  }, [masterKeys.length]);
 
   // PIN validation
   const pinValid = useMemo(() => {
@@ -92,7 +100,7 @@ export function WalletImportScreen(): React.JSX.Element {
       setError(null);
 
       const normalizedMnemonic = normalizeMnemonic(mnemonic);
-      await importMasterKey(normalizedMnemonic, pin);
+      await importMasterKey(normalizedMnemonic, pin, walletName.trim() || undefined);
       setCurrentStep('complete');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to import wallet';
@@ -215,6 +223,20 @@ export function WalletImportScreen(): React.JSX.Element {
       )}
 
       <View style={styles.pinInputs}>
+        <TextInput
+          mode="outlined"
+          label="Wallet Name"
+          value={walletName}
+          onChangeText={(text) => {
+            setWalletName(text);
+            nameChangedRef.current = true;
+          }}
+          style={styles.pinInput}
+          outlineColor="rgba(255, 255, 255, 0.3)"
+          activeOutlineColor="#FFC107"
+          textColor="#FFFFFF"
+        />
+
         <TextInput
           mode="outlined"
           label="Enter PIN"

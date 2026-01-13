@@ -70,6 +70,7 @@ export interface WalletActions {
   receivePayment: (amountSats: number, description?: string) => Promise<string>;
 
   // Utility
+  syncSubWalletActivity: (masterKeyId: string, subWalletIndex: number, pin: string, restorePin?: string | null) => Promise<boolean>;
   getMnemonic: (masterKeyId: string, pin: string) => Promise<string>;
   canAddSubWallet: (masterKeyId: string) => boolean;
   getAddSubWalletDisabledReason: (masterKeyId: string) => string | null;
@@ -819,6 +820,76 @@ export function useWallet(): WalletState & WalletActions {
     [masterKeys, activeWalletInfo, balance, transactions]
   );
 
+  /**
+   * Background sync activity for a specific sub-wallet
+   * This is used to determine if a sub-wallet has had any activity
+   * so we can enable/disable the "Add Sub-Wallet" button.
+   */
+  const syncSubWalletActivity = useCallback(
+    async (
+      masterKeyId: string,
+      subWalletIndex: number,
+      pin: string,
+      restorePin?: string | null
+    ): Promise<boolean> => {
+      console.log('🔄 [useWallet] Syncing sub-wallet activity:', {
+        masterKeyId,
+        subWalletIndex,
+      });
+
+      try {
+        // 1. Get mnemonic for the target master key
+        const mnemonic = await storageService.getMasterKeyMnemonic(masterKeyId, pin);
+        if (!mnemonic) return false;
+
+        // 2. Identify current connection to restore later
+        const originalWallet = await storageService.getActiveWalletInfo();
+
+        // 3. Derive target mnemonic and initialize SDK
+        const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, subWalletIndex);
+        
+        // Disconnect current
+        await BreezSparkService.disconnectSDK().catch(() => {});
+        
+        // Initialize target
+        await BreezSparkService.initializeSDK(derivedMnemonic);
+        
+        // 4. Fetch transactions
+        const payments = await BreezSparkService.listPayments();
+        const hasActivity = payments.length > 0;
+
+        // 5. Update storage
+        if (hasActivity) {
+          await storageService.updateSubWalletActivity(masterKeyId, subWalletIndex, true);
+          await loadWalletData(); // Refresh local state
+        }
+
+        // 6. Restore original connection
+        if (originalWallet && (restorePin || pin)) {
+          try {
+            // Use restorePin if provided, otherwise fall back to current pin (if it was same wallet)
+            const rPin = restorePin || pin;
+            const orgMnemonic = await storageService.getMasterKeyMnemonic(originalWallet.masterKeyId, rPin);
+            if (orgMnemonic) {
+              const orgDerived = deriveSubWalletMnemonic(orgMnemonic, originalWallet.subWalletIndex);
+              await BreezSparkService.disconnectSDK().catch(() => {});
+              await BreezSparkService.initializeSDK(orgDerived);
+              console.log('✅ [useWallet] Restored original wallet connection');
+            }
+          } catch (restoreError) {
+            console.warn('⚠️ [useWallet] Failed to restore original connection after sync:', restoreError);
+          }
+        }
+
+        return hasActivity;
+      } catch (err) {
+        console.error('❌ [useWallet] syncSubWalletActivity failed:', err);
+        return false;
+      }
+    },
+    [loadWalletData]
+  );
+
   const canAddSubWallet = useCallback(
     (masterKeyId: string): boolean => {
       return getAddSubWalletDisabledReason(masterKeyId) === null;
@@ -857,6 +928,7 @@ export function useWallet(): WalletState & WalletActions {
     refreshTransactions,
     sendPayment,
     receivePayment,
+    syncSubWalletActivity,
     getMnemonic,
     canAddSubWallet,
     getAddSubWalletDisabledReason,

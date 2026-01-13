@@ -49,6 +49,7 @@ export interface WalletAuthActions {
   // Session management
   updateActivity: () => void;
   checkAutoLock: () => Promise<void>;
+  getSessionPin: () => string | null;
 }
 
 // =============================================================================
@@ -140,7 +141,7 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
 
-    return () => {
+    return (): void => {
       subscription?.remove();
       if (autoLockTimerRef.current) {
         global.clearTimeout(autoLockTimerRef.current);
@@ -559,5 +560,6 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
     selectSubWallet,
     updateActivity,
     checkAutoLock,
+    getSessionPin: () => sessionPinRef.current,
   };
 }

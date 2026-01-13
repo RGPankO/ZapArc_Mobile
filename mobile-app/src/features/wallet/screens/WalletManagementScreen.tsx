@@ -26,6 +26,7 @@ import { useAppTheme } from '../../../contexts/ThemeContext';
 import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor } from '../../../utils/theme-helpers';
 import { useWallet } from '../../../hooks/useWallet';
 import { useWalletAuth } from '../../../hooks/useWalletAuth';
+import { storageService } from '../../../services';
 import type { MasterKeyEntry, SubWalletEntry } from '../types';
 
 // =============================================================================
@@ -49,8 +50,9 @@ export function WalletManagementScreen(): React.JSX.Element {
     deleteMasterKey,
     canAddSubWallet,
     getAddSubWalletDisabledReason,
+    syncSubWalletActivity,
   } = useWallet();
-  const { selectSubWallet } = useWalletAuth();
+  const { selectSubWallet, getSessionPin } = useWalletAuth();
 
   const { themeMode } = useAppTheme();
   const gradientColors = getGradientColors(themeMode);
@@ -103,6 +105,51 @@ export function WalletManagementScreen(): React.JSX.Element {
       return next;
     });
   }, [activeMasterKey?.id]);
+
+  // ========================================
+  // Background Activity Sync
+  // ========================================
+
+  useEffect(() => {
+    const syncActivities = async (): Promise<void> => {
+      const sessionPin = getSessionPin();
+      
+      for (const masterKey of masterKeys) {
+        const subWallets = masterKey.subWallets;
+        if (subWallets.length === 0) continue;
+        
+        const lastSubWallet = subWallets[subWallets.length - 1];
+        
+        // If we already know it has activity, skip
+        if (lastSubWallet.hasActivity === true) continue;
+
+        // Try to get PIN for this master key
+        let pin: string | null = null;
+        if (masterKey.id === activeMasterKey?.id) {
+          pin = sessionPin;
+        } else {
+          // Try biometric (will be silent if already authorized in current session's keystore)
+          try {
+            pin = await storageService.getBiometricPin(masterKey.id);
+          } catch {
+            // Silently fail if biometric not available
+          }
+        }
+
+        if (pin) {
+          console.log(`🔄 [WalletManagement] Background syncing activity for ${masterKey.nickname}...`);
+          // Note: This temporarily disconnects and reconnects the SDK
+          // Pass sessionPin as restorePin to ensure we can go back to the original active wallet
+          await syncSubWalletActivity(masterKey.id, lastSubWallet.index, pin, sessionPin);
+        }
+      }
+    };
+
+    // Run when masterKeys are loaded or changed
+    if (masterKeys.length > 0) {
+      syncActivities();
+    }
+  }, [masterKeys.length, activeMasterKey?.id]);
 
   // ========================================
   // Add Sub-Wallet

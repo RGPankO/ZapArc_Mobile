@@ -74,9 +74,8 @@ let _isInitialized = false;
 type PaymentEventCallback = (payment: TransactionInfo) => void;
 const paymentEventListeners: Set<PaymentEventCallback> = new Set();
 
-// Event listener subscription (returns unsubscribe function)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let eventListenerUnsubscribe: (() => void) | null = null;
+// Active SDK event listener ID for cleanup
+let activeEventListenerId: string | null = null;
 
 // =============================================================================
 // Public API
@@ -241,9 +240,13 @@ export async function disconnectSDK(): Promise<void> {
 
   try {
     // Unsubscribe from events
-    if (eventListenerUnsubscribe) {
-      eventListenerUnsubscribe();
-      eventListenerUnsubscribe = null;
+    if (activeEventListenerId && sdkInstance) {
+      try {
+        await sdkInstance.removeEventListener(activeEventListenerId);
+      } catch (e) {
+        console.warn('⚠️ [BreezSparkService] Error removing listener during disconnect:', e);
+      }
+      activeEventListenerId = null;
     }
 
     if (sdkInstance) {
@@ -281,13 +284,13 @@ async function setupEventListeners(): Promise<void> {
 
   try {
     // Unsubscribe from previous listener if exists
-    if (eventListenerUnsubscribe) {
+    if (activeEventListenerId) {
       try {
-        await sdkInstance.removeEventListener(eventListenerUnsubscribe);
+        await sdkInstance.removeEventListener(activeEventListenerId);
       } catch (e) {
         console.warn('⚠️ [BreezSparkService] Error removing listener:', e);
       }
-      eventListenerUnsubscribe = null;
+      activeEventListenerId = null;
     }
 
     // Create event listener object with onEvent method (per SDK docs)
@@ -389,7 +392,7 @@ async function setupEventListeners(): Promise<void> {
     console.log('✅ [BreezSparkService] Event listener added with ID:', listenerId);
     
     // Store the ID for later removal
-    eventListenerUnsubscribe = listenerId;
+    activeEventListenerId = listenerId;
 
   } catch (error) {
     console.warn('⚠️ [BreezSparkService] Failed to setup event listeners:', error);
