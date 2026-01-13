@@ -85,12 +85,6 @@ export function CurrencySettingsScreen(): React.JSX.Element {
   // Load current settings
   useEffect(() => {
     if (settings) {
-      console.log('💱 [CurrencySettings] Loading settings:', {
-        primaryDenomination: settings.primaryDenomination,
-        secondaryFiatCurrency: settings.secondaryFiatCurrency,
-        legacyCurrency: settings.currency,
-      });
-
       // Handle new split settings
       if (settings.primaryDenomination) {
         setPrimaryDenomination(settings.primaryDenomination);
@@ -114,13 +108,11 @@ export function CurrencySettingsScreen(): React.JSX.Element {
     setPrimaryDenomination(newValue);
     
     try {
-      console.log('💱 [CurrencySettings] Saving primaryDenomination:', newValue);
       await updateSettings({ 
         primaryDenomination: newValue,
         // Also update legacy field for backwards compatibility
         currency: newValue,
       });
-      console.log('✅ [CurrencySettings] primaryDenomination saved');
     } catch (error) {
       console.error('❌ [CurrencySettings] Failed to save primaryDenomination:', error);
     }
@@ -132,11 +124,9 @@ export function CurrencySettingsScreen(): React.JSX.Element {
     setSecondaryFiatCurrency(newValue);
     
     try {
-      console.log('💱 [CurrencySettings] Saving secondaryFiatCurrency:', newValue);
       await updateSettings({ 
         secondaryFiatCurrency: newValue,
       });
-      console.log('✅ [CurrencySettings] secondaryFiatCurrency saved');
     } catch (error) {
       console.error('❌ [CurrencySettings] Failed to save secondaryFiatCurrency:', error);
     }

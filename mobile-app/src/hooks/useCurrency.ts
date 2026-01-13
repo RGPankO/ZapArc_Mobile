@@ -49,17 +49,6 @@ export function useCurrency(): UseCurrencyReturn {
   const secondaryFiatCurrency: FiatCurrency = settings?.secondaryFiatCurrency || 
     (settings?.currency === 'eur' ? 'eur' : 'usd');
 
-  // Debug log when settings change
-  useEffect(() => {
-    console.log('💱 [useCurrency] Settings updated:', {
-      primaryDenomination,
-      secondaryFiatCurrency,
-      rawPrimaryDenomination: settings?.primaryDenomination,
-      rawSecondaryFiatCurrency: settings?.secondaryFiatCurrency,
-      legacyCurrency: settings?.currency,
-    });
-  }, [settings?.primaryDenomination, settings?.secondaryFiatCurrency, settings?.currency, primaryDenomination, secondaryFiatCurrency]);
-
   // Memoize the currency settings object
   const currencySettings = useMemo<CurrencySettings>(() => ({
     primaryDenomination,
@@ -112,7 +101,6 @@ export function useCurrency(): UseCurrencyReturn {
 
   // Refresh settings from storage (call when returning to screen)
   const refreshSettings = useCallback(async (): Promise<void> => {
-    console.log('💱 [useCurrency] Refreshing settings from storage...');
     await loadSettings();
   }, [loadSettings]);
 

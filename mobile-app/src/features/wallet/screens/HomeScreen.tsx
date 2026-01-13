@@ -10,9 +10,9 @@ import {
   RefreshControl,
   Modal,
 } from 'react-native';
-import { Text, IconButton, ActivityIndicator, Button, Divider } from 'react-native-paper';
+import { Text, IconButton, ActivityIndicator, Button, Divider, Snackbar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '../../../contexts/ThemeContext';
 import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor } from '../../../utils/theme-helpers';
@@ -52,6 +52,12 @@ export function HomeScreen(): React.JSX.Element {
   const { t } = useLanguage();
   const { format, formatTx, refreshSettings } = useCurrency();
 
+  // Get navigation params (for payment success toast)
+  const params = useLocalSearchParams<{
+    paymentSuccess?: string;
+    paymentAmount?: string;
+  }>();
+
   const { themeMode } = useAppTheme();
   const gradientColors = getGradientColors(themeMode);
   const primaryTextColor = getPrimaryTextColor(themeMode);
@@ -62,6 +68,8 @@ export function HomeScreen(): React.JSX.Element {
   const [refreshing, setRefreshing] = useState(false);
   const [showBalance, setShowBalance] = useState(true);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   // Currency formatting using the useCurrency hook
   const getFormattedBalance = (sats: number) => {
@@ -99,12 +107,14 @@ export function HomeScreen(): React.JSX.Element {
       const isSyncEvent = payment.description === '__SYNC_EVENT__';
       
       if (isSyncEvent) {
-        console.log('🔄 [HomeScreen] SDK sync event - refreshing...');
+        // Sync event - just refresh silently
       } else {
-        console.log('💰 [HomeScreen] Payment received - refreshing...', {
-          amount: payment.amountSat,
-          type: payment.type,
-        });
+        // Show snackbar toast for SENT payments (not received - those get push notifications)
+        if (payment.type === 'send' && payment.amountSat > 0) {
+          const formattedAmount = payment.amountSat.toLocaleString();
+          setSnackbarMessage(`⚡ Payment sent: ${formattedAmount} sats`);
+          setSnackbarVisible(true);
+        }
       }
       
       // Refresh balance and transactions
@@ -129,6 +139,17 @@ export function HomeScreen(): React.JSX.Element {
       }
     }, [isConnected, isLoading, refreshTransactions, refreshSettings])
   );
+
+  // Show payment success toast when returning from successful payment (via PaymentConfirmationScreen)
+  useEffect(() => {
+    if (params.paymentSuccess === 'true' && params.paymentAmount) {
+      const amount = parseInt(params.paymentAmount, 10);
+      const formattedAmount = amount.toLocaleString();
+      setSnackbarMessage(`⚡ Payment sent: ${formattedAmount} sats`);
+      setSnackbarVisible(true);
+      router.setParams({ paymentSuccess: undefined, paymentAmount: undefined });
+    }
+  }, [params.paymentSuccess, params.paymentAmount]);
 
   // Navigation handlers
   const handleSend = (): void => {
@@ -354,6 +375,17 @@ export function HomeScreen(): React.JSX.Element {
         {/* Transaction Details Modal */}
         {selectedTransaction && renderDetailsModal()}
       </SafeAreaView>
+
+      {/* Payment Success Snackbar - needs to be at root level for proper display */}
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={3000}
+        style={styles.snackbar}
+        wrapperStyle={styles.snackbarWrapper}
+      >
+        {snackbarMessage}
+      </Snackbar>
     </LinearGradient>
   );
 
@@ -779,5 +811,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   closeModalButtonLabel: {
+  },
+  snackbar: {
+    backgroundColor: '#4CAF50',
+  },
+  snackbarWrapper: {
+    position: 'absolute',
+    bottom: 100,
+    left: 16,
+    right: 16,
   },
 });

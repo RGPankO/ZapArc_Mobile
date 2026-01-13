@@ -16,24 +16,26 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useWallet } from '../../../../hooks/useWallet';
+import { storageService } from '../../../../services';
 
 // =============================================================================
 // Component
 // =============================================================================
 
 export function BackupScreen(): React.JSX.Element {
-  const { getMnemonic, activeWallet } = useWallet();
+  const { getMnemonic, activeMasterKey, activeWalletInfo } = useWallet();
 
   // State
   const [showMnemonic, setShowMnemonic] = useState(false);
   const [mnemonic, setMnemonic] = useState<string | null>(null);
-  const [isVerified, setIsVerified] = useState(false);
   const [backupConfirmed, setBackupConfirmed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   // Authenticate and reveal mnemonic
   const handleRevealMnemonic = useCallback(async () => {
-    if (!activeWallet) {
+    console.log('🔐 [BackupScreen] Reveal requested. activeMasterKey:', activeMasterKey?.id);
+    
+    if (!activeMasterKey) {
       Alert.alert('Error', 'No active wallet found');
       return;
     }
@@ -57,12 +59,20 @@ export function BackupScreen(): React.JSX.Element {
         }
       }
 
-      // Get the mnemonic
-      const phrase = await getMnemonic();
+      // Get PIN from biometric storage (stored during wallet creation)
+      const pin = await storageService.getBiometricPin(activeMasterKey.id);
+      
+      if (!pin) {
+        Alert.alert('Error', 'PIN not available. Please unlock wallet with PIN first.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Get the mnemonic with masterKeyId and pin
+      const phrase = await getMnemonic(activeMasterKey.id, pin);
       if (phrase) {
         setMnemonic(phrase);
         setShowMnemonic(true);
-        setIsVerified(true);
       } else {
         Alert.alert('Error', 'Could not retrieve recovery phrase');
       }
@@ -72,17 +82,16 @@ export function BackupScreen(): React.JSX.Element {
     } finally {
       setIsLoading(false);
     }
-  }, [activeWallet, getMnemonic]);
+  }, [activeMasterKey, activeWalletInfo, getMnemonic]);
 
   // Hide mnemonic
   const handleHideMnemonic = useCallback(() => {
     setShowMnemonic(false);
     setMnemonic(null);
-    setIsVerified(false);
   }, []);
 
   // Copy mnemonic to clipboard
-  const handleCopyMnemonic = useCallback(() => {
+  const handleCopyMnemonic = useCallback((): void => {
     if (!mnemonic) return;
 
     Alert.alert(
@@ -93,12 +102,8 @@ export function BackupScreen(): React.JSX.Element {
         {
           text: 'Copy',
           style: 'destructive',
-          onPress: () => {
+          onPress: (): void => {
             Clipboard.setString(mnemonic);
-            Alert.alert(
-              'Copied',
-              'Recovery phrase copied to clipboard. Clear your clipboard after use.'
-            );
           },
         },
       ]
@@ -106,7 +111,7 @@ export function BackupScreen(): React.JSX.Element {
   }, [mnemonic]);
 
   // Render mnemonic words
-  const renderMnemonicWords = () => {
+  const renderMnemonicWords = (): React.JSX.Element | null => {
     if (!mnemonic) return null;
 
     const words = mnemonic.split(' ');
@@ -278,17 +283,17 @@ export function BackupScreen(): React.JSX.Element {
             </View>
 
             {/* Wallet Info */}
-            {activeWallet && (
+            {activeMasterKey && (
               <View style={styles.infoBox}>
                 <Text style={styles.infoTitle}>Wallet Information</Text>
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Name:</Text>
-                  <Text style={styles.infoValue}>{activeWallet.name}</Text>
+                  <Text style={styles.infoValue}>{activeMasterKey.nickname}</Text>
                 </View>
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Created:</Text>
                   <Text style={styles.infoValue}>
-                    {new Date(activeWallet.createdAt).toLocaleDateString()}
+                    {new Date(activeMasterKey.createdAt).toLocaleDateString()}
                   </Text>
                 </View>
               </View>

@@ -77,6 +77,10 @@ const paymentEventListeners: Set<PaymentEventCallback> = new Set();
 // Active SDK event listener ID for cleanup
 let activeEventListenerId: string | null = null;
 
+// Track recently sent payment IDs to avoid sending "Payment Received" notifications for our own sends
+const recentlySentPaymentIds: Set<string> = new Set();
+const SENT_PAYMENT_TRACKING_MS = 60000; // Track for 1 minute
+
 // =============================================================================
 // Public API
 // =============================================================================
@@ -298,12 +302,6 @@ async function setupEventListeners(): Promise<void> {
     const eventListener = {
       onEvent: async (event: unknown): Promise<void> => {
         try {
-          // Log full event for debugging (handle BigInt)
-          const safeStringify = (obj: unknown): string => {
-            return JSON.stringify(obj, (_, v) => typeof v === 'bigint' ? v.toString() : v, 2).substring(0, 500);
-          };
-          console.log('📡 [BreezSparkService] SDK Event received:', safeStringify(event));
-          
           // Cast to expected structure based on SDK docs
           const evt = event as {
             tag?: string;
@@ -315,7 +313,6 @@ async function setupEventListeners(): Promise<void> {
           };
 
           const eventTag = evt?.tag || (event as Record<string, unknown>)?.type || 'unknown';
-          console.log('📡 [BreezSparkService] Event tag:', eventTag);
 
           // Handle PaymentSucceeded event (try multiple possible formats)
           const isPaymentEvent = 
@@ -331,22 +328,31 @@ async function setupEventListeners(): Promise<void> {
               (event as Record<string, unknown>)?.data
             ) as Record<string, unknown>;
             
-            console.log('💰 [BreezSparkService] Payment event data:', safeStringify(paymentData));
+            // Determine if this is a received or sent payment
+            // paymentType: 1 = receive, 0 = send (or string 'receive'/'send')
+            const paymentType = paymentData?.paymentType;
+            const isReceived = 
+              paymentType === 1 || 
+              paymentType === 'receive' || 
+              paymentType === 'Receive' ||
+              String(paymentType).toLowerCase() === 'receive';
             
             const payment: TransactionInfo = {
               id: String(paymentData?.id || Date.now()),
-              type: 'receive',
-              amountSat: Number(paymentData?.amountSat || paymentData?.amount || 0),
-              feeSat: Number(paymentData?.feeSat || paymentData?.fee || 0),
+              type: isReceived ? 'receive' : 'send',
+              amountSat: Number(paymentData?.amountSat || paymentData?.amount || paymentData?.amountSats || 0),
+              feeSat: Number(paymentData?.feeSat || paymentData?.fee || paymentData?.feesSats || 0),
               status: 'completed',
               timestamp: Date.now(),
               description: String(paymentData?.description || ''),
             };
 
-            console.log('💰 [BreezSparkService] Payment received:', payment);
-
-            // Send push notification for the payment
-            sendPaymentReceivedNotification(payment.amountSat, payment.description);
+            // Only send push notification for RECEIVED payments
+            // Skip if: not received, no amount, or we recently sent this payment ourselves
+            const wasRecentlySent = recentlySentPaymentIds.has(payment.id);
+            if (isReceived && payment.amountSat > 0 && !wasRecentlySent) {
+              sendPaymentReceivedNotification(payment.amountSat, payment.description);
+            }
 
             // Notify all listeners (for UI refresh etc)
             paymentEventListeners.forEach((listener) => {
@@ -360,7 +366,6 @@ async function setupEventListeners(): Promise<void> {
 
           // Handle Synced event - trigger refresh for all listeners
           if (eventTag === 'Synced') {
-            console.log('🔄 [BreezSparkService] SDK synced - notifying listeners to refresh');
             // Create a "sync" event to notify listeners to refresh their data
             const syncEvent: TransactionInfo = {
               id: 'sync-' + Date.now(),
@@ -421,6 +426,12 @@ export async function getBalance(): Promise<WalletBalance> {
       }
     } catch (infoError) {
       console.warn('⚠️ [BreezSparkService] getInfo() failed:', infoError);
+    }
+
+    // Re-check sdkInstance before fallback (could have disconnected during getInfo)
+    if (!sdkInstance) {
+      console.warn('⚠️ [BreezSparkService] SDK disconnected during balance fetch');
+      return { balanceSat: 0, pendingSendSat: 0, pendingReceiveSat: 0 };
     }
 
     // Fallback: Calculate from payments
@@ -491,9 +502,20 @@ export async function payInvoice(
       prepareResponse,
     });
 
+    // Track this payment ID so we don't show "Payment Received" notification for it
+    const paymentId = response.payment?.id;
+    if (paymentId) {
+      recentlySentPaymentIds.add(paymentId);
+      console.log('📤 [BreezSparkService] Tracking sent payment ID:', paymentId);
+      // Remove from tracking after timeout
+      global.setTimeout(() => {
+        recentlySentPaymentIds.delete(paymentId);
+      }, SENT_PAYMENT_TRACKING_MS);
+    }
+
     return {
       success: true,
-      paymentId: response.payment?.id,
+      paymentId,
     };
   } catch (error) {
     console.error('Failed to pay invoice:', error);
@@ -779,9 +801,20 @@ export async function sendPayment(
       idempotencyKey,
     });
 
+    // Track this payment ID so we don't show "Payment Received" notification for it
+    const paymentId = response.payment?.id;
+    if (paymentId) {
+      recentlySentPaymentIds.add(paymentId);
+      console.log('📤 [BreezSparkService] Tracking sent payment ID (sendPayment):', paymentId);
+      // Remove from tracking after timeout
+      global.setTimeout(() => {
+        recentlySentPaymentIds.delete(paymentId);
+      }, SENT_PAYMENT_TRACKING_MS);
+    }
+
     return {
       success: true,
-      paymentId: response.payment?.id,
+      paymentId,
     };
   } catch (error) {
     console.error('Failed to send payment:', error);

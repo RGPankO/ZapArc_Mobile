@@ -60,8 +60,6 @@ export function PinEntryScreen(): React.JSX.Element {
     biometricType,
     activeWalletInfo,
     selectWallet,
-    isLoading,
-    error: authError,
   } = useWalletAuth();
 
   // State
@@ -186,7 +184,7 @@ export function PinEntryScreen(): React.JSX.Element {
   // Get biometric icon
   // ========================================
 
-  const getBiometricIcon = () => {
+  const getBiometricIcon = (): string => {
     switch (biometricType) {
       case 'facial':
         return 'face-recognition';
@@ -199,7 +197,7 @@ export function PinEntryScreen(): React.JSX.Element {
     }
   };
 
-  const getBiometricLabel = () => {
+  const getBiometricLabel = (): string => {
     switch (biometricType) {
       case 'facial':
         return t('auth.useFaceId');
@@ -392,7 +390,7 @@ const styles = StyleSheet.create({
   },
   pinDotError: {
     borderColor: '#F44336',
-    backgroundColor: pin => pin ? '#F44336' : 'transparent',
+    backgroundColor: '#F44336',
   },
   errorText: {
     color: '#F44336',

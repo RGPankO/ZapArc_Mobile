@@ -49,7 +49,6 @@ export function TipQRCodeScreen(): React.JSX.Element {
     if (!params.encoded) return;
 
     Clipboard.setString(params.encoded);
-    Alert.alert('Copied!', 'Tip request copied to clipboard');
   }, [params.encoded]);
 
   // Handle save QR image

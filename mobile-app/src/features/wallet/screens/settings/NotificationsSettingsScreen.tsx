@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert, Linking } from 'react-native';
-import { Text, List, Switch, IconButton, Button, Divider } from 'react-native-paper';
+import { Text, List, Switch, IconButton, Button } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,7 +20,6 @@ interface NotificationSettings {
   pushEnabled: boolean;
   transactionAlerts: boolean;
   paymentReceived: boolean;
-  paymentSent: boolean;
 }
 
 // =============================================================================
@@ -38,7 +37,6 @@ export function NotificationsSettingsScreen(): React.JSX.Element {
     pushEnabled: settings?.notificationsEnabled ?? true,
     transactionAlerts: true,
     paymentReceived: settings?.notifyPaymentReceived ?? true,
-    paymentSent: settings?.notifyPaymentSent ?? true,
   });
 
   // Dynamic colors
@@ -67,7 +65,6 @@ export function NotificationsSettingsScreen(): React.JSX.Element {
         pushEnabled: settings.notificationsEnabled ?? true,
         transactionAlerts: true,
         paymentReceived: settings.notifyPaymentReceived ?? true,
-        paymentSent: settings.notifyPaymentSent ?? true,
       });
     }
   }, [settings]);
@@ -135,18 +132,13 @@ export function NotificationsSettingsScreen(): React.JSX.Element {
   };
 
   // Note: handleToggleTransactionAlerts removed as it was unused
-  // Transaction alerts are controlled via paymentReceived and paymentSent toggles
+  // Transaction alerts are controlled via paymentReceived toggle. 
+  // Payment sent notifications were removed in favor of in-app toasts.
 
   const handleTogglePaymentReceived = async (enabled: boolean): Promise<void> => {
     setNotifSettings(prev => ({ ...prev, paymentReceived: enabled }));
     await updateSettings({ notifyPaymentReceived: enabled });
     console.log('🔔 [Notifications] Payment received alerts:', enabled ? 'enabled' : 'disabled');
-  };
-
-  const handleTogglePaymentSent = async (enabled: boolean): Promise<void> => {
-    setNotifSettings(prev => ({ ...prev, paymentSent: enabled }));
-    await updateSettings({ notifyPaymentSent: enabled });
-    console.log('🔔 [Notifications] Payment sent alerts:', enabled ? 'enabled' : 'disabled');
   };
 
   // Test notification
@@ -259,26 +251,6 @@ export function NotificationsSettingsScreen(): React.JSX.Element {
                 <Switch
                   value={notifSettings.paymentReceived}
                   onValueChange={handleTogglePaymentReceived}
-                  disabled={!notifSettings.pushEnabled || permissionStatus !== 'granted'}
-                />
-              )}
-              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
-              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
-              style={styles.listItem}
-            />
-
-            <Divider style={styles.divider} />
-
-            <List.Item
-              title={t('settings.paymentSent')}
-              description={t('settings.paymentSentDescription')}
-              left={(props) => (
-                <List.Icon {...props} icon="arrow-up" color="#F44336" />
-              )}
-              right={() => (
-                <Switch
-                  value={notifSettings.paymentSent}
-                  onValueChange={handleTogglePaymentSent}
                   disabled={!notifSettings.pushEnabled || permissionStatus !== 'granted'}
                 />
               )}

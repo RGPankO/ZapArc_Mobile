@@ -95,9 +95,15 @@ export function PaymentConfirmationScreen(): React.JSX.Element {
 
   // Handle done (after success/failure)
   const handleDone = useCallback(() => {
-    // Navigate back to home - this will trigger useFocusEffect to refresh transactions
-    router.navigate('/wallet/home');
-  }, []);
+    // Navigate back to home with success params for toast notification
+    router.navigate({
+      pathname: '/wallet/home',
+      params: {
+        paymentSuccess: 'true',
+        paymentAmount: paymentInfo.amount.toString(),
+      },
+    });
+  }, [paymentInfo.amount]);
 
   // Format sats with thousand separators
   const formatSats = (sats: number): string => {

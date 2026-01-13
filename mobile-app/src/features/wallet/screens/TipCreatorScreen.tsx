@@ -174,7 +174,6 @@ export function TipCreatorScreen(): React.JSX.Element {
     if (!tipRequest) return;
 
     Clipboard.setString(tipRequest.encoded);
-    Alert.alert('Copied!', 'Tip request copied to clipboard');
   }, [tipRequest]);
 
   // Navigate to QR display

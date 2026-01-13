@@ -33,7 +33,6 @@ export interface UserSettings {
   autoLockTimeout: AutoLockTimeout; // In seconds
   notificationsEnabled: boolean;
   notifyPaymentReceived: boolean; // Notify on incoming payments
-  notifyPaymentSent: boolean; // Notify on outgoing payments
 
   // Social Platform Settings
   preferredSharingPlatforms: SocialPlatform[];
@@ -150,7 +149,6 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   autoLockTimeout: 900, // 15 minutes
   notificationsEnabled: true,
   notifyPaymentReceived: true,
-  notifyPaymentSent: true,
   preferredSharingPlatforms: ['twitter', 'telegram'],
 };
 
