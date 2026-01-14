@@ -46,8 +46,9 @@ export function WalletManagementScreen(): React.JSX.Element {
     activeSubWallet,
     addSubWallet,
     archiveSubWallet,
-    restoreSubWallet,
     deleteMasterKey,
+    renameMasterKey,
+    renameSubWallet,
     canAddSubWallet,
     getAddSubWalletDisabledReason,
     syncSubWalletActivity,
@@ -73,6 +74,7 @@ export function WalletManagementScreen(): React.JSX.Element {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [menuVisible, setMenuVisible] = useState<string | null>(null);
+  const [renameSubWalletIndex, setRenameSubWalletIndex] = useState<number | null>(null);
   const [syncingMasterKeys, setSyncingMasterKeys] = useState<Set<string>>(new Set());
 
   // Keep active master key always expanded
@@ -223,24 +225,40 @@ export function WalletManagementScreen(): React.JSX.Element {
     [archiveSubWallet]
   );
 
-  const handleRestoreSubWallet = useCallback(
-    async (masterKeyId: string, subWalletIndex: number) => {
-      try {
-        setProcessing(true);
-        await restoreSubWallet(masterKeyId, subWalletIndex);
-        Alert.alert('Success', 'Sub-wallet restored');
-      } catch {
-        Alert.alert('Error', 'Failed to restore sub-wallet');
-      } finally {
-        setProcessing(false);
-      }
-    },
-    [restoreSubWallet]
-  );
+
 
   // ========================================
-  // Delete Master Key
+  // Rename Operations
   // ========================================
+
+  const handleRename = useCallback(async () => {
+    if (!selectedMasterKeyId || !newName.trim()) return;
+
+    try {
+      setProcessing(true);
+      setError(null);
+
+      if (renameSubWalletIndex !== null) {
+        // Renaming sub-wallet
+        await renameSubWallet(selectedMasterKeyId, renameSubWalletIndex, newName.trim());
+        Alert.alert('Success', 'Sub-wallet renamed successfully');
+      } else {
+        // Renaming master key
+        await renameMasterKey(selectedMasterKeyId, newName.trim());
+        Alert.alert('Success', 'Wallet renamed successfully');
+      }
+
+      setModalType(null);
+      setSelectedMasterKeyId(null);
+      setRenameSubWalletIndex(null);
+      setNewName('');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to rename';
+      Alert.alert('Error', message);
+    } finally {
+      setProcessing(false);
+    }
+  }, [selectedMasterKeyId, renameSubWalletIndex, newName, renameMasterKey, renameSubWallet]);
 
   const handleDeleteMasterKey = useCallback(() => {
     if (!deleteTarget || !pinInput) return;
@@ -342,8 +360,6 @@ export function WalletManagementScreen(): React.JSX.Element {
               <Text style={[styles.masterKeySubtitle, { color: secondaryTextColor }]}>
                 {masterKey.subWallets.length} sub-wallet
                 {masterKey.subWallets.length !== 1 ? 's' : ''}
-                {masterKey.archivedSubWallets.length > 0 &&
-                  ` • ${masterKey.archivedSubWallets.length} archived`}
               </Text>
             </View>
             <IconButton
@@ -363,6 +379,7 @@ export function WalletManagementScreen(): React.JSX.Element {
                 iconColor={iconColor}
                 size={20}
                 onPress={() => setMenuVisible(masterKey.id)}
+                style={{ margin: 0 }}
               />
             }
             contentStyle={styles.menuContent}
@@ -371,12 +388,12 @@ export function WalletManagementScreen(): React.JSX.Element {
               onPress={() => {
                 setMenuVisible(null);
                 setNewName(masterKey.nickname);
-                // setSelectedMasterKeyId(masterKey.id); // If we implement renaming later
-                // setModalType('rename'); // If we implement renaming later
+                setSelectedMasterKeyId(masterKey.id);
+                setRenameSubWalletIndex(null);
+                setModalType('rename');
               }}
-              title="Rename (Coming Soon)"
+              title="Rename"
               leadingIcon="pencil"
-              disabled
             />
             <Menu.Item
               onPress={() => {
@@ -396,18 +413,10 @@ export function WalletManagementScreen(): React.JSX.Element {
           <View style={styles.subWalletsContainer}>
             {/* Active Sub-Wallets */}
             {masterKey.subWallets.map((subWallet) =>
-              renderSubWallet(masterKey.id, subWallet, false)
+              renderSubWallet(masterKey.id, subWallet)
             )}
 
-            {/* Archived Sub-Wallets */}
-            {masterKey.archivedSubWallets.length > 0 && (
-              <View style={styles.archivedSection}>
-                <Text style={[styles.archivedLabel, { color: secondaryTextColor }]}>Archived</Text>
-                {masterKey.archivedSubWallets.map((subWallet) =>
-                  renderSubWallet(masterKey.id, subWallet, true)
-                )}
-              </View>
-            )}
+
 
             {/* Add Sub-Wallet Button */}
             <TouchableOpacity
@@ -464,83 +473,149 @@ export function WalletManagementScreen(): React.JSX.Element {
 
   const renderSubWallet = (
     masterKeyId: string,
-    subWallet: SubWalletEntry,
-    isArchived: boolean
+    subWallet: SubWalletEntry
   ): React.JSX.Element => {
     const isActive =
-      !isArchived &&
       masterKeyId === activeMasterKey?.id &&
       subWallet.index === activeSubWallet?.index;
 
+    const menuKey = `${masterKeyId}-${subWallet.index}-menu`;
+
     return (
-      <TouchableOpacity
-        key={`${masterKeyId}-${subWallet.index}`}
-        style={[
-          styles.subWalletRow,
-          isActive && styles.subWalletRowActive,
-          isArchived && styles.subWalletRowArchived,
-        ]}
-        onPress={() =>
-          !isArchived && handleSwitchWallet(masterKeyId, subWallet.index)
-        }
-        disabled={isArchived}
-      >
-        <View style={styles.subWalletInfo}>
-          <View
-            style={[
-              styles.subWalletIcon,
-              isArchived && styles.subWalletIconArchived,
-            ]}
-          >
-            <Text style={styles.subWalletIconText}>
-              {isArchived ? '📦' : subWallet.index === 0 ? '💰' : '👝'}
-            </Text>
+      <View key={`${masterKeyId}-${subWallet.index}`} style={styles.subWalletWrapper}>
+        <TouchableOpacity
+          style={[
+            styles.subWalletRow,
+            isActive && styles.subWalletRowActive,
+            { flex: 1, marginBottom: 0 }, // Reset margin for wrapper
+          ]}
+          onPress={() => handleSwitchWallet(masterKeyId, subWallet.index)}
+        >
+          <View style={styles.subWalletInfo}>
+            <View style={styles.subWalletIcon}>
+              <Text style={styles.subWalletIconText}>
+                {subWallet.index === 0 ? '💰' : '👝'}
+              </Text>
+            </View>
+            <View>
+              <Text style={[styles.subWalletName, { color: primaryTextColor }]}>
+                {subWallet.nickname}
+              </Text>
+              <Text style={[styles.subWalletIndex, { color: secondaryTextColor }]}>
+                Index: {subWallet.index}
+                {subWallet.hasActivity === true && ' • Has activity'}
+                {subWallet.hasActivity === false && ' • No activity'}
+              </Text>
+            </View>
           </View>
-          <View>
-            <Text
-              style={[
-                styles.subWalletName,
-                { color: primaryTextColor },
-                isArchived && styles.subWalletNameArchived,
-              ]}
-            >
-              {subWallet.nickname}
-            </Text>
-            <Text style={[styles.subWalletIndex, { color: secondaryTextColor }]}>
-              Index: {subWallet.index}
-              {subWallet.hasActivity === true && ' • Has activity'}
-              {subWallet.hasActivity === false && ' • No activity'}
-            </Text>
-          </View>
-        </View>
 
-        {isActive && (
-          <View style={styles.activeIndicator}>
-            <Text style={[styles.activeIndicatorText, { color: primaryTextColor }]}>Active</Text>
-          </View>
-        )}
+          {isActive && (
+            <View style={styles.activeIndicator}>
+              <Text style={[styles.activeIndicatorText, { color: primaryTextColor }]}>Active</Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
-        {/* Sub-wallet actions */}
-        {!isActive && !isArchived && subWallet.index !== 0 && (
-          <IconButton
-            icon="archive"
-            iconColor={secondaryTextColor}
-            size={18}
-            onPress={() => handleArchiveSubWallet(masterKeyId, subWallet.index)}
+        {/* Sub-wallet Actions Menu */}
+        <Menu
+          visible={menuVisible === menuKey}
+          onDismiss={() => setMenuVisible(null)}
+          anchor={
+            <IconButton
+              icon="dots-vertical"
+              iconColor={secondaryTextColor}
+              size={20}
+              onPress={() => setMenuVisible(menuKey)}
+              style={{ margin: 0 }}
+            />
+          }
+          contentStyle={styles.menuContent}
+        >
+          <Menu.Item
+            onPress={() => {
+              setMenuVisible(null);
+              setNewName(subWallet.nickname);
+              setSelectedMasterKeyId(masterKeyId);
+              setRenameSubWalletIndex(subWallet.index);
+              setModalType('rename');
+            }}
+            title="Rename"
+            leadingIcon="pencil"
           />
-        )}
+          {!isActive && subWallet.index !== 0 && (
+            <Menu.Item
+              onPress={() => {
+                setMenuVisible(null);
+                handleArchiveSubWallet(masterKeyId, subWallet.index);
+              }}
+              title="Archive"
+              leadingIcon="archive"
+            />
+          )}
+        </Menu>
+      </View>
+    );
+  };
 
-        {isArchived && (
-          <Button
-            mode="text"
-            onPress={() => handleRestoreSubWallet(masterKeyId, subWallet.index)}
-            labelStyle={styles.restoreButtonLabel}
-            compact
-          >
-            Restore
-          </Button>
-        )}
-      </TouchableOpacity>
+  // ========================================
+  // Render Rename Modal
+  // ========================================
+
+  const renderRenameModal = (): React.JSX.Element | null => {
+    if (modalType !== 'rename') return null;
+
+    const isSubWallet = renameSubWalletIndex !== null;
+    const title = isSubWallet ? 'Rename Sub-Wallet' : 'Rename Wallet';
+
+    return (
+      <Portal>
+        <Dialog
+          visible
+          onDismiss={() => {
+            setModalType(null);
+            setSelectedMasterKeyId(null);
+            setRenameSubWalletIndex(null);
+            setNewName('');
+          }}
+          style={[styles.dialog, { backgroundColor: dialogBackgroundColor }]}
+        >
+          <Dialog.Title style={[styles.dialogTitle, { color: primaryTextColor }]}>
+            {title}
+          </Dialog.Title>
+          <Dialog.Content>
+            <StyledTextInput
+              style={styles.nameInputField}
+              value={newName}
+              onChangeText={setNewName}
+              label="New Name"
+              placeholder="Enter new name"
+              autoFocus
+              mode="outlined"
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              onPress={() => {
+                setModalType(null);
+                setSelectedMasterKeyId(null);
+                setRenameSubWalletIndex(null);
+                setNewName('');
+              }}
+              labelStyle={[styles.cancelButtonLabel, { color: secondaryTextColor }]}
+            >
+              Cancel
+            </Button>
+            <Button
+              onPress={handleRename}
+              disabled={!newName.trim() || processing}
+              loading={processing}
+              labelStyle={[styles.saveButtonLabel, { color: '#FFC107' }]}
+            >
+              Save
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     );
   };
 
@@ -719,6 +794,7 @@ export function WalletManagementScreen(): React.JSX.Element {
         {/* Modals */}
         {renderDeleteModal()}
         {renderAddSubWalletModal()}
+        {renderRenameModal()}
       </SafeAreaView>
     </LinearGradient>
   );
@@ -804,7 +880,8 @@ const styles = StyleSheet.create({
     color: '#F44336',
   },
   subWalletsContainer: {
-    paddingHorizontal: 16,
+    paddingLeft: 16,
+    paddingRight: 12, // Match masterKeyHeader padding for dot alignment
     paddingBottom: 16,
   },
   subWalletRow: {
@@ -824,6 +901,11 @@ const styles = StyleSheet.create({
   },
   subWalletRowArchived: {
     opacity: 0.6,
+  },
+  subWalletWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   subWalletInfo: {
     flexDirection: 'row',
@@ -948,5 +1030,8 @@ const styles = StyleSheet.create({
   },
   primaryButtonLabel: {
     color: '#FFC107',
+  },
+  saveButtonLabel: {
+    fontWeight: 'bold',
   },
 });

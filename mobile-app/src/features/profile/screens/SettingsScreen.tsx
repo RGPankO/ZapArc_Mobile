@@ -153,6 +153,21 @@ export function SettingsScreen(): React.JSX.Element {
           <Card style={styles.card}>
             <Card.Content>
               <Text variant="titleMedium" style={styles.sectionTitle}>
+                Wallet & Data
+              </Text>
+
+              <List.Item
+                title="Archived Wallets"
+                description="View and restore hidden sub-wallets"
+                left={(props) => <List.Icon {...props} icon="archive" />}
+                onPress={() => router.push('/wallet/archived')}
+              />
+            </Card.Content>
+          </Card>
+
+          <Card style={styles.card}>
+            <Card.Content>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
                 App Preferences
               </Text>
 

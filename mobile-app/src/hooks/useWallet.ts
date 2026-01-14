@@ -301,9 +301,6 @@ export function useWallet(): WalletState & WalletActions {
         setError(null);
 
         const nextIndex = await storageService.getNextSubWalletIndex(masterKeyId);
-        if (nextIndex === -1) {
-          throw new Error('Maximum sub-wallets reached');
-        }
 
         const name = nickname ?? generateSubWalletNickname(nextIndex);
         const index = await storageService.addSubWallet(masterKeyId, name);
@@ -466,10 +463,21 @@ export function useWallet(): WalletState & WalletActions {
 
   const renameMasterKey = useCallback(
     async (masterKeyId: string, nickname: string): Promise<void> => {
-      // TODO: Implement in storageService
-      console.log('🔵 [useWallet] Rename master key:', { masterKeyId, nickname });
+      try {
+        setIsLoading(true);
+        setError(null);
+        await storageService.renameMasterKey(masterKeyId, nickname);
+        await loadWalletData();
+        console.log('✅ [useWallet] Master key renamed:', { masterKeyId, nickname });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to rename wallet';
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
     },
-    []
+    [loadWalletData]
   );
 
   const renameSubWallet = useCallback(
@@ -478,14 +486,25 @@ export function useWallet(): WalletState & WalletActions {
       index: number,
       nickname: string
     ): Promise<void> => {
-      // TODO: Implement in storageService
-      console.log('🔵 [useWallet] Rename sub-wallet:', {
-        masterKeyId,
-        index,
-        nickname,
-      });
+      try {
+        setIsLoading(true);
+        setError(null);
+        await storageService.renameSubWallet(masterKeyId, index, nickname);
+        await loadWalletData();
+        console.log('✅ [useWallet] Sub-wallet renamed:', {
+          masterKeyId,
+          index,
+          nickname,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to rename sub-wallet';
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
     },
-    []
+    [loadWalletData]
   );
 
   // ========================================

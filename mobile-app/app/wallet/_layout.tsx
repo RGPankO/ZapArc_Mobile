@@ -21,6 +21,7 @@ export default function WalletLayout(): React.JSX.Element {
       <Stack.Screen name="tip/create" />
       <Stack.Screen name="tip/qr" />
       <Stack.Screen name="settings" />
+      <Stack.Screen name="archived" />
     </Stack>
   );
 }

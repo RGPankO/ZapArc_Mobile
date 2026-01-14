@@ -205,6 +205,22 @@ export function WalletSettingsScreen(): React.JSX.Element {
               descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
               style={styles.listItem}
             />
+            <Divider style={styles.divider} />
+
+            <List.Item
+              title={t('wallet.archivedWallets')}
+              description={t('wallet.viewArchivedWallets')}
+              left={(props) => (
+                <List.Icon {...props} icon="archive" color="#FFC107" />
+              )}
+              right={(props) => (
+                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
+              )}
+              onPress={() => router.push('/wallet/archived')}
+              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
+              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
+              style={styles.listItem}
+            />
           </View>
 
           {/* Security - Removed Auto-Lock */}

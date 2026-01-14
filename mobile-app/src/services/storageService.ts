@@ -230,15 +230,11 @@ class StorageService {
             needsMigration = true;
             sw.index = idx;
           }
-          // Fix incorrect nicknames (e.g., "Sub-Wallet 1" for index 0)
-          const expectedNickname = sw.index === 0 ? 'Main Wallet' : `Sub-Wallet ${sw.index}`;
-          if (sw.nickname && sw.nickname !== expectedNickname && sw.nickname.startsWith('Sub-Wallet')) {
-            console.warn('⚠️ [StorageService] Fixing incorrect nickname:', sw.nickname, '->', expectedNickname);
-            needsMigration = true;
-            sw.nickname = expectedNickname;
-          }
           return sw;
         });
+        
+        // Ensure sub-wallets are sorted by index
+        masterKey.subWallets.sort((a, b) => a.index - b.index);
 
         // Fix archived sub-wallets
         masterKey.archivedSubWallets = masterKey.archivedSubWallets.map((sw, idx) => {
@@ -468,8 +464,9 @@ class StorageService {
         throw new Error('Master key not found');
       }
 
-      // Check limit
-      if (masterKey.subWallets.length >= WALLET_CONSTANTS.MAX_SUB_WALLETS) {
+      // Check limit (total of active + archived)
+      const totalCount = masterKey.subWallets.length + masterKey.archivedSubWallets.length;
+      if (totalCount >= WALLET_CONSTANTS.MAX_SUB_WALLETS) {
         throw new Error(
           `Maximum sub-wallets (${WALLET_CONSTANTS.MAX_SUB_WALLETS}) reached`
         );
@@ -623,6 +620,68 @@ class StorageService {
     } catch (error) {
       console.error('❌ [StorageService] UPDATE_SUB_WALLET_ACTIVITY FAILED', error);
       // Non-critical, valid to suppress error in some contexts but good to log
+      throw error;
+    }
+  }
+
+  /**
+   * Rename a master key
+   */
+  async renameMasterKey(masterKeyId: string, nickname: string): Promise<void> {
+    console.log('🔵 [StorageService] RENAME_MASTER_KEY', { masterKeyId, nickname });
+
+    try {
+      const storage = await this.loadMultiWalletStorage();
+      if (!storage) throw new Error('No storage found');
+
+      const masterKey = storage.masterKeys.find((mk) => mk.id === masterKeyId);
+      if (!masterKey) throw new Error('Master key not found');
+
+      masterKey.nickname = nickname;
+      await this.saveMultiWalletStorage(storage);
+      console.log('✅ [StorageService] RENAME_MASTER_KEY SUCCESS');
+    } catch (error) {
+      console.error('❌ [StorageService] RENAME_MASTER_KEY FAILED', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Rename a sub-wallet
+   */
+  async renameSubWallet(
+    masterKeyId: string,
+    subWalletIndex: number,
+    nickname: string
+  ): Promise<void> {
+    console.log('🔵 [StorageService] RENAME_SUB_WALLET', {
+      masterKeyId,
+      subWalletIndex,
+      nickname,
+    });
+
+    try {
+      const storage = await this.loadMultiWalletStorage();
+      if (!storage) throw new Error('No storage found');
+
+      const masterKey = storage.masterKeys.find((mk) => mk.id === masterKeyId);
+      if (!masterKey) throw new Error('Master key not found');
+
+      // Check active sub-wallets
+      let subWallet = masterKey.subWallets.find((sw) => sw.index === subWalletIndex);
+      
+      // If not in active, check archived
+      if (!subWallet) {
+        subWallet = masterKey.archivedSubWallets.find((sw) => sw.index === subWalletIndex);
+      }
+
+      if (!subWallet) throw new Error('Sub-wallet not found');
+
+      subWallet.nickname = nickname;
+      await this.saveMultiWalletStorage(storage);
+      console.log('✅ [StorageService] RENAME_SUB_WALLET SUCCESS');
+    } catch (error) {
+      console.error('❌ [StorageService] RENAME_SUB_WALLET FAILED', error);
       throw error;
     }
   }
