@@ -17,9 +17,12 @@ const createLightTheme = (): MD3Theme => ({
   colors: {
     ...MD3LightTheme.colors,
     primary: '#FFC107', // Gold accent
-    background: '#f5f5f5',
+    // Use transparent for outlined input label backgrounds
+    // The actual screen background is handled by LinearGradient
+    background: 'transparent',
     surface: '#ffffff',
     surfaceVariant: '#f5f5f5',
+    onSurfaceVariant: 'rgba(0, 0, 0, 0.6)', // Label text color for light mode
   },
   roundness: 8,
 });
@@ -29,9 +32,12 @@ const createDarkTheme = (): MD3Theme => ({
   colors: {
     ...MD3DarkTheme.colors,
     primary: '#FFC107', // Gold accent
-    background: '#1a1a2e',
+    // Use transparent for outlined input label backgrounds
+    // The actual screen background is handled by LinearGradient
+    background: 'transparent',
     surface: '#1a1a2e',
     surfaceVariant: 'rgba(255, 255, 255, 0.05)',
+    onSurfaceVariant: 'rgba(255, 255, 255, 0.6)', // Label text color for dark mode
   },
   roundness: 8,
 });

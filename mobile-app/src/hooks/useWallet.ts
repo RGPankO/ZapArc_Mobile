@@ -800,7 +800,12 @@ export function useWallet(): WalletState & WalletActions {
                                 activeWalletInfo.subWalletIndex === lastSubWallet.index;
 
       if (isConnectedToLast) {
-         // Use real-time state
+         // First check cached value - if we know it has activity, enable immediately
+         if (lastSubWallet.hasActivity === true) {
+           return null;
+         }
+         
+         // Then check real-time state (more up-to-date than cache)
          const hasActivity = balance > 0 || transactions.length > 0;
          if (hasActivity) return null;
          

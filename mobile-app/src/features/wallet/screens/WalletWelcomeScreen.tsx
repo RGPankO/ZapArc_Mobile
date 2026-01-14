@@ -2,8 +2,9 @@
 // First launch screen for setting up the Lightning wallet
 
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, Alert, TextInput as RNTextInput } from 'react-native';
+import { View, StyleSheet, Alert } from 'react-native';
 import { Button, Text, Portal, Dialog } from 'react-native-paper';
+import { StyledTextInput } from '../../../components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -193,13 +194,14 @@ export function WalletWelcomeScreen(): React.JSX.Element {
                 {t('onboarding.createSubWalletUnder', { name: activeMasterKey?.nickname || '' })}
               </Text>
 
-              <RNTextInput
-                style={[styles.nameInput, { color: primaryText }]}
+              <StyledTextInput
+                style={styles.nameInput}
                 value={subWalletName}
                 onChangeText={setSubWalletName}
+                label={t('onboarding.subWalletName')}
                 placeholder={t('onboarding.subWalletName')}
-                placeholderTextColor={secondaryText}
                 autoFocus
+                mode="outlined"
               />
             </Dialog.Content>
             <Dialog.Actions>
@@ -349,8 +351,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   nameInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
     padding: 12,
     fontSize: 16,
   },

@@ -15,13 +15,15 @@ import {
   Text,
   IconButton,
   Button,
-  TextInput,
   Divider,
 } from 'react-native-paper';
+import { StyledTextInput } from '../../../components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../../hooks/useSettings';
+import { useAppTheme } from '../../../contexts/ThemeContext';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../utils/theme-helpers';
 
 // =============================================================================
 // Types
@@ -89,6 +91,12 @@ export function decodeTipRequest(encoded: string): TipRequest | null {
 
 export function TipCreatorScreen(): React.JSX.Element {
   const { settings } = useSettings();
+  const { themeMode } = useAppTheme();
+
+  // Theme colors
+  const gradientColors = getGradientColors(themeMode);
+  const primaryText = getPrimaryTextColor(themeMode);
+  const secondaryText = getSecondaryTextColor(themeMode);
 
   // State
   const [address, setAddress] = useState('');
@@ -195,7 +203,7 @@ export function TipCreatorScreen(): React.JSX.Element {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
@@ -203,11 +211,11 @@ export function TipCreatorScreen(): React.JSX.Element {
         <View style={styles.header}>
           <IconButton
             icon="arrow-left"
-            iconColor="#FFFFFF"
+            iconColor={primaryText}
             size={24}
             onPress={() => router.back()}
           />
-          <Text style={styles.headerTitle}>Create Tip Request</Text>
+          <Text style={[styles.headerTitle, { color: primaryText }]}>Create Tip Request</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -218,8 +226,8 @@ export function TipCreatorScreen(): React.JSX.Element {
         >
           {/* Lightning Address */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Lightning Address</Text>
-            <TextInput
+            <Text style={[styles.sectionTitle, { color: primaryText }]}>Lightning Address</Text>
+            <StyledTextInput
               mode="outlined"
               value={address}
               onChangeText={setAddress}
@@ -227,10 +235,6 @@ export function TipCreatorScreen(): React.JSX.Element {
               style={styles.input}
               autoCapitalize="none"
               autoCorrect={false}
-              outlineColor="rgba(255, 255, 255, 0.3)"
-              activeOutlineColor="#FFC107"
-              textColor="#FFFFFF"
-              placeholderTextColor="rgba(255, 255, 255, 0.4)"
             />
           </View>
 
@@ -248,11 +252,11 @@ export function TipCreatorScreen(): React.JSX.Element {
               >
                 {useCustomLnurl && <Text style={styles.checkmark}>✓</Text>}
               </View>
-              <Text style={styles.toggleLabel}>Use Custom LNURL</Text>
+              <Text style={[styles.toggleLabel, { color: secondaryText }]}>Use Custom LNURL</Text>
             </TouchableOpacity>
             
             {useCustomLnurl && (
-              <TextInput
+              <StyledTextInput
                 mode="outlined"
                 value={lnurl}
                 onChangeText={setLnurl}
@@ -260,10 +264,6 @@ export function TipCreatorScreen(): React.JSX.Element {
                 style={styles.input}
                 autoCapitalize="none"
                 autoCorrect={false}
-                outlineColor="rgba(255, 255, 255, 0.3)"
-                activeOutlineColor="#FFC107"
-                textColor="#FFFFFF"
-                placeholderTextColor="rgba(255, 255, 255, 0.4)"
               />
             )}
           </View>
@@ -310,7 +310,7 @@ export function TipCreatorScreen(): React.JSX.Element {
                 <Text style={styles.customAmountTitle}>
                   Enter Custom Amount
                 </Text>
-                <TextInput
+                <StyledTextInput
                   mode="outlined"
                   value={customAmountValue}
                   onChangeText={setCustomAmountValue}
@@ -318,9 +318,6 @@ export function TipCreatorScreen(): React.JSX.Element {
                   placeholder="Amount in sats"
                   style={styles.customAmountInput}
                   autoFocus
-                  outlineColor="rgba(255, 255, 255, 0.3)"
-                  activeOutlineColor="#FFC107"
-                  textColor="#FFFFFF"
                 />
                 
                 {/* Preset buttons */}
@@ -475,7 +472,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   toggleRow: {
     flexDirection: 'row',
@@ -548,7 +544,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   customAmountInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     marginBottom: 12,
   },
   presetContainer: {

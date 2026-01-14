@@ -11,12 +11,15 @@ import {
   BackHandler,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { Button, Text, TextInput, ProgressBar } from 'react-native-paper';
+import { Button, Text, ProgressBar } from 'react-native-paper';
+import { StyledTextInput } from '../../../components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { generateMnemonic, generateMasterKeyNickname } from '../../../utils/mnemonic';
 import { useWallet } from '../../../hooks/useWallet';
+import { useAppTheme } from '../../../contexts/ThemeContext';
+import { getGradientColors } from '../../../utils/theme-helpers';
 
 // =============================================================================
 // Types
@@ -35,6 +38,10 @@ interface MnemonicWord {
 
 export function WalletCreationScreen(): React.JSX.Element {
   const { createMasterKey, masterKeys } = useWallet();
+  const { themeMode } = useAppTheme();
+
+  // Theme colors
+  const gradientColors = getGradientColors(themeMode);
 
   // State
   const [currentStep, setCurrentStep] = useState<CreationStep>('generate');
@@ -423,10 +430,10 @@ export function WalletCreationScreen(): React.JSX.Element {
       {pasteMode ? (
         /* Paste mode */
         <View style={styles.pasteContainer}>
-          <TextInput
+          <StyledTextInput
             mode="outlined"
             value={pasteText}
-            onChangeText={(text) => {
+            onChangeText={(text: string) => {
               setPasteText(text);
               setError(null);
             }}
@@ -436,9 +443,6 @@ export function WalletCreationScreen(): React.JSX.Element {
             numberOfLines={4}
             autoCapitalize="none"
             autoCorrect={false}
-            outlineColor="rgba(255, 255, 255, 0.3)"
-            activeOutlineColor="#FFC107"
-            textColor="#FFFFFF"
           />
         </View>
       ) : (
@@ -528,21 +532,18 @@ export function WalletCreationScreen(): React.JSX.Element {
       )}
 
       <View style={styles.pinInputs}>
-        <TextInput
+        <StyledTextInput
           mode="outlined"
           label="Wallet Name"
           value={walletName}
-          onChangeText={(text) => {
+          onChangeText={(text: string) => {
             setWalletName(text);
             nameChangedRef.current = true;
           }}
           style={styles.pinInput}
-          outlineColor="rgba(255, 255, 255, 0.3)"
-          activeOutlineColor="#FFC107"
-          textColor="#FFFFFF"
         />
 
-        <TextInput
+        <StyledTextInput
           mode="outlined"
           label="Enter PIN"
           value={pin}
@@ -551,12 +552,9 @@ export function WalletCreationScreen(): React.JSX.Element {
           keyboardType="numeric"
           maxLength={6}
           style={styles.pinInput}
-          outlineColor="rgba(255, 255, 255, 0.3)"
-          activeOutlineColor="#FFC107"
-          textColor="#FFFFFF"
         />
 
-        <TextInput
+        <StyledTextInput
           mode="outlined"
           label="Confirm PIN"
           value={confirmPin}
@@ -629,7 +627,7 @@ export function WalletCreationScreen(): React.JSX.Element {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
@@ -1016,7 +1014,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   pinInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   pinMismatch: {
     color: '#F44336',
@@ -1066,7 +1063,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   nameInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     marginBottom: 24,
   },
   modalButton: {

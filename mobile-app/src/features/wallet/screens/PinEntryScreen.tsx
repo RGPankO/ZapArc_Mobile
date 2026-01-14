@@ -57,6 +57,7 @@ export function PinEntryScreen(): React.JSX.Element {
     unlock,
     unlockWithBiometric,
     biometricAvailable,
+    biometricEnabled,
     biometricType,
     activeWalletInfo,
     selectWallet,
@@ -75,11 +76,11 @@ export function PinEntryScreen(): React.JSX.Element {
   // ========================================
 
   useEffect(() => {
-    // Try biometric on mount if available, but not when switching wallets
-    if (biometricAvailable && !targetMasterKeyId) {
+    // Try biometric on mount if available and enabled, but not when switching wallets
+    if (biometricAvailable && biometricEnabled && !targetMasterKeyId) {
       handleBiometricUnlock();
     }
-  }, [biometricAvailable, targetMasterKeyId]);
+  }, [biometricAvailable, biometricEnabled, targetMasterKeyId]);
 
   // Auto-submit when PIN is complete
   useEffect(() => {

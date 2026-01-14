@@ -1,20 +1,20 @@
 // QR Scanner Screen
 // Camera-based QR scanning for Lightning invoices, LNURL, and addresses
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
   Keyboard,
   Alert,
 } from 'react-native';
+import { StyledTextInput } from '../../../components';
 import { Text, IconButton, Button, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
-import type { LNURLType } from '../../../utils/lnurl';
+
 
 // =============================================================================
 // Types
@@ -121,7 +121,7 @@ export function QRScannerScreen(): React.JSX.Element {
               [
                 {
                   text: 'OK',
-                  onPress: () => {
+                  onPress: (): void => {
                     setScanned(false);
                     setIsProcessing(false);
                   },
@@ -277,16 +277,17 @@ export function QRScannerScreen(): React.JSX.Element {
             Paste a Lightning invoice, LNURL, or Lightning address
           </Text>
 
-          <TextInput
+          <StyledTextInput
             style={styles.manualInput}
             value={manualInput}
             onChangeText={setManualInput}
+            label="Payment Code"
             placeholder="lnbc... or LNURL... or user@domain.com"
-            placeholderTextColor="rgba(255, 255, 255, 0.4)"
             multiline
             numberOfLines={4}
             autoCapitalize="none"
             autoCorrect={false}
+            mode="outlined"
           />
 
           <Button
@@ -551,13 +552,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   manualInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
     padding: 16,
-    color: '#FFFFFF',
-    fontSize: 14,
     minHeight: 120,
-    textAlignVertical: 'top',
+    textAlignVertical: 'top' as const,
     marginBottom: 24,
   },
   submitButton: {

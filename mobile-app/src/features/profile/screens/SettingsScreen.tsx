@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { TextInput, Button, Text, Card, List, Switch, Dialog, Portal, useTheme } from 'react-native-paper';
+import { TextInput, Button, Text, Card, List, Switch, Dialog, Portal, useTheme, MD3Theme } from 'react-native-paper';
+import { StyledTextInput } from '../../../components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -43,7 +44,7 @@ export function SettingsScreen(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
 
   // App preferences
-  const { settings, setTheme: saveTheme, setNotificationsEnabled } = useSettings();
+  const { settings, setNotificationsEnabled } = useSettings();
   const { themeMode, toggleTheme } = useAppTheme();
   const [autoSync, setAutoSync] = useState(true);
 
@@ -74,7 +75,7 @@ export function SettingsScreen(): React.JSX.Element {
             [
               {
                 text: 'OK',
-                onPress: () => {
+                onPress: (): void => {
                   setShowPasswordForm(false);
                   reset();
                   handleLogout();
@@ -110,7 +111,7 @@ export function SettingsScreen(): React.JSX.Element {
           [
             {
               text: 'OK',
-              onPress: () => router.replace('/auth/welcome'),
+              onPress: (): void => router.replace('/auth/welcome'),
             },
           ]
         );
@@ -133,7 +134,7 @@ export function SettingsScreen(): React.JSX.Element {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => setShowDeleteDialog(true),
+          onPress: (): void => setShowDeleteDialog(true),
         },
       ]
     );
@@ -247,7 +248,7 @@ export function SettingsScreen(): React.JSX.Element {
               name="currentPassword"
               render={({ field: { onChange, onBlur, value } }) => (
                 <View style={styles.inputContainer}>
-                  <TextInput
+                  <StyledTextInput
                     label="Current Password"
                     value={value}
                     onChangeText={onChange}
@@ -275,7 +276,7 @@ export function SettingsScreen(): React.JSX.Element {
               name="newPassword"
               render={({ field: { onChange, onBlur, value } }) => (
                 <View style={styles.inputContainer}>
-                  <TextInput
+                  <StyledTextInput
                     label="New Password"
                     value={value}
                     onChangeText={onChange}
@@ -303,7 +304,7 @@ export function SettingsScreen(): React.JSX.Element {
               name="confirmPassword"
               render={({ field: { onChange, onBlur, value } }) => (
                 <View style={styles.inputContainer}>
-                  <TextInput
+                  <StyledTextInput
                     label="Confirm New Password"
                     value={value}
                     onChangeText={onChange}
@@ -370,7 +371,7 @@ export function SettingsScreen(): React.JSX.Element {
   );
 }
 
-const createStyles = (theme: any) => StyleSheet.create({
+const createStyles = (theme: MD3Theme): ReturnType<typeof StyleSheet.create> => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -384,9 +385,9 @@ const createStyles = (theme: any) => StyleSheet.create({
     paddingTop: 16,
   },
   title: {
-    textAlign: 'center',
+    textAlign: 'center' as const,
     marginBottom: 24,
-    fontWeight: 'bold',
+    fontWeight: 'bold' as const,
     color: theme.colors.onBackground,
   },
   card: {
@@ -395,7 +396,7 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   sectionTitle: {
     marginBottom: 8,
-    fontWeight: 'bold',
+    fontWeight: 'bold' as const,
     color: theme.colors.onSurface,
   },
   dangerText: {
@@ -417,7 +418,6 @@ const createStyles = (theme: any) => StyleSheet.create({
     marginBottom: 16,
   },
   input: {
-    backgroundColor: theme.colors.surface,
   },
   fieldError: {
     color: '#f44336',
@@ -426,7 +426,7 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   warningText: {
     marginTop: 16,
-    fontWeight: 'bold',
+    fontWeight: 'bold' as const,
     color: '#f44336',
   },
 });

@@ -17,6 +17,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useWallet } from '../../../../hooks/useWallet';
 import { storageService } from '../../../../services';
+import { useAppTheme } from '../../../../contexts/ThemeContext';
+import { useLanguage } from '../../../../hooks/useLanguage';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../../utils/theme-helpers';
 
 // =============================================================================
 // Component
@@ -24,6 +27,13 @@ import { storageService } from '../../../../services';
 
 export function BackupScreen(): React.JSX.Element {
   const { getMnemonic, activeMasterKey, activeWalletInfo } = useWallet();
+  const { themeMode } = useAppTheme();
+  const { t } = useLanguage();
+
+  // Get theme colors
+  const gradientColors = getGradientColors(themeMode);
+  const primaryText = getPrimaryTextColor(themeMode);
+  const secondaryText = getSecondaryTextColor(themeMode);
 
   // State
   const [showMnemonic, setShowMnemonic] = useState(false);
@@ -129,7 +139,7 @@ export function BackupScreen(): React.JSX.Element {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
@@ -137,11 +147,13 @@ export function BackupScreen(): React.JSX.Element {
         <View style={styles.header}>
           <IconButton
             icon="arrow-left"
-            iconColor="#FFFFFF"
+            iconColor={primaryText}
             size={24}
             onPress={() => router.back()}
           />
-          <Text style={styles.headerTitle}>Backup & Recovery</Text>
+          <Text style={[styles.headerTitle, { color: primaryText }]}>
+            {t('settings.backupRecovery')}
+          </Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -151,7 +163,7 @@ export function BackupScreen(): React.JSX.Element {
             <View style={styles.warningBanner}>
               <Text style={styles.warningIcon}>⚠️</Text>
               <Text style={styles.warningTitle}>Keep Your Phrase Safe</Text>
-              <Text style={styles.warningText}>
+              <Text style={[styles.warningText, { color: secondaryText }]}>
                 Your recovery phrase is the ONLY way to restore your wallet if
                 you lose access to this device. Never share it with anyone.
               </Text>
@@ -159,8 +171,8 @@ export function BackupScreen(): React.JSX.Element {
 
             {/* Recovery Phrase Section */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Recovery Phrase</Text>
-              <Text style={styles.sectionDescription}>
+              <Text style={[styles.sectionTitle, { color: primaryText }]}>Recovery Phrase</Text>
+              <Text style={[styles.sectionDescription, { color: secondaryText }]}>
                 Write down these 12 words in order and store them in a secure
                 location.
               </Text>
@@ -169,7 +181,7 @@ export function BackupScreen(): React.JSX.Element {
                 <View style={styles.hiddenContainer}>
                   <View style={styles.hiddenPlaceholder}>
                     <Text style={styles.hiddenIcon}>🔒</Text>
-                    <Text style={styles.hiddenText}>
+                    <Text style={[styles.hiddenText, { color: secondaryText }]}>
                       Recovery phrase is hidden for security
                     </Text>
                   </View>
@@ -200,7 +212,7 @@ export function BackupScreen(): React.JSX.Element {
                         iconColor="#FFC107"
                         size={20}
                       />
-                      <Text style={styles.mnemonicActionText}>Copy</Text>
+                      <Text style={[styles.mnemonicActionText, { color: secondaryText }]}>Copy</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -212,7 +224,7 @@ export function BackupScreen(): React.JSX.Element {
                         iconColor="#FF5252"
                         size={20}
                       />
-                      <Text style={styles.mnemonicActionText}>Hide</Text>
+                      <Text style={[styles.mnemonicActionText, { color: secondaryText }]}>Hide</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -228,7 +240,7 @@ export function BackupScreen(): React.JSX.Element {
                     onValueChange={setBackupConfirmed}
                     color="#4CAF50"
                   />
-                  <Text style={styles.confirmText}>
+                  <Text style={[styles.confirmText, { color: secondaryText }]}>
                     I have written down my recovery phrase and stored it safely
                   </Text>
                 </View>
@@ -237,46 +249,46 @@ export function BackupScreen(): React.JSX.Element {
 
             {/* Security Tips */}
             <View style={styles.tipsSection}>
-              <Text style={styles.tipsTitle}>Backup Security Tips</Text>
+              <Text style={[styles.tipsTitle, { color: primaryText }]}>Backup Security Tips</Text>
 
               <View style={styles.tipItem}>
                 <Text style={styles.tipIcon}>✅</Text>
-                <Text style={styles.tipText}>
+                <Text style={[styles.tipText, { color: secondaryText }]}>
                   Write on paper - never store digitally
                 </Text>
               </View>
 
               <View style={styles.tipItem}>
                 <Text style={styles.tipIcon}>✅</Text>
-                <Text style={styles.tipText}>
+                <Text style={[styles.tipText, { color: secondaryText }]}>
                   Store in multiple secure locations
                 </Text>
               </View>
 
               <View style={styles.tipItem}>
                 <Text style={styles.tipIcon}>✅</Text>
-                <Text style={styles.tipText}>
+                <Text style={[styles.tipText, { color: secondaryText }]}>
                   Consider using a metal backup for fire/water protection
                 </Text>
               </View>
 
               <View style={styles.tipItem}>
                 <Text style={styles.tipIcon}>❌</Text>
-                <Text style={styles.tipText}>
+                <Text style={[styles.tipText, { color: secondaryText }]}>
                   Never share with anyone - not even support staff
                 </Text>
               </View>
 
               <View style={styles.tipItem}>
                 <Text style={styles.tipIcon}>❌</Text>
-                <Text style={styles.tipText}>
+                <Text style={[styles.tipText, { color: secondaryText }]}>
                   Never enter on a website or in an email
                 </Text>
               </View>
 
               <View style={styles.tipItem}>
                 <Text style={styles.tipIcon}>❌</Text>
-                <Text style={styles.tipText}>
+                <Text style={[styles.tipText, { color: secondaryText }]}>
                   Never take a screenshot or photo
                 </Text>
               </View>
@@ -287,12 +299,12 @@ export function BackupScreen(): React.JSX.Element {
               <View style={styles.infoBox}>
                 <Text style={styles.infoTitle}>Wallet Information</Text>
                 <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Name:</Text>
-                  <Text style={styles.infoValue}>{activeMasterKey.nickname}</Text>
+                  <Text style={[styles.infoLabel, { color: secondaryText }]}>Name:</Text>
+                  <Text style={[styles.infoValue, { color: primaryText }]}>{activeMasterKey.nickname}</Text>
                 </View>
                 <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Created:</Text>
-                  <Text style={styles.infoValue}>
+                  <Text style={[styles.infoLabel, { color: secondaryText }]}>Created:</Text>
+                  <Text style={[styles.infoValue, { color: primaryText }]}>
                     {new Date(activeMasterKey.createdAt).toLocaleDateString()}
                   </Text>
                 </View>

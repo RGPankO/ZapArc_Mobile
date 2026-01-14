@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { TextInput, Button, Text, HelperText, Divider } from 'react-native-paper';
+import { StyledTextInput } from '../../../components';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
@@ -60,7 +61,7 @@ export function RegisterScreen(): React.JSX.Element {
           Alert.alert(
             'Registration Successful',
             'Please check your email to verify your account.',
-            [{ text: 'OK', onPress: () => router.push('/auth/email-verification') }]
+            [{ text: 'OK', onPress: (): void => router.push('/auth/email-verification') }]
           );
         },
         onError: (error) => {
@@ -112,7 +113,7 @@ export function RegisterScreen(): React.JSX.Element {
                 name="nickname"
                 render={({ field: { onChange, onBlur, value } }) => (
                   <View style={styles.inputContainer}>
-                    <TextInput
+                    <StyledTextInput
                       label="Nickname"
                       value={value}
                       onChangeText={onChange}
@@ -133,7 +134,7 @@ export function RegisterScreen(): React.JSX.Element {
                 name="email"
                 render={({ field: { onChange, onBlur, value } }) => (
                   <View style={styles.inputContainer}>
-                    <TextInput
+                    <StyledTextInput
                       label="Email"
                       value={value}
                       onChangeText={onChange}
@@ -156,7 +157,7 @@ export function RegisterScreen(): React.JSX.Element {
                 name="password"
                 render={({ field: { onChange, onBlur, value } }) => (
                   <View style={styles.inputContainer}>
-                    <TextInput
+                    <StyledTextInput
                       label="Password"
                       value={value}
                       onChangeText={onChange}
@@ -184,7 +185,7 @@ export function RegisterScreen(): React.JSX.Element {
                 name="confirmPassword"
                 render={({ field: { onChange, onBlur, value } }) => (
                   <View style={styles.inputContainer}>
-                    <TextInput
+                    <StyledTextInput
                       label="Confirm Password"
                       value={value}
                       onChangeText={onChange}
@@ -269,7 +270,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    backgroundColor: 'white',
   },
   submitButton: {
     marginTop: 24,

@@ -12,15 +12,17 @@ import {
 } from 'react-native';
 import {
   Text,
-  TextInput,
   Button,
   IconButton,
   Switch,
 } from 'react-native-paper';
+import { StyledTextInput } from '../../../../components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../../../hooks/useSettings';
+import { useAppTheme } from '../../../../contexts/ThemeContext';
+import { getGradientColors, getPrimaryTextColor } from '../../../../utils/theme-helpers';
 
 // =============================================================================
 // Types
@@ -37,6 +39,11 @@ interface TrustedDomain {
 
 export function DomainManagementScreen(): React.JSX.Element {
   const { settings, updateSettings } = useSettings();
+  const { themeMode } = useAppTheme();
+
+  // Theme colors
+  const gradientColors = getGradientColors(themeMode);
+  const primaryText = getPrimaryTextColor(themeMode);
 
   // State
   const [trustedDomains, setTrustedDomains] = useState<TrustedDomain[]>([]);
@@ -147,7 +154,7 @@ export function DomainManagementScreen(): React.JSX.Element {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
@@ -155,11 +162,11 @@ export function DomainManagementScreen(): React.JSX.Element {
         <View style={styles.header}>
           <IconButton
             icon="arrow-left"
-            iconColor="#FFFFFF"
+            iconColor={primaryText}
             size={24}
             onPress={() => router.back()}
           />
-          <Text style={styles.headerTitle}>Trusted Domains</Text>
+          <Text style={[styles.headerTitle, { color: primaryText }]}>Trusted Domains</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -187,9 +194,9 @@ export function DomainManagementScreen(): React.JSX.Element {
               <Text style={styles.sectionTitle}>Add Trusted Domain</Text>
 
               <View style={styles.addRow}>
-                <TextInput
+                <StyledTextInput
                   value={newDomain}
-                  onChangeText={(text) => {
+                  onChangeText={(text: string) => {
                     setNewDomain(text);
                     setError(null);
                   }}
@@ -198,10 +205,6 @@ export function DomainManagementScreen(): React.JSX.Element {
                   style={styles.domainInput}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  outlineColor="rgba(255, 255, 255, 0.3)"
-                  activeOutlineColor="#FFC107"
-                  textColor="#FFFFFF"
-                  placeholderTextColor="rgba(255, 255, 255, 0.4)"
                 />
                 <IconButton
                   icon="plus-circle"

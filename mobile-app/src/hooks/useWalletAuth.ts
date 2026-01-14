@@ -21,6 +21,7 @@ export interface WalletAuthState {
 
   // Biometric
   biometricAvailable: boolean;
+  biometricEnabled: boolean;
   biometricType: 'fingerprint' | 'facial' | 'iris' | 'none';
 
   // Active wallet
@@ -62,6 +63,7 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [biometricType, setBiometricType] = useState<
     'fingerprint' | 'facial' | 'iris' | 'none'
   >('none');
@@ -101,9 +103,10 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
         // Check biometric availability
         await checkBiometricAvailability();
 
-        // Get auto-lock timeout from settings
+        // Get settings and auto-lock timeout
         const settings = await settingsService.getUserSettings();
         setAutoLockTimeout(settings.autoLockTimeout);
+        setBiometricEnabled(settings.biometricEnabled ?? false);
 
         // Check if we should auto-lock
         await checkAutoLock();
@@ -544,6 +547,7 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
     isLoading,
     error,
     biometricAvailable,
+    biometricEnabled,
     biometricType,
     activeWalletInfo,
     currentMasterKeyId,

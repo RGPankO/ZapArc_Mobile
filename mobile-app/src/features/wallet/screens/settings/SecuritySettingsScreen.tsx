@@ -3,13 +3,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Text, Switch, Button, IconButton } from 'react-native-paper';
+import { Text, Switch, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useSettings } from '../../../../hooks/useSettings';
 import { useLanguage } from '../../../../hooks/useLanguage';
+import { useAppTheme } from '../../../../contexts/ThemeContext';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../../utils/theme-helpers';
 
 // =============================================================================
 // Component
@@ -18,12 +20,17 @@ import { useLanguage } from '../../../../hooks/useLanguage';
 export function SecuritySettingsScreen(): React.JSX.Element {
   const { settings, updateSettings } = useSettings();
   const { t } = useLanguage();
+  const { themeMode } = useAppTheme();
+
+  // Get theme colors
+  const gradientColors = getGradientColors(themeMode);
+  const primaryText = getPrimaryTextColor(themeMode);
+  const secondaryText = getSecondaryTextColor(themeMode);
 
   // State
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState<string>('Biometric');
-  const [isSaving, setIsSaving] = useState(false);
 
   // Check biometric availability
   useEffect(() => {
@@ -75,6 +82,8 @@ export function SecuritySettingsScreen(): React.JSX.Element {
 
   // Handle biometric toggle
   const handleBiometricToggle = async (enabled: boolean): Promise<void> => {
+    let finalEnabled = enabled;
+
     if (enabled) {
       // Verify biometric before enabling
       try {
@@ -83,41 +92,36 @@ export function SecuritySettingsScreen(): React.JSX.Element {
           fallbackLabel: t('settings.usePin'),
         });
 
-        if (result.success) {
-          setBiometricEnabled(true);
-        } else {
+        if (!result.success) {
           Alert.alert(t('settings.failed'), t('settings.biometricVerificationFailed'));
+          return;
         }
+        finalEnabled = true;
       } catch {
         Alert.alert(t('common.error'), t('settings.failedToVerifyBiometric'));
+        return;
       }
-    } else {
-      setBiometricEnabled(false);
     }
-  };
-
-  // Handle save
-  const handleSave = async (): Promise<void> => {
-    setIsSaving(true);
 
     try {
+      setBiometricEnabled(finalEnabled);
       await updateSettings({
-        biometricEnabled,
+        biometricEnabled: finalEnabled,
       });
-
-      Alert.alert(t('settings.saved'), t('settings.securitySettingsUpdated'), [
-        { text: t('common.ok'), onPress: (): void => router.back() },
-      ]);
-    } catch {
+      console.log(`🔐 [SecuritySettings] Biometric ${finalEnabled ? 'enabled' : 'disabled'}`);
+    } catch (err) {
+      console.error('❌ [SecuritySettings] Failed to save setting:', err);
       Alert.alert(t('common.error'), t('settings.failedToSaveSettings'));
-    } finally {
-      setIsSaving(false);
+      // Revert local state
+      setBiometricEnabled(!finalEnabled);
     }
   };
+
+  // handleSave removed (saving immediately now)
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
@@ -125,11 +129,13 @@ export function SecuritySettingsScreen(): React.JSX.Element {
         <View style={styles.header}>
           <IconButton
             icon="arrow-left"
-            iconColor="#FFFFFF"
+            iconColor={primaryText}
             size={24}
             onPress={() => router.back()}
           />
-          <Text style={styles.headerTitle}>{t('settings.security')}</Text>
+          <Text style={[styles.headerTitle, { color: primaryText }]}>
+            {t('settings.biometricAuth')}
+          </Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -144,14 +150,14 @@ export function SecuritySettingsScreen(): React.JSX.Element {
                   size={28}
                   style={styles.sectionIcon}
                 />
-                <Text style={styles.sectionTitle}>
+                <Text style={[styles.sectionTitle, { color: primaryText }]}>
                   {biometricType === 'Fingerprint' ? t('settings.fingerprintUnlock') : t('settings.faceIdUnlock')}
                 </Text>
               </View>
-              
+
               <View style={styles.switchRow}>
                 <View style={styles.switchContent}>
-                  <Text style={styles.switchDescription}>
+                  <Text style={[styles.switchDescription, { color: secondaryText }]}>
                     {biometricAvailable
                       ? t('settings.useBiometricToUnlock', { type: biometricType })
                       : t('settings.notAvailableOnDevice')}
@@ -177,7 +183,7 @@ export function SecuritySettingsScreen(): React.JSX.Element {
             {/* Info Box */}
             <View style={styles.infoBox}>
               <Text style={styles.infoTitle}>{t('settings.securityTips')}</Text>
-              <Text style={styles.infoText}>
+              <Text style={[styles.infoText, { color: secondaryText }]}>
                 • {t('settings.securityTip1')}{'\n'}
                 • {t('settings.securityTip2')}{'\n'}
                 • {t('settings.securityTip3')}{'\n'}
@@ -187,19 +193,8 @@ export function SecuritySettingsScreen(): React.JSX.Element {
           </View>
         </ScrollView>
 
-        {/* Save Button */}
-        <View style={styles.footer}>
-          <Button
-            mode="contained"
-            onPress={handleSave}
-            loading={isSaving}
-            disabled={isSaving}
-            style={styles.saveButton}
-            labelStyle={styles.saveButtonLabel}
-          >
-            {t('settings.saveChanges')}
-          </Button>
-        </View>
+        {/* Footer spacer */}
+        <View style={styles.bottomSpacer} />
       </SafeAreaView>
     </LinearGradient>
   );
@@ -331,5 +326,8 @@ const styles = StyleSheet.create({
   saveButtonLabel: {
     color: '#1a1a2e',
     fontWeight: '600',
+  },
+  bottomSpacer: {
+    height: 32,
   },
 });

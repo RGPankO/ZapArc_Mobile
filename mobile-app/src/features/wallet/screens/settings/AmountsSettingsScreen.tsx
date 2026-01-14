@@ -3,11 +3,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Text, TextInput, Button, IconButton, Chip } from 'react-native-paper';
+import { Text, Button, IconButton, Chip } from 'react-native-paper';
+import { StyledTextInput } from '../../../../components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../../../hooks/useSettings';
+import { useLanguage } from '../../../../hooks/useLanguage';
+import { useAppTheme } from '../../../../contexts/ThemeContext';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../../utils/theme-helpers';
 import { validateTipAmounts } from '../../../../utils/lnurl';
 
 // =============================================================================
@@ -23,6 +27,13 @@ const MAX_AMOUNT = 100_000_000; // 1 BTC in sats
 
 export function AmountsSettingsScreen(): React.JSX.Element {
   const { settings, updateSettings } = useSettings();
+  const { t } = useLanguage();
+  const { themeMode } = useAppTheme();
+
+  // Get theme colors
+  const gradientColors = getGradientColors(themeMode);
+  const primaryText = getPrimaryTextColor(themeMode);
+  const secondaryText = getSecondaryTextColor(themeMode);
 
   // State for posting amounts (when creating tips)
   const [postingAmounts, setPostingAmounts] = useState<[number, number, number]>([100, 500, 1000]);
@@ -152,19 +163,16 @@ export function AmountsSettingsScreen(): React.JSX.Element {
 
     return (
       <View style={styles.amountRow} key={`${type}-${index}`}>
-        <Text style={styles.amountLabel}>{label}</Text>
+        <Text style={[styles.amountLabel, { color: secondaryText }]}>{label}</Text>
         {isEditing ? (
           <View style={styles.editContainer}>
-            <TextInput
+            <StyledTextInput
               value={editValue}
               onChangeText={setEditValue}
               keyboardType="numeric"
               mode="outlined"
               style={styles.editInput}
               autoFocus
-              outlineColor="rgba(255, 255, 255, 0.3)"
-              activeOutlineColor="#FFC107"
-              textColor="#FFFFFF"
             />
             <IconButton
               icon="check"
@@ -186,7 +194,7 @@ export function AmountsSettingsScreen(): React.JSX.Element {
             </Text>
             <IconButton
               icon="pencil"
-              iconColor="rgba(255, 255, 255, 0.5)"
+              iconColor={secondaryText}
               size={16}
             />
           </View>
@@ -197,7 +205,7 @@ export function AmountsSettingsScreen(): React.JSX.Element {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
@@ -205,11 +213,13 @@ export function AmountsSettingsScreen(): React.JSX.Element {
         <View style={styles.header}>
           <IconButton
             icon="arrow-left"
-            iconColor="#FFFFFF"
+            iconColor={primaryText}
             size={24}
             onPress={() => router.back()}
           />
-          <Text style={styles.headerTitle}>Default Amounts</Text>
+          <Text style={[styles.headerTitle, { color: primaryText }]}>
+            {t('settings.defaultTipAmounts')}
+          </Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -217,8 +227,8 @@ export function AmountsSettingsScreen(): React.JSX.Element {
           <View style={styles.content}>
             {/* Posting Amounts */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Tip Request Amounts</Text>
-              <Text style={styles.sectionDescription}>
+              <Text style={[styles.sectionTitle, { color: primaryText }]}>Tip Request Amounts</Text>
+              <Text style={[styles.sectionDescription, { color: secondaryText }]}>
                 Default amounts shown when creating tip requests
               </Text>
 
@@ -229,8 +239,8 @@ export function AmountsSettingsScreen(): React.JSX.Element {
 
             {/* Tipping Amounts */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Tipping Amounts</Text>
-              <Text style={styles.sectionDescription}>
+              <Text style={[styles.sectionTitle, { color: primaryText }]}>Tipping Amounts</Text>
+              <Text style={[styles.sectionDescription, { color: secondaryText }]}>
                 Default amounts shown when tipping others
               </Text>
 
@@ -242,14 +252,14 @@ export function AmountsSettingsScreen(): React.JSX.Element {
             {/* Presets (shown when editing) */}
             {editingField && (
               <View style={styles.presetsSection}>
-                <Text style={styles.presetsTitle}>Quick Select</Text>
+                <Text style={[styles.presetsTitle, { color: secondaryText }]}>Quick Select</Text>
                 <View style={styles.presetsContainer}>
                   {PRESET_AMOUNTS.map((preset) => (
                     <Chip
                       key={preset}
                       onPress={() => selectPreset(preset)}
                       style={styles.presetChip}
-                      textStyle={styles.presetChipText}
+                      textStyle={[styles.presetChipText, { color: primaryText }]}
                     >
                       {preset.toLocaleString()}
                     </Chip>
@@ -268,7 +278,7 @@ export function AmountsSettingsScreen(): React.JSX.Element {
             {/* Info Box */}
             <View style={styles.infoBox}>
               <Text style={styles.infoTitle}>About Amounts</Text>
-              <Text style={styles.infoText}>
+              <Text style={[styles.infoText, { color: secondaryText }]}>
                 • All amounts must be unique{'\n'}
                 • Maximum amount is 100,000,000 sats (1 BTC){'\n'}
                 • Minimum amount is 1 sat

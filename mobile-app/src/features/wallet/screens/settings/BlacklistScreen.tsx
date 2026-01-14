@@ -11,15 +11,17 @@ import {
 } from 'react-native';
 import {
   Text,
-  TextInput,
   Button,
   IconButton,
   SegmentedButtons,
 } from 'react-native-paper';
+import { StyledTextInput } from '../../../../components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../../../hooks/useSettings';
+import { useAppTheme } from '../../../../contexts/ThemeContext';
+import { getGradientColors, getPrimaryTextColor } from '../../../../utils/theme-helpers';
 
 // =============================================================================
 // Types
@@ -40,6 +42,11 @@ type FilterType = 'all' | 'domain' | 'address';
 
 export function BlacklistScreen(): React.JSX.Element {
   const { settings, updateSettings } = useSettings();
+  const { themeMode } = useAppTheme();
+
+  // Theme colors
+  const gradientColors = getGradientColors(themeMode);
+  const primaryText = getPrimaryTextColor(themeMode);
 
   // State
   const [blacklist, setBlacklist] = useState<BlacklistEntry[]>([]);
@@ -193,7 +200,7 @@ export function BlacklistScreen(): React.JSX.Element {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
@@ -201,11 +208,11 @@ export function BlacklistScreen(): React.JSX.Element {
         <View style={styles.header}>
           <IconButton
             icon="arrow-left"
-            iconColor="#FFFFFF"
+            iconColor={primaryText}
             size={24}
             onPress={() => router.back()}
           />
-          <Text style={styles.headerTitle}>Blacklist</Text>
+          <Text style={[styles.headerTitle, { color: primaryText }]}>Blacklist</Text>
           <IconButton
             icon="delete-sweep"
             iconColor={blacklist.length > 0 ? '#FF5252' : 'rgba(255,255,255,0.3)'}
@@ -233,9 +240,9 @@ export function BlacklistScreen(): React.JSX.Element {
               />
 
               <View style={styles.addRow}>
-                <TextInput
+                <StyledTextInput
                   value={newEntry}
-                  onChangeText={(text) => {
+                  onChangeText={(text: string) => {
                     setNewEntry(text);
                     setError(null);
                   }}
@@ -246,10 +253,6 @@ export function BlacklistScreen(): React.JSX.Element {
                   style={styles.entryInput}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  outlineColor="rgba(255, 255, 255, 0.3)"
-                  activeOutlineColor="#FFC107"
-                  textColor="#FFFFFF"
-                  placeholderTextColor="rgba(255, 255, 255, 0.4)"
                 />
                 <IconButton
                   icon="block-helper"

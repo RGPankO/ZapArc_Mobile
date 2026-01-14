@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { TextInput, Button, Text, HelperText, Divider } from 'react-native-paper';
+import { StyledTextInput } from '../../../components';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
@@ -48,10 +49,10 @@ export function LoginScreen(): React.JSX.Element {
 
   useEffect(() => {
     if (resendCooldown > 0) {
-      const timer = setTimeout(() => {
+      const timer = global.setTimeout((): void => {
         setResendCooldown(resendCooldown - 1);
       }, 1000);
-      return () => clearTimeout(timer);
+      return (): void => global.clearTimeout(timer);
     }
   }, [resendCooldown]);
 
@@ -169,7 +170,7 @@ export function LoginScreen(): React.JSX.Element {
               name="email"
               render={({ field: { onChange, onBlur, value } }) => (
                 <View style={styles.inputContainer}>
-                  <TextInput
+                  <StyledTextInput
                     label="Email"
                     value={value}
                     onChangeText={onChange}
@@ -192,7 +193,7 @@ export function LoginScreen(): React.JSX.Element {
               name="password"
               render={({ field: { onChange, onBlur, value } }) => (
                 <View style={styles.inputContainer}>
-                  <TextInput
+                  <StyledTextInput
                     label="Password"
                     value={value}
                     onChangeText={onChange}
@@ -316,7 +317,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    backgroundColor: 'white',
   },
   forgotButton: {
     alignSelf: 'flex-end',

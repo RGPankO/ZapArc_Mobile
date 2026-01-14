@@ -9,6 +9,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useWallet } from '../../../hooks/useWallet';
 import { useCurrency } from '../../../hooks/useCurrency';
+import { useAppTheme } from '../../../contexts/ThemeContext';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../utils/theme-helpers';
 
 // =============================================================================
 // Types
@@ -38,6 +40,12 @@ export function PaymentConfirmationScreen(): React.JSX.Element {
 
   const { balance, sendPayment } = useWallet();
   const { format } = useCurrency();
+  const { themeMode } = useAppTheme();
+
+  // Theme colors
+  const gradientColors = getGradientColors(themeMode);
+  const primaryText = getPrimaryTextColor(themeMode);
+  const secondaryText = getSecondaryTextColor(themeMode);
 
   // State
   const [status, setStatus] = useState<PaymentStatus>('confirming');
@@ -122,14 +130,14 @@ export function PaymentConfirmationScreen(): React.JSX.Element {
   if (status === 'processing') {
     return (
       <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        colors={gradientColors}
         style={styles.gradient}
       >
         <SafeAreaView style={styles.container}>
           <View style={styles.centerContent}>
             <ActivityIndicator size="large" color="#FFC107" />
-            <Text style={styles.processingText}>Processing Payment...</Text>
-            <Text style={styles.processingSubtext}>
+            <Text style={[styles.processingText, { color: primaryText }]}>Processing Payment...</Text>
+            <Text style={[styles.processingSubtext, { color: secondaryText }]}>
               Please wait while your payment is being sent
             </Text>
           </View>
@@ -144,7 +152,7 @@ export function PaymentConfirmationScreen(): React.JSX.Element {
   if (status === 'success') {
     return (
       <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        colors={gradientColors}
         style={styles.gradient}
       >
         <SafeAreaView style={styles.container}>
@@ -152,16 +160,16 @@ export function PaymentConfirmationScreen(): React.JSX.Element {
             <View style={styles.successIcon}>
               <Text style={styles.successIconText}>✓</Text>
             </View>
-            <Text style={styles.successTitle}>Payment Sent!</Text>
+            <Text style={[styles.successTitle, { color: primaryText }]}>Payment Sent!</Text>
             <Text style={styles.successAmount}>
               {format(paymentInfo.amount).primary}
             </Text>
             {format(paymentInfo.amount).secondary && (
-              <Text style={styles.successAmountSecondary}>
+              <Text style={[styles.successAmountSecondary, { color: secondaryText }]}>
                 {format(paymentInfo.amount).secondary}
               </Text>
             )}
-            <Text style={styles.successSubtext}>
+            <Text style={[styles.successSubtext, { color: secondaryText }]}>
               Your payment has been successfully sent
             </Text>
             <Button
@@ -184,7 +192,7 @@ export function PaymentConfirmationScreen(): React.JSX.Element {
   if (status === 'failed') {
     return (
       <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        colors={gradientColors}
         style={styles.gradient}
       >
         <SafeAreaView style={styles.container}>
@@ -192,8 +200,8 @@ export function PaymentConfirmationScreen(): React.JSX.Element {
             <View style={styles.failedIcon}>
               <Text style={styles.failedIconText}>✕</Text>
             </View>
-            <Text style={styles.failedTitle}>Payment Failed</Text>
-            <Text style={styles.failedError}>{error}</Text>
+            <Text style={[styles.failedTitle, { color: primaryText }]}>Payment Failed</Text>
+            <Text style={[styles.failedError, { color: secondaryText }]}>{error}</Text>
             <View style={styles.failedButtons}>
               <Button
                 mode="outlined"
@@ -223,7 +231,7 @@ export function PaymentConfirmationScreen(): React.JSX.Element {
   // ========================================
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
@@ -231,11 +239,11 @@ export function PaymentConfirmationScreen(): React.JSX.Element {
         <View style={styles.header}>
           <IconButton
             icon="close"
-            iconColor="#FFFFFF"
+            iconColor={primaryText}
             size={24}
             onPress={handleCancel}
           />
-          <Text style={styles.headerTitle}>Confirm Payment</Text>
+          <Text style={[styles.headerTitle, { color: primaryText }]}>Confirm Payment</Text>
           <View style={styles.headerSpacer} />
         </View>
 

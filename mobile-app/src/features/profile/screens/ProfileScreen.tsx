@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { TextInput, Button, Text, Card, Chip, ActivityIndicator } from 'react-native-paper';
+import { Button, Text, Card, Chip, ActivityIndicator } from 'react-native-paper';
+import { StyledTextInput } from '../../../components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -204,7 +205,7 @@ export function ProfileScreen(): React.JSX.Element {
                 name="nickname"
                 render={({ field: { onChange, onBlur, value } }) => (
                   <View style={styles.inputContainer}>
-                    <TextInput
+                    <StyledTextInput
                       label="Nickname"
                       value={value}
                       onChangeText={onChange}
@@ -225,7 +226,7 @@ export function ProfileScreen(): React.JSX.Element {
                 name="email"
                 render={({ field: { onChange, onBlur, value } }) => (
                   <View style={styles.inputContainer}>
-                    <TextInput
+                    <StyledTextInput
                       label="Email"
                       value={value}
                       onChangeText={onChange}
@@ -374,7 +375,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   input: {
-    backgroundColor: 'white',
   },
   fieldErrorText: {
     color: '#f44336',

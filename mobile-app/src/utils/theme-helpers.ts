@@ -63,3 +63,15 @@ export const STATUS_COLORS = {
   warning: '#FF9800',
   info: '#2196F3',
 } as const;
+
+/**
+ * Get input background color for outlined TextInputs
+ * This should match the gradient background so the floating label
+ * can properly mask the border line
+ */
+export const getInputBackgroundColor = (themeMode: ThemeMode): string => {
+  // Use the middle color of the gradient for best approximation
+  return themeMode === 'dark'
+    ? '#16213e' // Middle of dark gradient
+    : '#e8e8e8'; // Middle of light gradient
+};

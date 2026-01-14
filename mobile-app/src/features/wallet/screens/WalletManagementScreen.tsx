@@ -8,8 +8,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  TextInput,
 } from 'react-native';
+import { StyledTextInput } from '../../../components';
 import {
   Text,
   IconButton,
@@ -59,6 +59,7 @@ export function WalletManagementScreen(): React.JSX.Element {
   const primaryTextColor = getPrimaryTextColor(themeMode);
   const secondaryTextColor = getSecondaryTextColor(themeMode);
   const iconColor = getIconColor(themeMode);
+  const dialogBackgroundColor = themeMode === 'dark' ? '#1a1a2e' : '#FFFFFF';
 
   // State
   const [expandedMasterKeys, setExpandedMasterKeys] = useState<Set<string>>(
@@ -72,6 +73,7 @@ export function WalletManagementScreen(): React.JSX.Element {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [menuVisible, setMenuVisible] = useState<string | null>(null);
+  const [syncingMasterKeys, setSyncingMasterKeys] = useState<Set<string>>(new Set());
 
   // Keep active master key always expanded
   useEffect(() => {
@@ -138,9 +140,22 @@ export function WalletManagementScreen(): React.JSX.Element {
 
         if (pin) {
           console.log(`🔄 [WalletManagement] Background syncing activity for ${masterKey.nickname}...`);
-          // Note: This temporarily disconnects and reconnects the SDK
-          // Pass sessionPin as restorePin to ensure we can go back to the original active wallet
-          await syncSubWalletActivity(masterKey.id, lastSubWallet.index, pin, sessionPin);
+          
+          // Mark as syncing
+          setSyncingMasterKeys(prev => new Set(prev).add(masterKey.id));
+          
+          try {
+            // Note: This temporarily disconnects and reconnects the SDK
+            // Pass sessionPin as restorePin to ensure we can go back to the original active wallet
+            await syncSubWalletActivity(masterKey.id, lastSubWallet.index, pin, sessionPin);
+          } finally {
+            // Remove from syncing set
+            setSyncingMasterKeys(prev => {
+              const next = new Set(prev);
+              next.delete(masterKey.id);
+              return next;
+            });
+          }
         }
       }
     };
@@ -304,6 +319,7 @@ export function WalletManagementScreen(): React.JSX.Element {
     const isExpanded = expandedMasterKeys.has(masterKey.id);
     const isActive = masterKey.id === activeMasterKey?.id;
     const canAddSub = canAddSubWallet(masterKey.id);
+    const isSyncing = syncingMasterKeys.has(masterKey.id);
 
     return (
       <View key={masterKey.id} style={styles.masterKeyContainer}>
@@ -397,10 +413,10 @@ export function WalletManagementScreen(): React.JSX.Element {
             <TouchableOpacity
               style={[
                 styles.addSubWalletButton,
-                !canAddSub && styles.addSubWalletButtonDisabled,
+                !canAddSub && !isSyncing && styles.addSubWalletButtonDisabled,
               ]}
               onPress={() => {
-                if (canAddSub) {
+                if (canAddSub && !isSyncing) {
                   setSelectedMasterKeyId(masterKey.id);
                   // Calculate next sub-wallet index for default name
                   // Main wallet is index 0. First sub-wallet should be index 1 and named "Sub-Wallet 1"
@@ -409,23 +425,27 @@ export function WalletManagementScreen(): React.JSX.Element {
                   setModalType('addSubWallet');
                 }
               }}
-              disabled={!canAddSub}
+              disabled={!canAddSub || isSyncing}
             >
-              <IconButton
-                icon="plus"
-                iconColor={canAddSub ? '#FFC107' : 'rgba(255, 255, 255, 0.3)'}
-                size={20}
-              />
+              {isSyncing ? (
+                <ActivityIndicator size="small" color="#FFC107" style={{ marginHorizontal: 12 }} />
+              ) : (
+                <IconButton
+                  icon="plus"
+                  iconColor={canAddSub ? '#FFC107' : 'rgba(255, 255, 255, 0.3)'}
+                  size={20}
+                />
+              )}
               <View>
                 <Text
                   style={[
                     styles.addSubWalletText,
-                    !canAddSub && styles.addSubWalletTextDisabled,
+                    !canAddSub && !isSyncing && styles.addSubWalletTextDisabled,
                   ]}
                 >
-                  Add Sub-Wallet
+                  {isSyncing ? 'Checking...' : 'Add Sub-Wallet'}
                 </Text>
-                {!canAddSub && (
+                {!canAddSub && !isSyncing && (
                   <Text style={[styles.addSubWalletHint, { color: secondaryTextColor }]}>
                     {getAddSubWalletDisabledReason(masterKey.id) || 'Last sub-wallet needs transaction history'}
                   </Text>
@@ -543,7 +563,7 @@ export function WalletManagementScreen(): React.JSX.Element {
             setPinInput('');
             setError(null);
           }}
-          style={styles.dialog}
+          style={[styles.dialog, { backgroundColor: dialogBackgroundColor }]}
         >
           <Dialog.Title style={[styles.dialogTitle, { color: primaryTextColor }]}>Delete Wallet</Dialog.Title>
           <Dialog.Content>
@@ -557,15 +577,16 @@ export function WalletManagementScreen(): React.JSX.Element {
 
             {error && <Text style={styles.dialogError}>{error}</Text>}
 
-            <TextInput
-              style={[styles.pinInputField, { color: primaryTextColor }]}
+            <StyledTextInput
+              style={styles.pinInputField}
               value={pinInput}
               onChangeText={setPinInput}
+              label="PIN"
               placeholder="Enter PIN to confirm"
-              placeholderTextColor={secondaryTextColor}
               secureTextEntry
               keyboardType="numeric"
               maxLength={6}
+              mode="outlined"
             />
           </Dialog.Content>
           <Dialog.Actions>
@@ -610,7 +631,7 @@ export function WalletManagementScreen(): React.JSX.Element {
             setSelectedMasterKeyId(null);
             setNewName('');
           }}
-          style={styles.dialog}
+          style={[styles.dialog, { backgroundColor: dialogBackgroundColor }]}
         >
           <Dialog.Title style={[styles.dialogTitle, { color: primaryTextColor }]}>Name Your Sub-Wallet</Dialog.Title>
           <Dialog.Content>
@@ -618,13 +639,14 @@ export function WalletManagementScreen(): React.JSX.Element {
               Choose a name for your new sub-wallet.
             </Text>
 
-            <TextInput
-              style={[styles.nameInputField, { color: primaryTextColor }]}
+            <StyledTextInput
+              style={styles.nameInputField}
               value={newName}
               onChangeText={setNewName}
+              label="Sub-Wallet Name"
               placeholder="Sub-Wallet name"
-              placeholderTextColor={secondaryTextColor}
               autoFocus
+              mode="outlined"
             />
           </Dialog.Content>
           <Dialog.Actions>
@@ -890,7 +912,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dialog: {
-    backgroundColor: '#1a1a2e',
+    borderRadius: 12,
   },
   dialogTitle: {
   },
@@ -911,8 +933,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   pinInputField: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
     padding: 12,
     fontSize: 16,
   },
@@ -922,8 +942,6 @@ const styles = StyleSheet.create({
     color: '#F44336',
   },
   nameInputField: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
     padding: 12,
     fontSize: 16,
     marginTop: 8,

@@ -237,7 +237,7 @@ export function CurrencySettingsScreen(): React.JSX.Element {
                 Your balance will display as:
               </Text>
               <View style={styles.previewExample}>
-                <Text style={styles.previewPrimary}>
+                <Text style={[styles.previewPrimary, { color: primaryText }]}>
                   {primaryDenomination === 'btc' ? '₿ 0.00035529' : '35,529 sats'}
                 </Text>
                 <Text style={[styles.previewSecondary, { color: secondaryText }]}>

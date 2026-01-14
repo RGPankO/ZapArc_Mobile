@@ -6,14 +6,17 @@ import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import {
   Text,
   RadioButton,
-  TextInput,
   Button,
   IconButton,
 } from 'react-native-paper';
+import { StyledTextInput } from '../../../../components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../../../hooks/useSettings';
+import { useLanguage } from '../../../../hooks/useLanguage';
+import { useAppTheme } from '../../../../contexts/ThemeContext';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../../utils/theme-helpers';
 import { isLightningAddress, isValidLnurlFormat } from '../../../../utils/lnurl';
 
 // =============================================================================
@@ -22,6 +25,13 @@ import { isLightningAddress, isValidLnurlFormat } from '../../../../utils/lnurl'
 
 export function WalletConfigScreen(): React.JSX.Element {
   const { settings, updateSettings } = useSettings();
+  const { t } = useLanguage();
+  const { themeMode } = useAppTheme();
+
+  // Get theme colors
+  const gradientColors = getGradientColors(themeMode);
+  const primaryText = getPrimaryTextColor(themeMode);
+  const secondaryText = getSecondaryTextColor(themeMode);
 
   // State
   const [useBuiltIn, setUseBuiltIn] = useState(true);
@@ -90,7 +100,7 @@ export function WalletConfigScreen(): React.JSX.Element {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
@@ -98,11 +108,13 @@ export function WalletConfigScreen(): React.JSX.Element {
         <View style={styles.header}>
           <IconButton
             icon="arrow-left"
-            iconColor="#FFFFFF"
+            iconColor={primaryText}
             size={24}
             onPress={() => router.back()}
           />
-          <Text style={styles.headerTitle}>Wallet Type</Text>
+          <Text style={[styles.headerTitle, { color: primaryText }]}>
+            {t('settings.walletType')}
+          </Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -110,7 +122,7 @@ export function WalletConfigScreen(): React.JSX.Element {
           <View style={styles.content}>
             {/* Wallet Type Selection */}
             <View style={styles.section}>
-              <Text style={styles.sectionDescription}>
+              <Text style={[styles.sectionDescription, { color: secondaryText }]}>
                 Choose how you want to receive Lightning payments
               </Text>
 
@@ -122,13 +134,13 @@ export function WalletConfigScreen(): React.JSX.Element {
                   <RadioButton.Android
                     value="builtin"
                     color="#FFC107"
-                    uncheckedColor="rgba(255, 255, 255, 0.5)"
+                    uncheckedColor={secondaryText}
                   />
                   <View style={styles.radioContent}>
-                    <Text style={styles.radioTitle}>
+                    <Text style={[styles.radioTitle, { color: primaryText }]}>
                       Built-in Wallet (Recommended)
                     </Text>
-                    <Text style={styles.radioDescription}>
+                    <Text style={[styles.radioDescription, { color: secondaryText }]}>
                       Use Breez SDK for seamless Lightning payments. Your keys,
                       your coins.
                     </Text>
@@ -139,11 +151,11 @@ export function WalletConfigScreen(): React.JSX.Element {
                   <RadioButton.Android
                     value="custom"
                     color="#FFC107"
-                    uncheckedColor="rgba(255, 255, 255, 0.5)"
+                    uncheckedColor={secondaryText}
                   />
                   <View style={styles.radioContent}>
-                    <Text style={styles.radioTitle}>Custom LNURL/Address</Text>
-                    <Text style={styles.radioDescription}>
+                    <Text style={[styles.radioTitle, { color: primaryText }]}>Custom LNURL/Address</Text>
+                    <Text style={[styles.radioDescription, { color: secondaryText }]}>
                       Use your own Lightning address or LNURL-pay endpoint.
                     </Text>
                   </View>
@@ -154,12 +166,12 @@ export function WalletConfigScreen(): React.JSX.Element {
             {/* Custom Configuration */}
             {!useBuiltIn && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Custom Configuration</Text>
+                <Text style={[styles.sectionTitle, { color: primaryText }]}>Custom Configuration</Text>
 
-                <TextInput
+                <StyledTextInput
                   label="Lightning Address"
                   value={customAddress}
-                  onChangeText={(text) => {
+                  onChangeText={(text: string) => {
                     setCustomAddress(text);
                     setError(null);
                   }}
@@ -168,18 +180,14 @@ export function WalletConfigScreen(): React.JSX.Element {
                   style={styles.input}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  outlineColor="rgba(255, 255, 255, 0.3)"
-                  activeOutlineColor="#FFC107"
-                  textColor="#FFFFFF"
-                  placeholderTextColor="rgba(255, 255, 255, 0.4)"
                 />
 
-                <Text style={styles.orDivider}>— or —</Text>
+                <Text style={[styles.orDivider, { color: secondaryText }]}>— or —</Text>
 
-                <TextInput
+                <StyledTextInput
                   label="LNURL-pay"
                   value={customLNURL}
-                  onChangeText={(text) => {
+                  onChangeText={(text: string) => {
                     setCustomLNURL(text);
                     setError(null);
                   }}
@@ -188,10 +196,6 @@ export function WalletConfigScreen(): React.JSX.Element {
                   style={styles.input}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  outlineColor="rgba(255, 255, 255, 0.3)"
-                  activeOutlineColor="#FFC107"
-                  textColor="#FFFFFF"
-                  placeholderTextColor="rgba(255, 255, 255, 0.4)"
                 />
               </View>
             )}
@@ -206,7 +210,7 @@ export function WalletConfigScreen(): React.JSX.Element {
             {/* Info Box */}
             <View style={styles.infoBox}>
               <Text style={styles.infoTitle}>About Wallet Types</Text>
-              <Text style={styles.infoText}>
+              <Text style={[styles.infoText, { color: secondaryText }]}>
                 {useBuiltIn
                   ? 'The built-in wallet uses Breez SDK to create a non-custodial Lightning wallet. Your seed phrase is encrypted and stored securely on your device.'
                   : 'Using a custom address means tips will be sent directly to your existing Lightning wallet. Make sure your wallet supports LNURL-pay.'}
@@ -302,7 +306,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
   },
   input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     marginBottom: 12,
   },
   orDivider: {

@@ -16,6 +16,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import QRCode from 'react-native-qrcode-svg';
 import { decodeTipRequest } from './TipCreatorScreen';
+import { useAppTheme } from '../../../contexts/ThemeContext';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../utils/theme-helpers';
 
 // =============================================================================
 // Component
@@ -24,6 +26,12 @@ import { decodeTipRequest } from './TipCreatorScreen';
 export function TipQRCodeScreen(): React.JSX.Element {
   const params = useLocalSearchParams<{ encoded: string }>();
   const qrRef = useRef<any>(null);
+  const { themeMode } = useAppTheme();
+
+  // Theme colors
+  const gradientColors = getGradientColors(themeMode);
+  const primaryText = getPrimaryTextColor(themeMode);
+  const secondaryText = getSecondaryTextColor(themeMode);
 
   // Parse the tip request
   const tipRequest = useMemo(() => {
@@ -91,14 +99,14 @@ export function TipQRCodeScreen(): React.JSX.Element {
   if (!tipRequest || !params.encoded) {
     return (
       <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        colors={gradientColors}
         style={styles.gradient}
       >
         <SafeAreaView style={styles.container}>
           <View style={styles.errorContainer}>
             <Text style={styles.errorIcon}>❌</Text>
-            <Text style={styles.errorTitle}>Invalid Tip Request</Text>
-            <Text style={styles.errorText}>
+            <Text style={[styles.errorTitle, { color: primaryText }]}>Invalid Tip Request</Text>
+            <Text style={[styles.errorText, { color: secondaryText }]}>
               The tip request data is invalid or missing.
             </Text>
             <Button
@@ -117,7 +125,7 @@ export function TipQRCodeScreen(): React.JSX.Element {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
@@ -125,11 +133,11 @@ export function TipQRCodeScreen(): React.JSX.Element {
         <View style={styles.header}>
           <IconButton
             icon="close"
-            iconColor="#FFFFFF"
+            iconColor={primaryText}
             size={24}
             onPress={() => router.back()}
           />
-          <Text style={styles.headerTitle}>Tip QR Code</Text>
+          <Text style={[styles.headerTitle, { color: primaryText }]}>Tip QR Code</Text>
           <View style={styles.headerSpacer} />
         </View>
 

@@ -8,7 +8,8 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import { Button, Text, TextInput, ProgressBar } from 'react-native-paper';
+import { Button, Text, ProgressBar } from 'react-native-paper';
+import { StyledTextInput } from '../../../components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,6 +20,8 @@ import {
   generateMasterKeyNickname,
 } from '../../../utils/mnemonic';
 import { useWallet } from '../../../hooks/useWallet';
+import { useAppTheme } from '../../../contexts/ThemeContext';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../utils/theme-helpers';
 
 // =============================================================================
 // Types
@@ -32,6 +35,12 @@ type ImportStep = 'input' | 'pin' | 'complete';
 
 export function WalletImportScreen(): React.JSX.Element {
   const { importMasterKey, masterKeys } = useWallet();
+  const { themeMode } = useAppTheme();
+
+  // Theme colors
+  const gradientColors = getGradientColors(themeMode);
+  const primaryText = getPrimaryTextColor(themeMode);
+  const secondaryText = getSecondaryTextColor(themeMode);
 
   // State
   const [currentStep, setCurrentStep] = useState<ImportStep>('input');
@@ -130,8 +139,8 @@ export function WalletImportScreen(): React.JSX.Element {
 
   const renderInputStep = () => (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-      <Text style={styles.stepTitle}>Import Wallet</Text>
-      <Text style={styles.stepDescription}>
+      <Text style={[styles.stepTitle, { color: primaryText }]}>Import Wallet</Text>
+      <Text style={[styles.stepDescription, { color: secondaryText }]}>
         Enter your 12 or 24-word recovery phrase. Words should be separated by spaces.
       </Text>
 
@@ -141,7 +150,7 @@ export function WalletImportScreen(): React.JSX.Element {
         </View>
       )}
 
-      <TextInput
+      <StyledTextInput
         mode="outlined"
         label="Recovery Phrase"
         value={mnemonic}
@@ -155,10 +164,6 @@ export function WalletImportScreen(): React.JSX.Element {
         numberOfLines={4}
         autoCapitalize="none"
         autoCorrect={false}
-        outlineColor="rgba(255, 255, 255, 0.3)"
-        activeOutlineColor="#FFC107"
-        textColor="#FFFFFF"
-        placeholderTextColor="rgba(255, 255, 255, 0.4)"
       />
 
       {/* Word Count Indicator */}
@@ -210,8 +215,8 @@ export function WalletImportScreen(): React.JSX.Element {
 
   const renderPinStep = () => (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-      <Text style={styles.stepTitle}>Set Your PIN</Text>
-      <Text style={styles.stepDescription}>
+      <Text style={[styles.stepTitle, { color: primaryText }]}>Set Your PIN</Text>
+      <Text style={[styles.stepDescription, { color: secondaryText }]}>
         Create a 6-digit PIN to secure your wallet. You'll use this PIN to
         unlock the wallet.
       </Text>
@@ -223,21 +228,18 @@ export function WalletImportScreen(): React.JSX.Element {
       )}
 
       <View style={styles.pinInputs}>
-        <TextInput
+        <StyledTextInput
           mode="outlined"
           label="Wallet Name"
           value={walletName}
-          onChangeText={(text) => {
+          onChangeText={(text: string) => {
             setWalletName(text);
             nameChangedRef.current = true;
           }}
           style={styles.pinInput}
-          outlineColor="rgba(255, 255, 255, 0.3)"
-          activeOutlineColor="#FFC107"
-          textColor="#FFFFFF"
         />
 
-        <TextInput
+        <StyledTextInput
           mode="outlined"
           label="Enter PIN"
           value={pin}
@@ -246,12 +248,9 @@ export function WalletImportScreen(): React.JSX.Element {
           keyboardType="numeric"
           maxLength={6}
           style={styles.pinInput}
-          outlineColor="rgba(255, 255, 255, 0.3)"
-          activeOutlineColor="#FFC107"
-          textColor="#FFFFFF"
         />
 
-        <TextInput
+        <StyledTextInput
           mode="outlined"
           label="Confirm PIN"
           value={confirmPin}
@@ -260,9 +259,6 @@ export function WalletImportScreen(): React.JSX.Element {
           keyboardType="numeric"
           maxLength={6}
           style={styles.pinInput}
-          outlineColor="rgba(255, 255, 255, 0.3)"
-          activeOutlineColor="#FFC107"
-          textColor="#FFFFFF"
         />
       </View>
 
@@ -290,8 +286,8 @@ export function WalletImportScreen(): React.JSX.Element {
         <Text style={styles.successEmoji}>✅</Text>
       </View>
 
-      <Text style={styles.stepTitle}>Wallet Imported!</Text>
-      <Text style={styles.stepDescription}>
+      <Text style={[styles.stepTitle, { color: primaryText }]}>Wallet Imported!</Text>
+      <Text style={[styles.stepDescription, { color: secondaryText }]}>
         Your wallet has been successfully imported. You can now access your
         funds via the Lightning Network.
       </Text>
@@ -323,7 +319,7 @@ export function WalletImportScreen(): React.JSX.Element {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={gradientColors}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
@@ -423,7 +419,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   mnemonicInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     marginBottom: 12,
     minHeight: 100,
   },
@@ -492,7 +487,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   pinInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   pinMismatch: {
     color: '#F44336',
