@@ -11,7 +11,10 @@
     "test:watch": "jest --watch",
     "lint": "eslint 'src/**/*.{ts,tsx}'",
     "lint:fix": "eslint 'src/**/*.{ts,tsx}' --fix",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "build:dev": "EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform android --profile development",
+    "build:preview": "EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform android --profile preview",
+    "build:prod": "EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform android --profile production"
   },
   "dependencies": {
     "@breeztech/breez-sdk-spark-react-native": "^0.6.6",

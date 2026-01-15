@@ -237,3 +237,6 @@ coverage/
 .claude
 
 **/**/query_engine-windows.dll.node
+
+**/android/**
+**/ios/**
