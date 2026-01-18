@@ -136,7 +136,7 @@ export interface LocationData {
 // =============================================================================
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
-  language: 'en',
+  language: 'auto',
   isLocationBased: true,
   currency: 'sats', // Legacy field, kept for backwards compatibility
   primaryDenomination: 'sats', // Default to satoshis

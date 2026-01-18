@@ -72,7 +72,55 @@ class LocationService {
   }
 
   /**
+   * Get location by IP address (no permission required)
+   * Uses free IP geolocation API as fallback
+   */
+  async getLocationByIP(): Promise<LocationInfo | null> {
+    try {
+      console.log('📍 [LocationService] Attempting IP-based geolocation...');
+      
+      // Use ip-api.com (free, no API key required, 45 requests/minute limit)
+      const response = await fetch('http://ip-api.com/json/?fields=status,countryCode,lat,lon', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`IP geolocation failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.status !== 'success') {
+        throw new Error('IP geolocation returned failure status');
+      }
+
+      const isInBulgaria = data.countryCode === 'BG';
+      
+      const locationInfo: LocationInfo = {
+        latitude: data.lat || 0,
+        longitude: data.lon || 0,
+        countryCode: data.countryCode || null,
+        isInBulgaria,
+      };
+
+      console.log('✅ [LocationService] IP geolocation result:', {
+        countryCode: data.countryCode,
+        isInBulgaria,
+      });
+
+      return locationInfo;
+    } catch (error) {
+      console.error('❌ [LocationService] IP geolocation failed:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get current location and determine country
+   * Tries GPS first, falls back to IP-based geolocation
    */
   async getCurrentLocation(): Promise<LocationInfo | null> {
     try {
@@ -82,44 +130,62 @@ class LocationService {
         return this.cachedLocation;
       }
 
-      // Check permission
+      // Check permission for GPS location
       const hasPermission = await this.hasPermission();
-      if (!hasPermission) {
-        console.log('📍 [LocationService] No location permission');
-        return null;
+      
+      if (hasPermission) {
+        console.log('📍 [LocationService] Getting current location via GPS...');
+        
+        try {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Lowest, // Fast, low battery usage
+          });
+
+          const { latitude, longitude } = location.coords;
+          const isInBulgaria = this.isCoordinateInBulgaria(latitude, longitude);
+          const countryCode = isInBulgaria ? 'BG' : null;
+
+          const locationInfo: LocationInfo = {
+            latitude,
+            longitude,
+            countryCode,
+            isInBulgaria,
+          };
+
+          // Cache the result
+          this.cachedLocation = locationInfo;
+          this.lastLocationCheck = Date.now();
+
+          console.log('✅ [LocationService] GPS location detected:', {
+            lat: latitude.toFixed(2),
+            lng: longitude.toFixed(2),
+            isInBulgaria,
+          });
+
+          return locationInfo;
+        } catch (gpsError) {
+          console.warn('⚠️ [LocationService] GPS failed, trying IP fallback:', gpsError);
+        }
+      } else {
+        console.log('📍 [LocationService] No GPS permission, using IP-based detection');
       }
 
-      console.log('📍 [LocationService] Getting current location...');
+      // Fallback to IP-based geolocation
+      const ipLocation = await this.getLocationByIP();
       
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Lowest, // Fast, low battery usage
-      });
+      if (ipLocation) {
+        // Cache the IP-based result (with shorter duration since it's less accurate)
+        this.cachedLocation = ipLocation;
+        this.lastLocationCheck = Date.now();
+        return ipLocation;
+      }
 
-      const { latitude, longitude } = location.coords;
-      const isInBulgaria = this.isCoordinateInBulgaria(latitude, longitude);
-      const countryCode = isInBulgaria ? 'BG' : null;
-
-      const locationInfo: LocationInfo = {
-        latitude,
-        longitude,
-        countryCode,
-        isInBulgaria,
-      };
-
-      // Cache the result
-      this.cachedLocation = locationInfo;
-      this.lastLocationCheck = Date.now();
-
-      console.log('✅ [LocationService] Location detected:', {
-        lat: latitude.toFixed(2),
-        lng: longitude.toFixed(2),
-        isInBulgaria,
-      });
-
-      return locationInfo;
+      return null;
     } catch (error) {
       console.error('❌ [LocationService] Failed to get location:', error);
-      return null;
+      
+      // Last resort: try IP geolocation
+      return this.getLocationByIP();
     }
   }
 

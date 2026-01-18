@@ -12,9 +12,15 @@
     "lint": "eslint 'src/**/*.{ts,tsx}'",
     "lint:fix": "eslint 'src/**/*.{ts,tsx}' --fix",
     "type-check": "tsc --noEmit",
-    "build:dev": "EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform android --profile development",
-    "build:preview": "EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform android --profile preview",
-    "build:prod": "EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform android --profile production"
+    "build:dev": "EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform all --profile development",
+    "build:preview": "EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform all --profile preview",
+    "build:prod": "EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform all --profile production",
+    "build:dev:android": "EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform android --profile development",
+    "build:dev:ios": "EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform ios --profile development",
+    "build:preview:android": "EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform android --profile preview",
+    "build:preview:ios": "EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform ios --profile preview",
+    "build:prod:android": "EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform android --profile production",
+    "build:prod:ios": "EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform ios --profile production"
   },
   "dependencies": {
     "@breeztech/breez-sdk-spark-react-native": "^0.6.6",
