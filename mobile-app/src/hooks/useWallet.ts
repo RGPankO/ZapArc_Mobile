@@ -575,11 +575,18 @@ export function useWallet(): WalletState & WalletActions {
 
   const refreshTransactions = useCallback(async (): Promise<void> => {
     try {
+      console.log('🔄 [useWallet] refreshTransactions: Starting...');
       const walletInfo = await storageService.getActiveWalletInfo();
       if (!walletInfo) {
+        console.log('⚠️ [useWallet] refreshTransactions: No active wallet info');
         setTransactions([]);
         return;
       }
+
+      console.log('🔄 [useWallet] refreshTransactions: Active wallet:', {
+        masterKeyId: walletInfo.masterKeyId,
+        subWalletIndex: walletInfo.subWalletIndex,
+      });
 
       // Load from cache first for instant display
       const cached = await WalletCache.getCachedTransactions(
@@ -588,21 +595,30 @@ export function useWallet(): WalletState & WalletActions {
       );
 
       if (cached) {
+        console.log('🔄 [useWallet] refreshTransactions: Got cached transactions:', cached.transactions.length);
         setTransactions(cached.transactions);
         setIsRefreshing(true); // Background refresh indicator
+      } else {
+        console.log('🔄 [useWallet] refreshTransactions: No cached transactions');
       }
 
       // Fetch fresh data from SDK
-      if (!BreezSparkService.isSDKInitialized()) {
+      const sdkInitialized = BreezSparkService.isSDKInitialized();
+      console.log('🔄 [useWallet] refreshTransactions: SDK initialized:', sdkInitialized);
+      
+      if (!sdkInitialized) {
         // If SDK not initialized and we have cache, keep using it
         if (!cached) {
+          console.log('⚠️ [useWallet] refreshTransactions: SDK not ready, no cache - setting empty');
           setTransactions([]);
         }
         setIsRefreshing(false);
         return;
       }
 
+      console.log('🔄 [useWallet] refreshTransactions: Calling listPayments...');
       const payments = await BreezSparkService.listPayments();
+      console.log('🔄 [useWallet] refreshTransactions: Got payments:', payments.length);
       
       // Map TransactionInfo to Transaction type
       const txs: Transaction[] = payments.map((p) => ({
@@ -615,6 +631,7 @@ export function useWallet(): WalletState & WalletActions {
         description: p.description,
       }));
       
+      console.log('🔄 [useWallet] refreshTransactions: Setting transactions:', txs.length);
       setTransactions(txs);
       setIsRefreshing(false);
 

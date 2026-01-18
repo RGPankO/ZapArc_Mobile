@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   Modal,
+  BackHandler,
 } from 'react-native';
 import { Text, IconButton, ActivityIndicator, Button, Divider, Snackbar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -75,6 +76,20 @@ export function HomeScreen(): React.JSX.Element {
   const getFormattedBalance = (sats: number) => {
     return format(sats, { hideBalance: !showBalance });
   };
+
+  // Prevent Android back button from navigating back to welcome/create screens
+  // Only active when HomeScreen is focused - allows normal back nav from other screens
+  useFocusEffect(
+    useCallback((): (() => void) => {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        // Return true to prevent default back behavior (going back to welcome/create)
+        // The app will minimize instead
+        return true;
+      });
+
+      return (): void => backHandler.remove();
+    }, [])
+  );
 
   // Refresh handler (for manual pull-to-refresh)
   const handleRefresh = useCallback(async () => {

@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Vibration,
   Animated,
+  BackHandler,
 } from 'react-native';
 import { Text, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -81,6 +82,17 @@ export function PinEntryScreen(): React.JSX.Element {
       handleBiometricUnlock();
     }
   }, [biometricAvailable, biometricEnabled, targetMasterKeyId]);
+
+  // Prevent back navigation to welcome/create screens
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      // Return true to prevent default back behavior
+      // This prevents going back to welcome/create screens
+      return true;
+    });
+
+    return () => backHandler.remove();
+  }, []);
 
   // Auto-submit when PIN is complete
   useEffect(() => {

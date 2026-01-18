@@ -8,13 +8,34 @@ export default function WalletLayout(): React.JSX.Element {
         animation: 'slide_from_right',
       }}
     >
-      <Stack.Screen name="welcome" />
-      <Stack.Screen name="unlock" />
+      <Stack.Screen 
+        name="welcome" 
+        options={{
+          gestureEnabled: false,
+        }}
+      />
+      <Stack.Screen 
+        name="unlock" 
+        options={{
+          gestureEnabled: false,
+        }}
+      />
       <Stack.Screen name="create" />
       <Stack.Screen name="import" />
       <Stack.Screen name="pin" />
-      <Stack.Screen name="selection" />
-      <Stack.Screen name="home" />
+      <Stack.Screen 
+        name="selection" 
+        options={{
+          gestureEnabled: false,
+        }}
+      />
+      <Stack.Screen 
+        name="home" 
+        options={{
+          // Prevent back navigation to welcome/create screens
+          gestureEnabled: false,
+        }}
+      />
       <Stack.Screen name="scan" />
       <Stack.Screen name="history" />
       <Stack.Screen name="manage" />

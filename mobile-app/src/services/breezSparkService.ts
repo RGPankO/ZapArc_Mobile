@@ -564,31 +564,48 @@ export async function receivePayment(
  */
 export async function listPayments(): Promise<TransactionInfo[]> {
   if (!_isNativeAvailable || !sdkInstance) {
+    console.log('⚠️ [BreezSparkService] listPayments: SDK not available');
     return [];
   }
 
   try {
+    console.log('🔵 [BreezSparkService] listPayments: Fetching payments...');
     const response = await sdkInstance.listPayments({
       sortAscending: false,
     });
 
     const payments = response.payments || [];
+    console.log('🔵 [BreezSparkService] listPayments: Got', payments.length, 'payments');
+    
+    // Log first payment for debugging field names
+    if (payments.length > 0) {
+      console.log('🔵 [BreezSparkService] listPayments: Sample payment fields:', Object.keys(payments[0]));
+    }
 
     return payments.map((payment: any) => {
-      const rawAmount = payment.amount || 0;
+      // Try multiple field name variations (SDK may return different formats)
+      const rawAmount = payment.amount ?? payment.amountSats ?? payment.amountSat ?? 0;
       const amountSat = typeof rawAmount === 'bigint' ? Number(rawAmount) : Number(rawAmount);
 
-      const rawFees = payment.fees || 0;
+      const rawFees = payment.fees ?? payment.feesSats ?? payment.feeSat ?? payment.fee ?? 0;
       const feeSat = typeof rawFees === 'bigint' ? Number(rawFees) : Number(rawFees);
 
-      const rawTime = payment.timestamp || 0;
+      const rawTime = payment.timestamp ?? payment.createdAt ?? 0;
       let timestamp = typeof rawTime === 'bigint' ? Number(rawTime) : Number(rawTime);
+      // Convert from seconds to milliseconds if needed
       if (timestamp > 0 && timestamp < 10000000000) {
         timestamp *= 1000;
       }
 
+      // Determine payment type - try multiple formats
       let type: 'receive' | 'send' = 'send';
-      if (payment.paymentType === 1 || payment.paymentType === '1') {
+      const paymentType = payment.paymentType;
+      if (
+        paymentType === 1 || 
+        paymentType === '1' || 
+        paymentType === 'receive' || 
+        String(paymentType).toLowerCase() === 'receive'
+      ) {
         type = 'receive';
       }
 
@@ -607,7 +624,7 @@ export async function listPayments(): Promise<TransactionInfo[]> {
       };
     });
   } catch (error) {
-    console.error('Failed to list payments:', error);
+    console.error('❌ [BreezSparkService] Failed to list payments:', error);
     return [];
   }
 }
