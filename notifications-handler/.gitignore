@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+lib/
+
+# Environment files (may contain secrets)
+.env
+.env.local
+
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
