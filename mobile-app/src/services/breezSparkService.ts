@@ -193,7 +193,7 @@ export async function initializeSDK(
     });
 
     _isInitialized = true;
-    
+
     // Setup event listeners for real-time payment notifications
     // Based on: https://sdk-doc-spark.breez.technology/guide/events.html
     try {
@@ -203,7 +203,12 @@ export async function initializeSDK(
       console.warn('⚠️ [BreezSparkService] Event listeners failed (non-fatal):', eventError);
       // Don't fail SDK init if events don't work - user can still pull-to-refresh
     }
-    
+
+    // NOTE: Webhook registration for background notifications is not available
+    // in Breez SDK Spark. Notifications only work when the app is in foreground.
+    // The NDS webhook infrastructure is ready in our Cloud Functions if Breez
+    // adds this feature in the future.
+
     console.log('✅ [BreezSparkService] Breez SDK initialized successfully');
     console.log('✅ [BreezSparkService] sdkInstance:', !!sdkInstance);
     return true;
@@ -272,12 +277,13 @@ export async function disconnectSDK(): Promise<void> {
 export function onPaymentReceived(callback: PaymentEventCallback): () => void {
   paymentEventListeners.add(callback);
   console.log('✅ [BreezSparkService] Payment event listener added');
-  
+
   return () => {
     paymentEventListeners.delete(callback);
     console.log('✅ [BreezSparkService] Payment event listener removed');
   };
 }
+
 
 /**
  * Setup SDK event listeners

@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { useSettings } from '../../../../hooks/useSettings';
 import { useAppTheme } from '../../../../contexts/ThemeContext';
 import { useLanguage } from '../../../../hooks/useLanguage';
@@ -172,6 +173,8 @@ export function NotificationsSettingsScreen(): React.JSX.Element {
   // Test remote notification via Cloud Function
   const sendRemoteTestNotification = async (): Promise<void> => {
     try {
+      console.log('🔔 [Test] Starting remote notification test...');
+
       if (permissionStatus !== 'granted') {
         Alert.alert(
           t('settings.permissionRequired'),
@@ -180,9 +183,19 @@ export function NotificationsSettingsScreen(): React.JSX.Element {
         return;
       }
 
+      // Get project ID from Constants (app.json extra.eas.projectId)
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+      console.log('🔔 [Test] Project ID:', projectId);
+
+      if (!projectId) {
+        Alert.alert('Error', 'Project ID not found in app config');
+        return;
+      }
+
       // Get current token
+      console.log('🔔 [Test] Getting push token...');
       const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: process.env.EXPO_PUBLIC_PROJECT_ID,
+        projectId,
       });
       const token = tokenData.data;
 
@@ -193,15 +206,15 @@ export function NotificationsSettingsScreen(): React.JSX.Element {
 
       if (result.success) {
         Alert.alert(
-          'Success', 
-          'Remote notification sent! You should receive it momentarily.'
+          'Success',
+          `Remote notification sent!\n\nToken: ${token.substring(0, 30)}...`
         );
       } else {
         Alert.alert('Error', result.error || 'Failed to send remote notification');
       }
     } catch (error) {
       console.error('❌ [Notifications] Failed to send remote test notification:', error);
-      Alert.alert('Error', 'Failed to trigger remote notification');
+      Alert.alert('Error', `Failed to trigger remote notification: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 

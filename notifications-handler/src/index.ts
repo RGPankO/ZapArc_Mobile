@@ -10,6 +10,7 @@ import type {
   TransactionNotificationRequest,
   TransactionNotificationResponse,
   ExpoPushMessage,
+  BreezWebhookRequest,
 } from './types.js';
 
 /**
@@ -148,6 +149,114 @@ export const sendTransactionNotification = onRequest(
         success: false,
         error: 'An unexpected error occurred',
       } satisfies TransactionNotificationResponse);
+    }
+  }
+);
+
+/**
+ * NDS (Notification Delivery Service) webhook endpoint
+ * Called by Breez LSP when an incoming payment is detected
+ *
+ * URL format: /notify?platform=android&token=<EXPO_PUSH_TOKEN>
+ *
+ * The Breez SDK registers this webhook URL, and when a payment arrives,
+ * the LSP calls this endpoint. We then forward the notification to
+ * the device via Expo Push API.
+ *
+ * @see https://sdk-doc-greenlight.breez.technology/notifications/setup_nds.html
+ */
+export const notify = onRequest(
+  { cors: true },
+  async (request, response) => {
+    try {
+      // Only allow POST requests
+      if (request.method !== 'POST') {
+        response.status(405).json({
+          success: false,
+          error: 'Method not allowed. Use POST.',
+        });
+        return;
+      }
+
+      // Extract token from query params
+      // URL format: /notify?platform=android&token=ExponentPushToken[xxx]
+      const token = request.query.token as string | undefined;
+      const platform = request.query.platform as string | undefined;
+
+      console.log('[NDS] Webhook received:', {
+        platform,
+        hasToken: !!token,
+        tokenPrefix: token?.substring(0, 20),
+      });
+
+      if (!token) {
+        console.error('[NDS] Missing token in query params');
+        response.status(400).json({
+          success: false,
+          error: 'Missing token query parameter',
+        });
+        return;
+      }
+
+      // Validate token format
+      if (!token.startsWith('ExponentPushToken[')) {
+        console.error('[NDS] Invalid token format:', token.substring(0, 30));
+        response.status(400).json({
+          success: false,
+          error: 'Invalid Expo push token format',
+        });
+        return;
+      }
+
+      // Parse webhook body from Breez LSP
+      const body = request.body as BreezWebhookRequest;
+      console.log('[NDS] Webhook body:', JSON.stringify(body));
+
+      // Handle different notification templates
+      let notificationTitle = 'Payment Update';
+      let notificationBody = 'You have a payment update';
+
+      if (body.template === 'payment_received') {
+        notificationTitle = 'Payment Incoming';
+        notificationBody = 'You have an incoming payment!';
+      } else if (body.template === 'lnurlpay_info' || body.template === 'lnurlpay_invoice') {
+        notificationTitle = 'Payment Request';
+        notificationBody = 'Someone wants to pay you';
+      }
+
+      // Send push notification
+      const message: ExpoPushMessage = {
+        to: token,
+        title: notificationTitle,
+        body: notificationBody,
+        data: {
+          type: body.template || 'unknown',
+          payment_hash: body.data?.payment_hash || '',
+        },
+      };
+
+      const sendResult = await sendPushNotification(message);
+
+      if (!sendResult.success) {
+        console.error('[NDS] Failed to send push:', sendResult.error);
+        response.status(500).json({
+          success: false,
+          error: sendResult.error,
+        });
+        return;
+      }
+
+      console.log('[NDS] Push notification sent successfully');
+      response.status(200).json({
+        success: true,
+        message: 'Notification delivered',
+      });
+    } catch (error) {
+      console.error('[NDS] Unexpected error:', error);
+      response.status(500).json({
+        success: false,
+        error: 'An unexpected error occurred',
+      });
     }
   }
 );

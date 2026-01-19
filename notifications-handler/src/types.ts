@@ -48,3 +48,22 @@ export interface ValidationResult {
   /** Error message if validation failed */
   error?: string;
 }
+
+/**
+ * Breez NDS webhook request structure
+ * Called by Breez LSP when a payment is incoming
+ * @see https://sdk-doc-greenlight.breez.technology/notifications/setup_nds.html
+ */
+export interface BreezWebhookRequest {
+  /** Notification template type */
+  template: 'payment_received' | 'lnurlpay_info' | 'lnurlpay_invoice';
+  /** Notification data */
+  data: {
+    /** Payment hash for the incoming payment */
+    payment_hash?: string;
+    /** Amount in millisatoshis (for some templates) */
+    amount_msat?: number;
+    /** Callback URL (for LNURL templates) */
+    callback_url?: string;
+  };
+}
