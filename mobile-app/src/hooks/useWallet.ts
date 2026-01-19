@@ -74,6 +74,7 @@ export interface WalletActions {
   getMnemonic: (masterKeyId: string, pin: string) => Promise<string>;
   canAddSubWallet: (masterKeyId: string) => boolean;
   getAddSubWalletDisabledReason: (masterKeyId: string) => string | null;
+  clearWalletState: () => void;
 }
 
 // =============================================================================
@@ -371,6 +372,11 @@ export function useWallet(): WalletState & WalletActions {
       try {
         setIsLoading(true);
         setError(null);
+
+        // Clear old wallet data immediately to prevent showing stale data
+        setBalance(0);
+        setTransactions([]);
+        setIsConnected(false);
 
         await storageService.setActiveWallet(masterKeyId, subWalletIndex);
 
@@ -942,6 +948,16 @@ export function useWallet(): WalletState & WalletActions {
   // Return Hook Value
   // ========================================
 
+  /**
+   * Clear wallet state (balance, transactions) - used when switching wallets
+   * to prevent showing stale data from previous wallet
+   */
+  const clearWalletState = useCallback(() => {
+    setBalance(0);
+    setTransactions([]);
+    setIsConnected(false);
+  }, []);
+
   return {
     // State
     isLoading,
@@ -973,5 +989,6 @@ export function useWallet(): WalletState & WalletActions {
     getMnemonic,
     canAddSubWallet,
     getAddSubWalletDisabledReason,
+    clearWalletState,
   };
 }

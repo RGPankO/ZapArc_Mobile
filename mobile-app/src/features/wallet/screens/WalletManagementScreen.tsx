@@ -52,6 +52,7 @@ export function WalletManagementScreen(): React.JSX.Element {
     canAddSubWallet,
     getAddSubWalletDisabledReason,
     syncSubWalletActivity,
+    clearWalletState,
   } = useWallet();
   const { selectSubWallet, getSessionPin } = useWalletAuth();
 
@@ -303,6 +304,8 @@ export function WalletManagementScreen(): React.JSX.Element {
 
         // For same master key, no PIN needed - use selectSubWallet which reinitializes SDK
         if (masterKeyId === activeMasterKey?.id) {
+          // Clear old wallet state immediately to prevent showing stale data
+          clearWalletState();
           const success = await selectSubWallet(subWalletIndex);
           if (success) {
             router.replace('/wallet/home');
@@ -326,7 +329,7 @@ export function WalletManagementScreen(): React.JSX.Element {
         setProcessing(false);
       }
     },
-    [activeMasterKey?.id, selectSubWallet]
+    [activeMasterKey?.id, selectSubWallet, clearWalletState]
   );
 
   // ========================================
