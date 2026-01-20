@@ -202,7 +202,7 @@ export function NotificationsSettingsScreen(): React.JSX.Element {
       console.log('🔔 [Test] Sending remote notification to:', token);
 
       // Call Cloud Function
-      const result = await NotificationTriggerService.sendTransactionNotification(token, 2100);
+      const result = await NotificationTriggerService.sendTransactionNotification({ pushToken: token }, 2100);
 
       if (result.success) {
         Alert.alert(

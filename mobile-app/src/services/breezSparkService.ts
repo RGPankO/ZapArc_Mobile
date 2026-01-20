@@ -4,10 +4,10 @@
 // NOTE: This service requires native modules. It will work in:
 // - Development builds (npx expo run:android)
 // - Production builds
-// It will NOT work in Expo Go (native modules not available)
-
 import { BREEZ_API_KEY, BREEZ_STORAGE_DIR } from '../config';
+import * as Notifications from 'expo-notifications';
 import { sendPaymentReceivedNotification } from './notificationService';
+import { NotificationTriggerService } from './notificationTriggerService';
 
 // =============================================================================
 // Types
@@ -86,6 +86,44 @@ const SENT_PAYMENT_TRACKING_MS = 60000; // Track for 1 minute
 // =============================================================================
 
 /**
+ * Get the local Node ID (Public Key)
+ * Spark SDK doesn't expose node ID directly, so we generate a minimal invoice and parse it
+ */
+ export async function getNodeId(): Promise<string | null> {
+  if (!_isNativeAvailable || !sdkInstance) return null;
+  try {
+    // Spark SDK doesn't have getNodeInfo() - try to get pubkey from a generated invoice
+    const paymentMethod = BreezSDK.ReceivePaymentMethod.Bolt11Invoice.new({
+      description: '__nodeId_probe__',
+      amountSats: BigInt(1),
+      expirySecs: 60,
+    });
+    
+    const response = await sdkInstance.receivePayment({ paymentMethod });
+    const invoice = response.paymentRequest;
+    
+    // Parse the invoice to get our own pubkey
+    const parsed = await sdkInstance.parse(invoice);
+    
+    if (parsed.tag === 'Bolt11Invoice' && parsed.inner) {
+      const innerData = Array.isArray(parsed.inner) ? parsed.inner[0] : parsed.inner;
+      const nodeId = innerData?.payeePubkey || innerData?.destination || innerData?.nodeId;
+      if (nodeId) {
+        console.log('✅ [BreezSparkService] Got node ID:', nodeId.substring(0, 20) + '...');
+        return nodeId;
+      }
+    }
+    
+    console.warn('⚠️ [BreezSparkService] Could not extract node ID from invoice');
+    return null;
+  } catch (err) {
+    console.warn('⚠️ [BreezSparkService] Failed to get node ID:', err);
+    return null;
+  }
+}
+
+
+/**
  * Check if native SDK is available
  */
 export function isNativeAvailable(): boolean {
@@ -125,13 +163,8 @@ export async function initializeSDK(
   apiKey?: string
 ): Promise<boolean> {
   const walletId = generateWalletStorageId(mnemonic);
-  const mnemonicWords = mnemonic.trim().split(/\s+/);
 
-  console.log('🔵 [BreezSparkService] initializeSDK called');
-  console.log('🔵 [BreezSparkService] Mnemonic word count:', mnemonicWords.length);
-  console.log('🔵 [BreezSparkService] First 2 words:', mnemonicWords.slice(0, 2).join(' '));
-  console.log('🔵 [BreezSparkService] Wallet storage ID:', walletId);
-  console.log('🔵 [BreezSparkService] _isNativeAvailable:', _isNativeAvailable);
+  console.log('🔵 [BreezSparkService] initializeSDK called for wallet:', walletId);
 
   if (!_isNativeAvailable) {
     console.warn('⚠️ [BreezSparkService] Cannot initialize - native SDK not available');
@@ -158,33 +191,20 @@ export async function initializeSDK(
     const effectiveApiKey = apiKey || BREEZ_API_KEY;
     if (effectiveApiKey && effectiveApiKey.length > 0) {
       config.apiKey = effectiveApiKey;
-      console.log('🔵 [BreezSparkService] API key configured: YES (length: ' + effectiveApiKey.length + ')');
     } else {
-      console.log('🔵 [BreezSparkService] API key configured: NO (running without API key)');
+      console.warn('⚠️ [BreezSparkService] No API key configured');
     }
 
     // Use wallet-specific storage directory
     const storageDir = `${RNFS.DocumentDirectoryPath}/${BREEZ_STORAGE_DIR}/${walletId}`;
-    console.log('🔵 [BreezSparkService] Storage directory:', storageDir);
+    // Storage directory set to: storageDir
 
     // Ensure storage directory exists
     const dirExists = await RNFS.exists(storageDir);
     if (!dirExists) {
-      console.log('🔵 [BreezSparkService] Creating storage directory...');
       await RNFS.mkdir(storageDir);
     }
 
-    console.log('🔵 [BreezSparkService] Calling BreezSDK.connect()...');
-    console.log('🔵 [BreezSparkService] Connect params:', {
-      hasConfig: !!config,
-      configApiKey: config?.apiKey ? '***SET***' : '***MISSING***',
-      hasSeed: !!seed,
-      seedType: seed?.constructor?.name,
-      storageDir,
-    });
-
-    // Log available SDK exports for debugging
-    console.log('🔵 [BreezSparkService] SDK exports:', Object.keys(BreezSDK || {}).slice(0, 20));
 
     sdkInstance = await BreezSDK.connect({
       config,
@@ -195,12 +215,10 @@ export async function initializeSDK(
     _isInitialized = true;
 
     // Setup event listeners for real-time payment notifications
-    // Based on: https://sdk-doc-spark.breez.technology/guide/events.html
     try {
       await setupEventListeners();
-      console.log('✅ [BreezSparkService] Event listeners configured');
     } catch (eventError) {
-      console.warn('⚠️ [BreezSparkService] Event listeners failed (non-fatal):', eventError);
+      console.warn('⚠️ [BreezSparkService] Event listeners failed:', eventError);
       // Don't fail SDK init if events don't work - user can still pull-to-refresh
     }
 
@@ -209,8 +227,22 @@ export async function initializeSDK(
     // The NDS webhook infrastructure is ready in our Cloud Functions if Breez
     // adds this feature in the future.
 
-    console.log('✅ [BreezSparkService] Breez SDK initialized successfully');
-    console.log('✅ [BreezSparkService] sdkInstance:', !!sdkInstance);
+    console.log('✅ [BreezSparkService] SDK initialized');
+
+    // Register for notifications
+    try {
+        const nodeId = await getNodeId();
+        if (nodeId) {
+            const pushTokenData = await Notifications.getExpoPushTokenAsync();
+            if (pushTokenData.data) {
+              await NotificationTriggerService.registerDevice(nodeId, pushTokenData.data);
+              console.log('✅ [BreezSparkService] Registered for push notifications');
+            }
+        }
+    } catch (e) {
+        console.warn('⚠️ [BreezSparkService] Notification registration warning:', e);
+    }
+
     return true;
   } catch (error) {
     // Try multiple ways to extract error info from native errors
@@ -517,6 +549,39 @@ export async function payInvoice(
       global.setTimeout(() => {
         recentlySentPaymentIds.delete(paymentId);
       }, SENT_PAYMENT_TRACKING_MS);
+
+            // Trigger notification to recipient if possible
+            try {
+              // Attempt to extract destination from payment request
+              const parsed = await sdkInstance.parse(paymentRequest);
+              
+              // DEBUG LOGGING
+              console.log('🔍 [BreezSparkService] Parsed invoice structure:', JSON.stringify(parsed, null, 2));
+
+              let destinationPubkey: string | undefined;
+              
+              if (parsed.tag === 'Bolt11Invoice' && parsed.inner) {
+                 const innerData = Array.isArray(parsed.inner) ? parsed.inner[0] : parsed.inner;
+                 // Try multiple known fields
+                 destinationPubkey = innerData?.payeePubkey || innerData?.destination || innerData?.nodeId; 
+                 console.log('🔍 [BreezSparkService] Extracted pubkey from Bolt11:', destinationPubkey);
+              }
+              
+              if (destinationPubkey) {
+                   console.log('🔔 [BreezSparkService] Triggering notification for recipient:', destinationPubkey);
+                   // Send async without awaiting so we don't block the UI
+                   NotificationTriggerService.sendTransactionNotification(
+                       { pubKey: destinationPubkey }, 
+                       _amountSat || 0 // use amount provided or from invoice
+                   )
+                   .then(res => console.log('🔔 [BreezSparkService] Trigger result:', res))
+                   .catch(e => console.warn('🔔 [BreezSparkService] Trigger failed:', e));
+              } else {
+                  console.warn('⚠️ [BreezSparkService] Could not find destination PubKey in invoice');
+              }
+          } catch (err) {
+              console.warn('⚠️ [BreezSparkService] Failed to parse invoice for notification:', err);
+          }
     }
 
     return {
@@ -581,12 +646,6 @@ export async function listPayments(): Promise<TransactionInfo[]> {
     });
 
     const payments = response.payments || [];
-    console.log('🔵 [BreezSparkService] listPayments: Got', payments.length, 'payments');
-    
-    // Log first payment for debugging field names
-    if (payments.length > 0) {
-      console.log('🔵 [BreezSparkService] listPayments: Sample payment fields:', Object.keys(payments[0]));
-    }
 
     return payments.map((payment: any) => {
       // Try multiple field name variations (SDK may return different formats)

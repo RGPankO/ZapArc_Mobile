@@ -74,7 +74,7 @@ export interface WalletActions {
   getMnemonic: (masterKeyId: string, pin: string) => Promise<string>;
   canAddSubWallet: (masterKeyId: string) => boolean;
   getAddSubWalletDisabledReason: (masterKeyId: string) => string | null;
-  clearWalletState: () => void;
+
 }
 
 // =============================================================================
@@ -141,6 +141,17 @@ export function useWallet(): WalletState & WalletActions {
 
       const data = await storageService.loadMultiWalletStorage();
       setStorage(data);
+
+      // Pre-load cache to prevent flash of zero
+      if (data?.activeMasterKeyId && data.activeSubWalletIndex !== undefined) {
+        const [cachedBal, cachedTx] = await Promise.all([
+           WalletCache.getCachedBalance(data.activeMasterKeyId, data.activeSubWalletIndex),
+           WalletCache.getCachedTransactions(data.activeMasterKeyId, data.activeSubWalletIndex)
+        ]);
+        
+        if (cachedBal) setBalance(cachedBal.balance);
+        if (cachedTx) setTransactions(cachedTx.transactions);
+      }
 
       if (data && BreezSparkService.isSDKInitialized()) {
         setIsConnected(true);
@@ -373,14 +384,35 @@ export function useWallet(): WalletState & WalletActions {
         setIsLoading(true);
         setError(null);
 
-        // Clear old wallet data immediately to prevent showing stale data
-        setBalance(0);
-        setTransactions([]);
-        setIsConnected(false);
-
+        // 1. Update active wallet in storage FIRST
+        // This ensures any background refreshes (e.g. from SDK sync) fetch data for the NEW wallet
+        // and prevents race conditions where old wallet data might be refetched
         await storageService.setActiveWallet(masterKeyId, subWalletIndex);
 
-        // Reconnect Breez SDK with the new wallet's mnemonic
+        // 2. Immediately load cached data for the TARGET wallet
+        // This prevents "flash of zero content" or showing stale data from previous wallet
+        setIsConnected(false); // Disconnected until SDK re-initializes
+        
+        const [cachedBalance, cachedTxs] = await Promise.all([
+          WalletCache.getCachedBalance(masterKeyId, subWalletIndex),
+          WalletCache.getCachedTransactions(masterKeyId, subWalletIndex)
+        ]);
+
+        if (cachedBalance) {
+          console.log('✅ [useWallet] switchWallet: Loaded cached balance:', cachedBalance.balance);
+          setBalance(cachedBalance.balance);
+        } else {
+           setBalance(0);
+        }
+
+        if (cachedTxs) {
+          console.log('✅ [useWallet] switchWallet: Loaded cached transactions:', cachedTxs.transactions.length);
+          setTransactions(cachedTxs.transactions);
+        } else {
+           setTransactions([]);
+        }
+
+        // 3. Reconnect Breez SDK with the new wallet's mnemonic
         if (pin) {
           try {
             const mnemonic = await storageService.getMasterKeyMnemonic(masterKeyId, pin);
@@ -396,6 +428,8 @@ export function useWallet(): WalletState & WalletActions {
           }
         }
 
+        // 4. Update full wallet state (storage wrapper)
+        // This updates activeWalletInfo which triggers the useEffect to refreshBalance again
         await loadWalletData();
 
         console.log('✅ [useWallet] Switched to wallet:', {
@@ -581,18 +615,11 @@ export function useWallet(): WalletState & WalletActions {
 
   const refreshTransactions = useCallback(async (): Promise<void> => {
     try {
-      console.log('🔄 [useWallet] refreshTransactions: Starting...');
       const walletInfo = await storageService.getActiveWalletInfo();
       if (!walletInfo) {
-        console.log('⚠️ [useWallet] refreshTransactions: No active wallet info');
         setTransactions([]);
         return;
       }
-
-      console.log('🔄 [useWallet] refreshTransactions: Active wallet:', {
-        masterKeyId: walletInfo.masterKeyId,
-        subWalletIndex: walletInfo.subWalletIndex,
-      });
 
       // Load from cache first for instant display
       const cached = await WalletCache.getCachedTransactions(
@@ -601,30 +628,22 @@ export function useWallet(): WalletState & WalletActions {
       );
 
       if (cached) {
-        console.log('🔄 [useWallet] refreshTransactions: Got cached transactions:', cached.transactions.length);
         setTransactions(cached.transactions);
-        setIsRefreshing(true); // Background refresh indicator
-      } else {
-        console.log('🔄 [useWallet] refreshTransactions: No cached transactions');
+        setIsRefreshing(true);
       }
 
       // Fetch fresh data from SDK
       const sdkInitialized = BreezSparkService.isSDKInitialized();
-      console.log('🔄 [useWallet] refreshTransactions: SDK initialized:', sdkInitialized);
       
       if (!sdkInitialized) {
-        // If SDK not initialized and we have cache, keep using it
         if (!cached) {
-          console.log('⚠️ [useWallet] refreshTransactions: SDK not ready, no cache - setting empty');
           setTransactions([]);
         }
         setIsRefreshing(false);
         return;
       }
 
-      console.log('🔄 [useWallet] refreshTransactions: Calling listPayments...');
       const payments = await BreezSparkService.listPayments();
-      console.log('🔄 [useWallet] refreshTransactions: Got payments:', payments.length);
       
       // Map TransactionInfo to Transaction type
       const txs: Transaction[] = payments.map((p) => ({
@@ -637,7 +656,6 @@ export function useWallet(): WalletState & WalletActions {
         description: p.description,
       }));
       
-      console.log('🔄 [useWallet] refreshTransactions: Setting transactions:', txs.length);
       setTransactions(txs);
       setIsRefreshing(false);
 
@@ -662,6 +680,19 @@ export function useWallet(): WalletState & WalletActions {
       setIsRefreshing(false);
     }
   }, []);
+
+  // ========================================
+  // Cache Loading Trigger
+  // ========================================
+
+  // Immediately load cached data (refreshBalance/Transactions checks cache first)
+  // whenever the active wallet changes in storage.
+  useEffect(() => {
+    if (activeWalletInfo) {
+      refreshBalance();
+      refreshTransactions();
+    }
+  }, [activeWalletInfo, refreshBalance, refreshTransactions]);
 
   // ========================================
   // Real-time Payment Event Listener
@@ -948,15 +979,7 @@ export function useWallet(): WalletState & WalletActions {
   // Return Hook Value
   // ========================================
 
-  /**
-   * Clear wallet state (balance, transactions) - used when switching wallets
-   * to prevent showing stale data from previous wallet
-   */
-  const clearWalletState = useCallback(() => {
-    setBalance(0);
-    setTransactions([]);
-    setIsConnected(false);
-  }, []);
+
 
   return {
     // State
@@ -989,6 +1012,6 @@ export function useWallet(): WalletState & WalletActions {
     getMnemonic,
     canAddSubWallet,
     getAddSubWalletDisabledReason,
-    clearWalletState,
+
   };
 }

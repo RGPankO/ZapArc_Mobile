@@ -589,12 +589,6 @@ class StorageService {
     subWalletIndex: number,
     hasActivity: boolean
   ): Promise<void> {
-    console.log('🔵 [StorageService] UPDATE_SUB_WALLET_ACTIVITY', {
-      masterKeyId,
-      subWalletIndex,
-      hasActivity,
-    });
-
     try {
       const storage = await this.loadMultiWalletStorage();
       if (!storage) {
@@ -615,11 +609,9 @@ class StorageService {
       if (subWallet.hasActivity !== hasActivity) {
         subWallet.hasActivity = hasActivity;
         await this.saveMultiWalletStorage(storage);
-        console.log('✅ [StorageService] UPDATE_SUB_WALLET_ACTIVITY SUCCESS');
       }
     } catch (error) {
       console.error('❌ [StorageService] UPDATE_SUB_WALLET_ACTIVITY FAILED', error);
-      // Non-critical, valid to suppress error in some contexts but good to log
       throw error;
     }
   }

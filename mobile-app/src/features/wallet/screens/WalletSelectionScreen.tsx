@@ -30,7 +30,7 @@ export function WalletSelectionScreen(): React.JSX.Element {
   const secondaryTextColor = getSecondaryTextColor(themeMode);
   const iconColor = getIconColor(themeMode);
 
-  const { masterKeys, activeWalletInfo, clearWalletState } = useWallet();
+  const { masterKeys, activeWalletInfo } = useWallet();
   const { selectSubWallet, currentMasterKeyId, isUnlocked } = useWalletAuth();
 
   // State - expand all master keys by default
@@ -80,8 +80,7 @@ export function WalletSelectionScreen(): React.JSX.Element {
       // Same master key and already unlocked - use selectSubWallet which will reinitialize SDK
       try {
         setIsLoading(true);
-        // Clear old wallet state immediately to prevent showing stale data
-        clearWalletState();
+        // No need to clear state manually, useWallet hook handles cache loading on active wallet change
         const success = await selectSubWallet(subWalletIndex);
 
         if (success) {
@@ -93,7 +92,7 @@ export function WalletSelectionScreen(): React.JSX.Element {
         setIsLoading(false);
       }
     },
-    [isUnlocked, currentMasterKeyId, selectSubWallet, clearWalletState]
+    [isUnlocked, currentMasterKeyId, selectSubWallet]
   );
 
   // ========================================

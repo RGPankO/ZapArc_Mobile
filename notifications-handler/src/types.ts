@@ -6,17 +6,39 @@
  * Request interface for transaction notifications
  */
 export interface TransactionNotificationRequest {
-  /** Expo push token (e.g., "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]") */
-  expoPushToken: string;
+  /** 
+   * Expo push token (e.g., "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]")
+   * Required if recipientPubKey is not provided
+   */
+  expoPushToken?: string;
+
+  /**
+   * Recipient's Lightning Node ID (Public Key)
+   * Used to look up the push token if not provided directly
+   */
+  recipientPubKey?: string;
+
   /** Amount in satoshis (positive integer) */
   amount: number;
+}
+
+/**
+ * Request interface for registering a device
+ */
+export interface RegisterPushTokenRequest {
+  /** User's Lightning Node ID (Public Key) */
+  pubKey: string;
+  /** Expo push token */
+  expoPushToken: string;
+  /** Platform (android/ios) - optional for analytics */
+  platform?: string;
 }
 
 /**
  * Response interface for notification API
  */
 export interface TransactionNotificationResponse {
-  /** Whether the notification was sent successfully */
+  /** Whether the notification/operation was sent successfully */
   success: boolean;
   /** Success message (present when success=true) */
   message?: string;

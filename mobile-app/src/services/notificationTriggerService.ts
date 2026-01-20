@@ -4,7 +4,11 @@
 
 // URL of the deployed Cloud Function
 // In a real app, this should be in an environment variable
-const NOTIFICATION_SERVICE_URL = 'https://us-central1-investave-1337.cloudfunctions.net/sendTransactionNotification';
+// URL of the deployed Cloud Function
+// In a real app, this should be in an environment variable
+const BASE_URL = 'https://us-central1-investave-1337.cloudfunctions.net';
+const NOTIFICATION_ENDPOINT = `${BASE_URL}/sendTransactionNotification`;
+const REGISTER_ENDPOINT = `${BASE_URL}/registerDevice`;
 
 interface NotificationResponse {
   success: boolean;
@@ -14,25 +18,66 @@ interface NotificationResponse {
 
 export const NotificationTriggerService = {
   /**
-   * Triggers a push notification to the recipient device.
-   * 
-   * @param recipientPushToken - The Expo Push Token of the recipient
-   * @param amountSats - The amount sent in satoshis
+   * Registers this device's push token with the backend, mapped to the Node ID
    */
-  async sendTransactionNotification(
-    recipientPushToken: string,
-    amountSats: number
+  async registerDevice(
+    nodeId: string,
+    pushToken: string
   ): Promise<NotificationResponse> {
     try {
-      console.log(`🔔 [Notification] Sending ${amountSats} sats notification to ${recipientPushToken}...`);
+      console.log(`🔔 [Notification] Registering device for node ${nodeId}...`);
       
-      const response = await fetch(NOTIFICATION_SERVICE_URL, {
+      const response = await fetch(REGISTER_ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          expoPushToken: recipientPushToken,
+          pubKey: nodeId,
+          expoPushToken: pushToken,
+          platform: 'android', // You could use Platform.OS here
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ [Notification] Registration Failed: ${errorText}`);
+        return { success: false, error: errorText };
+      }
+
+      const result = await response.json();
+      console.log('✅ [Notification] Device registered:', result);
+      return result;
+
+    } catch (error) {
+      console.error('❌ [Notification] Registration network error:', error);
+      return { success: false, error: String(error) };
+    }
+  },
+
+  /**
+   * Triggers a push notification to the recipient device.
+   * Can use either direct token (legacy) or recipient PubKey (lookup).
+   */
+  async sendTransactionNotification(
+    recipient: { pushToken?: string; pubKey?: string },
+    amountSats: number
+  ): Promise<NotificationResponse> {
+    try {
+      if (!recipient.pushToken && !recipient.pubKey) {
+        return { success: false, error: 'Must provide either pushToken or pubKey' };
+      }
+
+      console.log(`🔔 [Notification] Sending ${amountSats} sats notification to ${recipient.pubKey || recipient.pushToken}...`);
+      
+      const response = await fetch(NOTIFICATION_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          expoPushToken: recipient.pushToken,
+          recipientPubKey: recipient.pubKey,
           amount: amountSats,
         }),
       });
@@ -42,7 +87,7 @@ export const NotificationTriggerService = {
         console.error(`❌ [Notification] HTTP Error ${response.status}: ${errorText}`);
         return {
           success: false,
-          error: `HTTP Error: ${response.status}`,
+          error: `HTTP Error ${response.status}: ${errorText}`,
         };
       }
 
