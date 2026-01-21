@@ -319,16 +319,47 @@ export const notify = onRequest(
       const body = request.body as BreezWebhookRequest;
       console.log('[NDS] Webhook body:', JSON.stringify(body));
 
+      // Look up wallet nickname from Firestore by push token
+      let walletNickname: string | undefined;
+      try {
+        const usersSnapshot = await db.collection('users')
+          .where('expoPushToken', '==', token)
+          .limit(1)
+          .get();
+
+        if (!usersSnapshot.empty) {
+          const userData = usersSnapshot.docs[0].data();
+          walletNickname = userData.walletNickname;
+          console.log('[NDS] Found wallet nickname:', walletNickname);
+        }
+      } catch (lookupError) {
+        console.log('[NDS] Could not look up wallet nickname:', lookupError);
+        // Continue without nickname - notification will still be sent
+      }
+
       // Handle different notification templates
       let notificationTitle = 'Payment Update';
       let notificationBody = 'You have a payment update';
+      const walletInfo = walletNickname ? ` on ${walletNickname}` : '';
+
+      // Convert millisats to sats if amount is available
+      const amountSats = body.data?.amount_msat
+        ? Math.floor(body.data.amount_msat / 1000)
+        : undefined;
+      const amountText = amountSats ? `${amountSats.toLocaleString()} sats` : '';
 
       if (body.template === 'payment_received') {
-        notificationTitle = 'Payment Incoming';
-        notificationBody = 'You have an incoming payment!';
+        notificationTitle = 'Payment Received';
+        if (amountText) {
+          notificationBody = `You received ${amountText}${walletInfo}!`;
+        } else {
+          notificationBody = `You have an incoming payment${walletInfo}!`;
+        }
       } else if (body.template === 'lnurlpay_info' || body.template === 'lnurlpay_invoice') {
         notificationTitle = 'Payment Request';
-        notificationBody = 'Someone wants to pay you';
+        notificationBody = `Someone wants to pay you${walletInfo}`;
+      } else {
+        notificationBody = `You have a payment update${walletInfo}`;
       }
 
       // Send push notification
@@ -339,6 +370,8 @@ export const notify = onRequest(
         data: {
           type: body.template || 'unknown',
           payment_hash: body.data?.payment_hash || '',
+          walletNickname: walletNickname || '',
+          amount: amountSats || 0,
         },
       };
 

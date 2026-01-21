@@ -6,7 +6,7 @@
 // In a real app, this should be in an environment variable
 // URL of the deployed Cloud Function
 // In a real app, this should be in an environment variable
-const BASE_URL = 'https://us-central1-investave-1337.cloudfunctions.net';
+const BASE_URL = 'https://europe-west3-investave-1337.cloudfunctions.net';
 const NOTIFICATION_ENDPOINT = `${BASE_URL}/sendTransactionNotification`;
 const REGISTER_ENDPOINT = `${BASE_URL}/registerDevice`;
 
