@@ -245,25 +245,6 @@ export function WalletSettingsScreen(): React.JSX.Element {
             />
           </View>
 
-          {/* Backup & Recovery */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>{t('settings.backupRecovery')}</Text>
-
-            <List.Item
-              title={t('wallet.viewRecoveryPhrase')}
-              description={t('wallet.backupSeedPhrase')}
-              left={(props) => (
-                <List.Icon {...props} icon="key" color="#FFC107" />
-              )}
-              right={(props) => (
-                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
-              )}
-              onPress={() => router.push('/wallet/settings/backup')}
-              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
-              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
-              style={styles.listItem}
-            />
-          </View>
 
           {/* About */}
           <View style={styles.section}>

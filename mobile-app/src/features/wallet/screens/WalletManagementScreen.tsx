@@ -9,6 +9,8 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import * as LocalAuthentication from 'expo-local-authentication';
+import * as Clipboard from 'expo-clipboard';
 import { StyledTextInput } from '../../../components';
 import {
   Text,
@@ -33,7 +35,7 @@ import type { MasterKeyEntry, SubWalletEntry } from '../types';
 // Types
 // =============================================================================
 
-type ModalType = 'rename' | 'addSubWallet' | 'confirmDelete' | null;
+type ModalType = 'rename' | 'addSubWallet' | 'confirmDelete' | 'revealPhrase' | null;
 
 // =============================================================================
 // Component
@@ -52,6 +54,7 @@ export function WalletManagementScreen(): React.JSX.Element {
     canAddSubWallet,
     getAddSubWalletDisabledReason,
     syncSubWalletActivity,
+    getMnemonic,
   } = useWallet();
   const { selectSubWallet, getSessionPin } = useWalletAuth();
 
@@ -76,6 +79,10 @@ export function WalletManagementScreen(): React.JSX.Element {
   const [menuVisible, setMenuVisible] = useState<string | null>(null);
   const [renameSubWalletIndex, setRenameSubWalletIndex] = useState<number | null>(null);
   const [syncingMasterKeys, setSyncingMasterKeys] = useState<Set<string>>(new Set());
+
+  // Reveal Phrase State
+  const [revealMnemonic, setRevealMnemonic] = useState<string | null>(null);
+  const [isRevealing, setIsRevealing] = useState(false);
 
   // Keep active master key always expanded
   useEffect(() => {
@@ -292,6 +299,88 @@ export function WalletManagementScreen(): React.JSX.Element {
   }, [deleteTarget, pinInput, deleteMasterKey]);
 
   // ========================================
+  // Reveal Recovery Phrase
+  // ========================================
+
+  const handleRevealPhrase = useCallback(async () => {
+    if (!selectedMasterKeyId) return;
+
+    setIsRevealing(true);
+    setError(null);
+
+    try {
+      // First try biometric authentication
+      const biometricAvailable = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+      if (biometricAvailable && isEnrolled) {
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage: 'Authenticate to view recovery phrase',
+          fallbackLabel: 'Use PIN',
+        });
+
+        if (!result.success) {
+          setIsRevealing(false);
+          return;
+        }
+      }
+
+      // Get PIN from biometric storage
+      const pin = await storageService.getBiometricPin(selectedMasterKeyId);
+      
+      if (!pin) {
+        Alert.alert('Error', 'PIN not available. Please unlock wallet with PIN first.');
+        setIsRevealing(false);
+        setModalType(null);
+        setSelectedMasterKeyId(null);
+        return;
+      }
+
+      // Get the mnemonic
+      const phrase = await getMnemonic(selectedMasterKeyId, pin);
+      if (phrase) {
+        setRevealMnemonic(phrase);
+      } else {
+        Alert.alert('Error', 'Could not retrieve recovery phrase');
+        setModalType(null);
+        setSelectedMasterKeyId(null);
+      }
+    } catch (err) {
+      console.error('Failed to reveal mnemonic:', err);
+      Alert.alert('Error', 'Failed to authenticate');
+      setModalType(null);
+      setSelectedMasterKeyId(null);
+    } finally {
+      setIsRevealing(false);
+    }
+  }, [selectedMasterKeyId, getMnemonic]);
+
+  const handleCopyMnemonic = useCallback((): void => {
+    if (!revealMnemonic) return;
+
+    Alert.alert(
+      'Security Warning',
+      'Copying your recovery phrase to the clipboard is risky. Only do this in a secure environment. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Copy',
+          style: 'destructive',
+          onPress: (): void => {
+            Clipboard.setString(revealMnemonic);
+          },
+        },
+      ]
+    );
+  }, [revealMnemonic]);
+
+  const closeRevealModal = useCallback(() => {
+    setModalType(null);
+    setSelectedMasterKeyId(null);
+    setRevealMnemonic(null);
+  }, []);
+
+  // ========================================
   // Switch Wallet
   // ========================================
 
@@ -395,6 +484,16 @@ export function WalletManagementScreen(): React.JSX.Element {
               }}
               title="Rename"
               leadingIcon="pencil"
+            />
+            <Menu.Item
+              onPress={() => {
+                setMenuVisible(null);
+                setSelectedMasterKeyId(masterKey.id);
+                setRevealMnemonic(null);
+                setModalType('revealPhrase');
+              }}
+              title="View Recovery Phrase"
+              leadingIcon="key"
             />
             <Menu.Item
               onPress={() => {
@@ -504,8 +603,6 @@ export function WalletManagementScreen(): React.JSX.Element {
               </Text>
               <Text style={[styles.subWalletIndex, { color: secondaryTextColor }]}>
                 Index: {subWallet.index}
-                {subWallet.hasActivity === true && ' • Has activity'}
-                {subWallet.hasActivity === false && ' • No activity'}
               </Text>
             </View>
           </View>
@@ -542,6 +639,16 @@ export function WalletManagementScreen(): React.JSX.Element {
             }}
             title="Rename"
             leadingIcon="pencil"
+          />
+          <Menu.Item
+            onPress={() => {
+              setMenuVisible(null);
+              setSelectedMasterKeyId(masterKeyId);
+              setRevealMnemonic(null);
+              setModalType('revealPhrase');
+            }}
+            title="View Recovery Phrase"
+            leadingIcon="key"
           />
           {!isActive && subWallet.index !== 0 && (
             <Menu.Item
@@ -751,6 +858,127 @@ export function WalletManagementScreen(): React.JSX.Element {
   };
 
   // ========================================
+  // Render Reveal Phrase Modal
+  // ========================================
+
+  const renderRevealPhraseModal = (): React.JSX.Element | null => {
+    if (modalType !== 'revealPhrase' || !selectedMasterKeyId) return null;
+
+    const targetWallet = masterKeys.find((mk) => mk.id === selectedMasterKeyId);
+    const words = revealMnemonic?.split(' ') || [];
+
+    return (
+      <Portal>
+        <Dialog
+          visible
+          onDismiss={closeRevealModal}
+          style={[styles.dialog, styles.revealDialog, { backgroundColor: dialogBackgroundColor }]}
+        >
+          <Dialog.Title style={[styles.dialogTitle, { color: primaryTextColor }]}>
+            Recovery Phrase
+          </Dialog.Title>
+          <Dialog.ScrollArea style={styles.revealScrollArea}>
+            <ScrollView>
+              {/* Wallet Info */}
+              <Text style={[styles.revealWalletName, { color: secondaryTextColor }]}>
+                {targetWallet?.nickname || 'Wallet'}
+              </Text>
+
+              {/* Warning Banner - only show when phrase is hidden */}
+              {!revealMnemonic && (
+                <View style={styles.revealWarning}>
+                  <Text style={styles.revealWarningIcon}>⚠️</Text>
+                  <Text style={styles.revealWarningText}>
+                    Never share your recovery phrase with anyone. Anyone with this phrase can access your funds.
+                  </Text>
+                </View>
+              )}
+
+              {/* Mnemonic Display */}
+              {!revealMnemonic ? (
+                <View style={styles.revealHiddenContainer}>
+                  <View style={styles.revealHiddenPlaceholder}>
+                    <Text style={styles.revealHiddenIcon}>🔒</Text>
+                    <Text style={[styles.revealHiddenText, { color: secondaryTextColor }]}>
+                      Recovery phrase is hidden for security
+                    </Text>
+                  </View>
+
+                  <Button
+                    mode="contained"
+                    onPress={handleRevealPhrase}
+                    loading={isRevealing}
+                    disabled={isRevealing}
+                    style={styles.revealButton}
+                    labelStyle={styles.revealButtonLabel}
+                    icon="eye"
+                  >
+                    Reveal Recovery Phrase
+                  </Button>
+                </View>
+              ) : (
+                <View style={styles.mnemonicContainer}>
+                  <View style={styles.mnemonicGrid}>
+                    {words.map((word, index) => (
+                      <View key={index} style={styles.wordItem}>
+                        <Text style={styles.wordNumber}>{index + 1}</Text>
+                        <Text style={styles.wordText}>{word}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* Actions */}
+                  <View style={styles.mnemonicActions}>
+                    <TouchableOpacity
+                      style={styles.mnemonicAction}
+                      onPress={handleCopyMnemonic}
+                    >
+                      <IconButton
+                        icon="content-copy"
+                        iconColor="#FFC107"
+                        size={20}
+                      />
+                      <Text style={[styles.mnemonicActionText, { color: secondaryTextColor }]}>Copy</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.mnemonicAction}
+                      onPress={() => setRevealMnemonic(null)}
+                    >
+                      <IconButton
+                        icon="eye-off"
+                        iconColor="#FF5252"
+                        size={20}
+                      />
+                      <Text style={[styles.mnemonicActionText, { color: secondaryTextColor }]}>Hide</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* Security Tips */}
+              <View style={styles.revealTips}>
+                <Text style={[styles.revealTipsTitle, { color: primaryTextColor }]}>Security Tips</Text>
+                <Text style={[styles.revealTipText, { color: secondaryTextColor }]}>✅ Write on paper - never store digitally</Text>
+                <Text style={[styles.revealTipText, { color: secondaryTextColor }]}>❌ Never share with anyone</Text>
+                <Text style={[styles.revealTipText, { color: secondaryTextColor }]}>❌ Never take a screenshot</Text>
+              </View>
+            </ScrollView>
+          </Dialog.ScrollArea>
+          <Dialog.Actions>
+            <Button
+              onPress={closeRevealModal}
+              labelStyle={[styles.cancelButtonLabel, { color: secondaryTextColor }]}
+            >
+              Close
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+    );
+  };
+
+  // ========================================
   // Render
   // ========================================
 
@@ -796,6 +1024,7 @@ export function WalletManagementScreen(): React.JSX.Element {
         {renderDeleteModal()}
         {renderAddSubWalletModal()}
         {renderRenameModal()}
+        {renderRevealPhraseModal()}
       </SafeAreaView>
     </LinearGradient>
   );
@@ -1034,5 +1263,124 @@ const styles = StyleSheet.create({
   },
   saveButtonLabel: {
     fontWeight: 'bold',
+  },
+  // Reveal Phrase Modal Styles
+  revealDialog: {
+    maxHeight: '90%',
+  },
+  revealScrollArea: {
+    paddingHorizontal: 16,
+    maxHeight: 400,
+  },
+  revealWalletName: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  revealWarning: {
+    backgroundColor: 'rgba(255, 152, 0, 0.2)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  revealWarningIcon: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  revealWarningText: {
+    fontSize: 12,
+    color: '#FFC107',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  revealHiddenContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  revealHiddenPlaceholder: {
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 16,
+    width: '100%',
+  },
+  revealHiddenIcon: {
+    fontSize: 40,
+    marginBottom: 8,
+  },
+  revealHiddenText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  revealButton: {
+    backgroundColor: '#FFC107',
+  },
+  revealButtonLabel: {
+    color: '#1a1a2e',
+    fontWeight: '600',
+  },
+  mnemonicContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  mnemonicGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
+  },
+  wordItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 193, 7, 0.2)',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    width: '48%',
+  },
+  wordNumber: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#FFC107',
+    marginRight: 6,
+    width: 16,
+  },
+  wordText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#FFFFFF',
+  },
+  mnemonicActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 24,
+  },
+  mnemonicAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  mnemonicActionText: {
+    fontSize: 13,
+  },
+  revealTips: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  revealTipsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  revealTipText: {
+    fontSize: 12,
+    marginBottom: 4,
+    lineHeight: 18,
   },
 });

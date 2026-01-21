@@ -118,6 +118,28 @@ export function satsToFiat(sats: number, rates: ExchangeRates, currency: 'usd' |
   return btc * rates[currency];
 }
 
+/**
+ * Convert fiat amount to satoshis
+ */
+export function fiatToSats(
+  fiatAmount: number,
+  rates: ExchangeRates | null,
+  currency: 'usd' | 'eur'
+): number {
+  if (!rates || rates[currency] === 0) {
+    return 0;
+  }
+  const btcAmount = fiatAmount / rates[currency];
+  return Math.round(btcAmount * SATS_PER_BTC);
+}
+
+/**
+ * Convert BTC to satoshis
+ */
+export function btcToSats(btc: number): number {
+  return Math.round(btc * SATS_PER_BTC);
+}
+
 // =============================================================================
 // Formatting Functions
 // =============================================================================

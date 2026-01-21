@@ -1,6 +1,6 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
-import { Text, Button, TextInput } from 'react-native-paper';
+import { Text, Button, TextInput, Menu } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,29 +8,99 @@ import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
 import * as Sharing from 'expo-sharing';
 import { BreezSparkService } from '../../src/services/breezSparkService';
+import { useCurrency, type InputCurrency } from '../../src/hooks/useCurrency';
+import { StyledTextInput } from '../../src/components';
 
 type ReceiveStep = 'input' | 'invoice';
 
+// Currency labels for display
+const currencyLabels: Record<InputCurrency, string> = {
+  sats: 'sats',
+  btc: 'BTC',
+  usd: 'USD',
+  eur: 'EUR',
+};
+
 export default function ReceiveScreen() {
+  const { secondaryFiatCurrency, convertToSats, formatSatsWithFiat, rates, isLoadingRates } = useCurrency();
+  
   const [step, setStep] = useState<ReceiveStep>('input');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [invoice, setInvoice] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [expiryTime, setExpiryTime] = useState<number | null>(null);
+  const [invoiceSatsAmount, setInvoiceSatsAmount] = useState(0);
+  
+  // Currency selection state
+  const [inputCurrency, setInputCurrency] = useState<InputCurrency>('sats');
+  const [currencyMenuVisible, setCurrencyMenuVisible] = useState(false);
 
-  // Quick amount presets
-  const presets = [10000, 50000, 100000, 500000];
+  // Available currency options (sats + user's secondary fiat)
+  const currencyOptions: InputCurrency[] = useMemo(() => {
+    return ['sats', secondaryFiatCurrency];
+  }, [secondaryFiatCurrency]);
+
+  // Convert current amount to sats for preview
+  const previewSats = useMemo(() => {
+    const numAmount = parseFloat(amount);
+    if (!numAmount || isNaN(numAmount)) return 0;
+    return convertToSats(numAmount, inputCurrency);
+  }, [amount, inputCurrency, convertToSats]);
+
+  // Format preview display
+  const previewDisplay = useMemo(() => {
+    if (!previewSats) return null;
+    return formatSatsWithFiat(previewSats);
+  }, [previewSats, formatSatsWithFiat]);
+
+  // Dynamic presets based on currency
+  const presets = useMemo(() => {
+    switch (inputCurrency) {
+      case 'eur':
+        return [10, 25, 50, 100];
+      case 'usd':
+        return [10, 25, 50, 100];
+      case 'btc':
+        return [0.0001, 0.0005, 0.001, 0.005];
+      case 'sats':
+      default:
+        return [10000, 50000, 100000, 500000];
+    }
+  }, [inputCurrency]);
+
+  // Format preset label
+  const formatPresetLabel = useCallback((preset: number): string => {
+    switch (inputCurrency) {
+      case 'eur':
+        return `€${preset}`;
+      case 'usd':
+        return `$${preset}`;
+      case 'btc':
+        return `${preset} BTC`;
+      case 'sats':
+      default:
+        return preset >= 1000 ? `${preset / 1000}K` : `${preset}`;
+    }
+  }, [inputCurrency]);
 
   const handlePresetAmount = useCallback((presetAmount: number) => {
     setAmount(presetAmount.toString());
   }, []);
 
   const handleGenerateInvoice = useCallback(async () => {
-    const amountValue = parseInt(amount, 10);
-
-    if (!amountValue || amountValue <= 0) {
+    const numAmount = parseFloat(amount);
+    
+    if (!numAmount || numAmount <= 0) {
       Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0');
+      return;
+    }
+
+    // Convert to sats based on input currency
+    const satsAmount = convertToSats(numAmount, inputCurrency);
+    
+    if (!satsAmount || satsAmount <= 0) {
+      Alert.alert('Conversion Error', 'Could not convert amount. Please check exchange rates.');
       return;
     }
 
@@ -38,11 +108,12 @@ export default function ReceiveScreen() {
       setIsGenerating(true);
 
       const result = await BreezSparkService.receivePayment(
-        amountValue,
+        satsAmount,
         description || undefined
       );
 
       setInvoice(result.paymentRequest);
+      setInvoiceSatsAmount(satsAmount);
 
       // Set expiry time (15 minutes from now)
       const expiryTimestamp = Date.now() + 15 * 60 * 1000;
@@ -58,7 +129,7 @@ export default function ReceiveScreen() {
     } finally {
       setIsGenerating(false);
     }
-  }, [amount, description]);
+  }, [amount, description, inputCurrency, convertToSats]);
 
   const handleCopyInvoice = useCallback(async () => {
     try {
@@ -95,6 +166,14 @@ export default function ReceiveScreen() {
     setDescription('');
     setInvoice('');
     setExpiryTime(null);
+    setInvoiceSatsAmount(0);
+  }, []);
+
+  // Handle currency change
+  const handleCurrencyChange = useCallback((currency: InputCurrency) => {
+    setInputCurrency(currency);
+    setCurrencyMenuVisible(false);
+    setAmount(''); // Reset amount when switching currencies
   }, []);
 
   // Calculate remaining time
@@ -152,7 +231,12 @@ export default function ReceiveScreen() {
             </View>
 
             <Text style={styles.amountText}>
-              Amount: {parseInt(amount, 10).toLocaleString()} sats
+              Amount: {invoiceSatsAmount.toLocaleString()} sats
+              {formatSatsWithFiat(invoiceSatsAmount).fiatDisplay && (
+                <Text style={styles.amountFiatText}>
+                  {' '}({formatSatsWithFiat(invoiceSatsAmount).fiatDisplay})
+                </Text>
+              )}
             </Text>
 
             <View style={styles.invoiceContainer}>
@@ -211,21 +295,58 @@ export default function ReceiveScreen() {
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           <Text style={styles.label}>Enter the amount you want to deposit:</Text>
 
-          <TextInput
-            mode="outlined"
-            label="Amount in sats"
-            value={amount}
-            onChangeText={setAmount}
-            keyboardType="numeric"
-            style={styles.input}
-            outlineColor="rgba(255, 255, 255, 0.3)"
-            activeOutlineColor="#FFC107"
-            textColor="#FFFFFF"
-            placeholderTextColor="rgba(255, 255, 255, 0.5)"
-            outlineStyle={styles.inputOutline}
-            contentStyle={styles.inputContent}
-          />
+          {/* Amount Input with Currency Selector */}
+          <View style={styles.amountInputRow}>
+            <StyledTextInput
+              label={`Amount in ${currencyLabels[inputCurrency]}`}
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="decimal-pad"
+              style={[styles.input, styles.amountInput]}
+            />
+            
+            {/* Currency Selector */}
+            <Menu
+              visible={currencyMenuVisible}
+              onDismiss={() => setCurrencyMenuVisible(false)}
+              anchor={
+                <TouchableOpacity
+                  style={styles.currencySelector}
+                  onPress={() => setCurrencyMenuVisible(true)}
+                >
+                  <Text style={styles.currencySelectorText}>
+                    {currencyLabels[inputCurrency]} ▼
+                  </Text>
+                </TouchableOpacity>
+              }
+              contentStyle={styles.currencyMenu}
+            >
+              {currencyOptions.map((currency) => (
+                <Menu.Item
+                  key={currency}
+                  onPress={() => handleCurrencyChange(currency)}
+                  title={currencyLabels[currency]}
+                  titleStyle={inputCurrency === currency ? styles.currencyMenuItemActive : undefined}
+                />
+              ))}
+            </Menu>
+          </View>
 
+          {/* Conversion Preview */}
+          {previewDisplay && previewSats > 0 && inputCurrency !== 'sats' && (
+            <View style={styles.conversionPreview}>
+              <Text style={styles.conversionText}>
+                ≈ {previewDisplay.satsDisplay}
+              </Text>
+              {previewDisplay.fiatDisplay && (
+                <Text style={styles.conversionFiat}>
+                  ({previewDisplay.fiatDisplay})
+                </Text>
+              )}
+            </View>
+          )}
+
+          {/* Presets */}
           <View style={styles.presetsContainer}>
             {presets.map((preset) => (
               <Button
@@ -237,7 +358,7 @@ export default function ReceiveScreen() {
                 labelStyle={styles.presetButtonLabel}
                 textColor="#FFFFFF"
               >
-                {preset >= 1000 ? `${preset / 1000}K` : preset}
+                {formatPresetLabel(preset)}
               </Button>
             ))}
           </View>
@@ -262,12 +383,12 @@ export default function ReceiveScreen() {
             mode="contained"
             onPress={handleGenerateInvoice}
             loading={isGenerating}
-            disabled={isGenerating || !amount}
+            disabled={isGenerating || !amount || (inputCurrency !== 'sats' && isLoadingRates)}
             style={styles.generateButton}
             buttonColor="#FFC107"
             textColor="#1a1a2e"
           >
-            Generate Invoice
+            {isLoadingRates && inputCurrency !== 'sats' ? 'Loading rates...' : 'Generate Invoice'}
           </Button>
         </ScrollView>
       </SafeAreaView>
@@ -407,5 +528,66 @@ const styles = StyleSheet.create({
   },
   newInvoiceButton: {
     marginTop: 8,
+  },
+  // Currency input styles
+  amountInputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 16,
+  },
+  amountInput: {
+    flex: 1,
+    marginBottom: 0,
+    backgroundColor: undefined, // Let StyledTextInput handle background for proper label masking
+  },
+  currencySelector: {
+    backgroundColor: '#16213e', // Match input background
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FFC107',
+    minWidth: 75,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+  },
+  currencySelectorText: {
+    color: '#FFC107',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  currencyMenu: {
+    backgroundColor: '#1a1a2e',
+  },
+  currencyMenuItemActive: {
+    color: '#FFC107',
+    fontWeight: 'bold',
+  },
+  conversionPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    borderRadius: 8,
+    marginTop: 8,
+    marginBottom: 8,
+    gap: 8,
+  },
+  conversionText: {
+    color: '#FFC107',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  conversionFiat: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 14,
+  },
+  amountFiatText: {
+    fontWeight: 'normal',
+    color: 'rgba(255, 255, 255, 0.7)',
   },
 });

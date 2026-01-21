@@ -186,7 +186,6 @@ export function SecuritySettingsScreen(): React.JSX.Element {
               <Text style={[styles.infoText, { color: secondaryText }]}>
                 • {t('settings.securityTip1')}{'\n'}
                 • {t('settings.securityTip2')}{'\n'}
-                • {t('settings.securityTip3')}{'\n'}
                 • {t('settings.securityTip4')}
               </Text>
             </View>

@@ -202,7 +202,6 @@ const translations: Record<SupportedLanguage, TranslationSet> = {
       securityTips: 'Security Tips',
       securityTip1: 'Use a strong PIN that\'s not easy to guess',
       securityTip2: 'Enable biometric authentication for convenience',
-      securityTip3: 'Set a reasonable auto-lock timeout',
       securityTip4: 'Never share your recovery phrase with anyone',
       saveChanges: 'Save Changes',
       // Language screen
@@ -450,7 +449,6 @@ const translations: Record<SupportedLanguage, TranslationSet> = {
       securityTips: 'Съвети за сигурност',
       securityTip1: 'Използвайте силен ПИН, който не е лесен за отгатване',
       securityTip2: 'Включете биометрична автентикация за удобство',
-      securityTip3: 'Задайте разумно време за автоматично заключване',
       securityTip4: 'Никога не споделяйте фразата си за възстановяване',
       saveChanges: 'Запази промените',
       // Language screen

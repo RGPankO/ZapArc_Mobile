@@ -560,17 +560,14 @@ export function useWallet(): WalletState & WalletActions {
   const refreshBalance = useCallback(async (): Promise<void> => {
     // If already in progress, wait for the existing call to complete
     if (refreshBalancePromiseRef.current) {
-      console.log('⏭️ [useWallet] refreshBalance - waiting for in-progress call');
       return refreshBalancePromiseRef.current;
     }
 
     const doRefresh = async (): Promise<void> => {
       try {
-        console.log('🔵 [useWallet] refreshBalance started');
         const walletInfo = await storageService.getActiveWalletInfo();
 
         if (!walletInfo) {
-          console.log('⚠️ [useWallet] No wallet info, setting balance to 0');
           setBalance(0);
           setIsLoading(false);
           return;
@@ -583,7 +580,6 @@ export function useWallet(): WalletState & WalletActions {
         );
 
         if (cached) {
-          console.log('📦 [useWallet] Setting cached balance:', cached.balance);
           setBalance(cached.balance);
           setIsLoading(false);
           setIsRefreshing(true);
@@ -593,7 +589,6 @@ export function useWallet(): WalletState & WalletActions {
 
         // Fetch fresh data from SDK
         if (!BreezSparkService.isSDKInitialized()) {
-          console.log('⚠️ [useWallet] SDK not initialized, keeping cached balance');
           if (!cached) {
             setBalance(0);
             setIsLoading(false);
@@ -602,9 +597,7 @@ export function useWallet(): WalletState & WalletActions {
           return;
         }
 
-        console.log('🔄 [useWallet] Fetching fresh balance from SDK...');
         const walletBalance = await BreezSparkService.getBalance();
-        console.log('✅ [useWallet] Got fresh balance from SDK:', walletBalance.balanceSat);
         setBalance(walletBalance.balanceSat);
         setIsLoading(false);
         setIsRefreshing(false);
@@ -630,7 +623,6 @@ export function useWallet(): WalletState & WalletActions {
         setIsLoading(false);
         setIsRefreshing(false);
       } finally {
-        console.log('🏁 [useWallet] refreshBalance finished');
         refreshBalancePromiseRef.current = null;
       }
     };
@@ -642,13 +634,11 @@ export function useWallet(): WalletState & WalletActions {
   const refreshTransactions = useCallback(async (): Promise<void> => {
     // If already in progress, wait for the existing call to complete
     if (refreshTransactionsPromiseRef.current) {
-      console.log('⏭️ [useWallet] refreshTransactions - waiting for in-progress call');
       return refreshTransactionsPromiseRef.current;
     }
 
     const doRefresh = async (): Promise<void> => {
       try {
-        console.log('🔵 [useWallet] refreshTransactions started');
         const walletInfo = await storageService.getActiveWalletInfo();
         if (!walletInfo) {
           setTransactions([]);
@@ -713,7 +703,6 @@ export function useWallet(): WalletState & WalletActions {
         console.error('❌ [useWallet] Failed to refresh transactions:', err);
         setIsRefreshing(false);
       } finally {
-        console.log('🏁 [useWallet] refreshTransactions finished');
         refreshTransactionsPromiseRef.current = null;
       }
     };
@@ -764,9 +753,7 @@ export function useWallet(): WalletState & WalletActions {
           setIsConnected(true);
           // Refresh balance and transactions when SDK becomes available
           try {
-            console.log('🔄 [useWallet] Triggering balance refresh after SDK connect...');
             await refreshBalance();
-            console.log('🔄 [useWallet] Triggering transactions refresh after SDK connect...');
             await refreshTransactions();
             console.log('✅ [useWallet] Post-SDK-connect refresh complete');
           } catch (refreshError) {

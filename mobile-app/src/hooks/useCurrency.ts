@@ -8,9 +8,17 @@ import {
   getCachedRates,
   formatAmountWithSettings,
   formatTransactionAmountWithSettings,
+  fiatToSats,
+  btcToSats,
+  formatSats,
+  formatFiat,
+  satsToFiat,
 } from '../utils/currency';
 import type { PrimaryDenomination, FiatCurrency } from '../features/settings/types';
 import type { ExchangeRates, FormattedAmount, CurrencySettings } from '../utils/currency';
+
+// Input currency type for amount entry
+export type InputCurrency = 'sats' | 'btc' | 'usd' | 'eur';
 
 // =============================================================================
 // Types
@@ -30,6 +38,10 @@ interface UseCurrencyReturn {
   format: (sats: number, options?: { hideBalance?: boolean }) => FormattedAmount;
   formatTx: (sats: number, isReceived: boolean) => FormattedAmount;
   formatCompact: (sats: number) => string;
+
+  // Conversion functions for input
+  convertToSats: (amount: number, inputCurrency: InputCurrency) => number;
+  formatSatsWithFiat: (sats: number) => { satsDisplay: string; fiatDisplay: string | null };
 
   // Refresh functions
   refreshRates: () => Promise<void>;
@@ -129,6 +141,43 @@ export function useCurrency(): UseCurrencyReturn {
     [currencySettings, rates]
   );
 
+  // Convert input amount to sats based on input currency
+  const convertToSats = useCallback(
+    (amount: number, inputCurrency: InputCurrency): number => {
+      if (!amount || isNaN(amount)) return 0;
+      
+      switch (inputCurrency) {
+        case 'sats':
+          return Math.round(amount);
+        case 'btc':
+          return btcToSats(amount);
+        case 'usd':
+          return fiatToSats(amount, rates, 'usd');
+        case 'eur':
+          return fiatToSats(amount, rates, 'eur');
+        default:
+          return Math.round(amount);
+      }
+    },
+    [rates]
+  );
+
+  // Format sats with fiat equivalent for display
+  const formatSatsWithFiat = useCallback(
+    (sats: number): { satsDisplay: string; fiatDisplay: string | null } => {
+      const satsDisplay = `${formatSats(sats)} sats`;
+      let fiatDisplay: string | null = null;
+      
+      if (rates && rates[secondaryFiatCurrency] > 0) {
+        const fiatAmount = satsToFiat(sats, rates, secondaryFiatCurrency);
+        fiatDisplay = `~${formatFiat(fiatAmount, secondaryFiatCurrency)}`;
+      }
+      
+      return { satsDisplay, fiatDisplay };
+    },
+    [rates, secondaryFiatCurrency]
+  );
+
   return {
     primaryDenomination,
     secondaryFiatCurrency,
@@ -138,6 +187,8 @@ export function useCurrency(): UseCurrencyReturn {
     format,
     formatTx,
     formatCompact,
+    convertToSats,
+    formatSatsWithFiat,
     refreshRates,
     refreshSettings,
   };

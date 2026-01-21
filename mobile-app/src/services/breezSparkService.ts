@@ -649,7 +649,6 @@ export async function listPayments(): Promise<TransactionInfo[]> {
   }
 
   try {
-    console.log('🔵 [BreezSparkService] listPayments: Fetching payments...');
     const response = await sdkInstance.listPayments({
       sortAscending: false,
     });

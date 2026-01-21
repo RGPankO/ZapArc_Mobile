@@ -126,10 +126,7 @@ export function HomeScreen(): React.JSX.Element {
       // Check if this is a sync event or a real payment
       const isSyncEvent = payment.description === '__SYNC_EVENT__';
 
-      if (isSyncEvent) {
-        console.log('🔄 [HomeScreen] Sync event received, refreshing...');
-      } else {
-        console.log('🔔 [HomeScreen] Payment event received:', payment.type, payment.amountSat);
+      if (!isSyncEvent) {
         // Show snackbar toast for SENT payments (not received - those get push notifications)
         if (payment.type === 'send' && payment.amountSat > 0) {
           const formattedAmount = payment.amountSat.toLocaleString();
@@ -140,7 +137,6 @@ export function HomeScreen(): React.JSX.Element {
 
       // Refresh balance and transactions - use Promise.all to ensure both complete
       Promise.all([refreshBalance(), refreshTransactions()])
-        .then(() => console.log('✅ [HomeScreen] Refresh after payment event complete'))
         .catch((err) => console.error('❌ [HomeScreen] Refresh after payment event failed:', err));
     });
 
