@@ -95,6 +95,11 @@ export function useWallet(): WalletState & WalletActions {
   const balanceRef = useRef(balance);
   const transactionsRef = useRef(transactions);
 
+  // Refs for debouncing refresh calls to prevent redundant API calls
+  // Store the promise so callers can wait for the in-progress call
+  const refreshBalancePromiseRef = useRef<Promise<void> | null>(null);
+  const refreshTransactionsPromiseRef = useRef<Promise<void> | null>(null);
+
   useEffect(() => {
     balanceRef.current = balance;
   }, [balance]);
@@ -204,7 +209,7 @@ export function useWallet(): WalletState & WalletActions {
         let sdkInitialized = false;
         try {
           const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, 0);
-          await BreezSparkService.initializeSDK(derivedMnemonic);
+          await BreezSparkService.initializeSDK(derivedMnemonic, undefined, 'Main Wallet');
           sdkInitialized = true;
           console.log('✅ [useWallet] Breez SDK initialized for new wallet');
         } catch (sdkError) {
@@ -273,7 +278,7 @@ export function useWallet(): WalletState & WalletActions {
         let sdkInitialized = false;
         try {
           const derivedMnemonic = deriveSubWalletMnemonic(normalizedMnemonic, 0);
-          await BreezSparkService.initializeSDK(derivedMnemonic);
+          await BreezSparkService.initializeSDK(derivedMnemonic, undefined, 'Main Wallet');
           sdkInitialized = true;
           console.log('✅ [useWallet] Breez SDK initialized for imported wallet');
         } catch (sdkError) {
@@ -419,7 +424,8 @@ export function useWallet(): WalletState & WalletActions {
             if (mnemonic) {
               await BreezSparkService.disconnectSDK();
               const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, subWalletIndex);
-              await BreezSparkService.initializeSDK(derivedMnemonic);
+              const walletInfo = await storageService.getActiveWalletInfo();
+              await BreezSparkService.initializeSDK(derivedMnemonic, undefined, walletInfo?.subWalletNickname);
               console.log('✅ [useWallet] Breez SDK reconnected for switched wallet');
             }
           } catch (sdkError) {
@@ -552,133 +558,168 @@ export function useWallet(): WalletState & WalletActions {
   // ========================================
 
   const refreshBalance = useCallback(async (): Promise<void> => {
-    try {
-      const walletInfo = await storageService.getActiveWalletInfo();
+    // If already in progress, wait for the existing call to complete
+    if (refreshBalancePromiseRef.current) {
+      console.log('⏭️ [useWallet] refreshBalance - waiting for in-progress call');
+      return refreshBalancePromiseRef.current;
+    }
 
-      if (!walletInfo) {
-        setBalance(0);
-        setIsLoading(false);
-        return;
-      }
+    const doRefresh = async (): Promise<void> => {
+      try {
+        console.log('🔵 [useWallet] refreshBalance started');
+        const walletInfo = await storageService.getActiveWalletInfo();
 
-      // Load from cache first for instant display
-      const cached = await WalletCache.getCachedBalance(
-        walletInfo.masterKeyId,
-        walletInfo.subWalletIndex
-      );
-
-      if (cached) {
-        setBalance(cached.balance);
-        setIsLoading(false);
-        setIsRefreshing(true);
-      } else {
-        setIsLoading(true);
-      }
-
-      // Fetch fresh data from SDK
-      if (!BreezSparkService.isSDKInitialized()) {
-        if (!cached) {
+        if (!walletInfo) {
+          console.log('⚠️ [useWallet] No wallet info, setting balance to 0');
           setBalance(0);
           setIsLoading(false);
+          return;
         }
+
+        // Load from cache first for instant display
+        const cached = await WalletCache.getCachedBalance(
+          walletInfo.masterKeyId,
+          walletInfo.subWalletIndex
+        );
+
+        if (cached) {
+          console.log('📦 [useWallet] Setting cached balance:', cached.balance);
+          setBalance(cached.balance);
+          setIsLoading(false);
+          setIsRefreshing(true);
+        } else {
+          setIsLoading(true);
+        }
+
+        // Fetch fresh data from SDK
+        if (!BreezSparkService.isSDKInitialized()) {
+          console.log('⚠️ [useWallet] SDK not initialized, keeping cached balance');
+          if (!cached) {
+            setBalance(0);
+            setIsLoading(false);
+          }
+          setIsRefreshing(false);
+          return;
+        }
+
+        console.log('🔄 [useWallet] Fetching fresh balance from SDK...');
+        const walletBalance = await BreezSparkService.getBalance();
+        console.log('✅ [useWallet] Got fresh balance from SDK:', walletBalance.balanceSat);
+        setBalance(walletBalance.balanceSat);
+        setIsLoading(false);
         setIsRefreshing(false);
-        return;
-      }
 
-      const walletBalance = await BreezSparkService.getBalance();
-      setBalance(walletBalance.balanceSat);
-      setIsLoading(false);
-      setIsRefreshing(false);
-
-      // Update cache with fresh data
-      await WalletCache.cacheBalance(
-        walletInfo.masterKeyId,
-        walletInfo.subWalletIndex,
-        walletBalance.balanceSat
-      );
-
-      // Update activity flag
-      if (walletInfo) {
-        const hasActivity = walletBalance.balanceSat > 0 || transactionsRef.current.length > 0;
-        storageService.updateSubWalletActivity(
+        // Update cache with fresh data
+        await WalletCache.cacheBalance(
           walletInfo.masterKeyId,
           walletInfo.subWalletIndex,
-          hasActivity
-        ).catch(err => console.warn('⚠️ [useWallet] Failed to update activity:', err));
+          walletBalance.balanceSat
+        );
+
+        // Update activity flag
+        if (walletInfo) {
+          const hasActivity = walletBalance.balanceSat > 0 || transactionsRef.current.length > 0;
+          storageService.updateSubWalletActivity(
+            walletInfo.masterKeyId,
+            walletInfo.subWalletIndex,
+            hasActivity
+          ).catch(err => console.warn('⚠️ [useWallet] Failed to update activity:', err));
+        }
+      } catch (err) {
+        console.error('❌ [useWallet] Failed to refresh balance:', err);
+        setIsLoading(false);
+        setIsRefreshing(false);
+      } finally {
+        console.log('🏁 [useWallet] refreshBalance finished');
+        refreshBalancePromiseRef.current = null;
       }
-    } catch (err) {
-      console.error('❌ [useWallet] Failed to refresh balance:', err);
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
+    };
+
+    refreshBalancePromiseRef.current = doRefresh();
+    return refreshBalancePromiseRef.current;
   }, []);
 
   const refreshTransactions = useCallback(async (): Promise<void> => {
-    try {
-      const walletInfo = await storageService.getActiveWalletInfo();
-      if (!walletInfo) {
-        setTransactions([]);
-        return;
-      }
+    // If already in progress, wait for the existing call to complete
+    if (refreshTransactionsPromiseRef.current) {
+      console.log('⏭️ [useWallet] refreshTransactions - waiting for in-progress call');
+      return refreshTransactionsPromiseRef.current;
+    }
 
-      // Load from cache first for instant display
-      const cached = await WalletCache.getCachedTransactions(
-        walletInfo.masterKeyId,
-        walletInfo.subWalletIndex
-      );
-
-      if (cached) {
-        setTransactions(cached.transactions);
-        setIsRefreshing(true);
-      }
-
-      // Fetch fresh data from SDK
-      const sdkInitialized = BreezSparkService.isSDKInitialized();
-      
-      if (!sdkInitialized) {
-        if (!cached) {
+    const doRefresh = async (): Promise<void> => {
+      try {
+        console.log('🔵 [useWallet] refreshTransactions started');
+        const walletInfo = await storageService.getActiveWalletInfo();
+        if (!walletInfo) {
           setTransactions([]);
+          return;
         }
+
+        // Load from cache first for instant display
+        const cached = await WalletCache.getCachedTransactions(
+          walletInfo.masterKeyId,
+          walletInfo.subWalletIndex
+        );
+
+        if (cached) {
+          setTransactions(cached.transactions);
+          setIsRefreshing(true);
+        }
+
+        // Fetch fresh data from SDK
+        const sdkInitialized = BreezSparkService.isSDKInitialized();
+
+        if (!sdkInitialized) {
+          if (!cached) {
+            setTransactions([]);
+          }
+          setIsRefreshing(false);
+          return;
+        }
+
+        const payments = await BreezSparkService.listPayments();
+
+        // Map TransactionInfo to Transaction type
+        const txs: Transaction[] = payments.map((p) => ({
+          id: p.id,
+          type: p.type,
+          amount: p.amountSat,
+          feeSats: p.feeSat,
+          status: p.status,
+          timestamp: p.timestamp,
+          description: p.description,
+        }));
+
+        setTransactions(txs);
         setIsRefreshing(false);
-        return;
-      }
 
-      const payments = await BreezSparkService.listPayments();
-      
-      // Map TransactionInfo to Transaction type
-      const txs: Transaction[] = payments.map((p) => ({
-        id: p.id,
-        type: p.type,
-        amount: p.amountSat,
-        feeSats: p.feeSat,
-        status: p.status,
-        timestamp: p.timestamp,
-        description: p.description,
-      }));
-      
-      setTransactions(txs);
-      setIsRefreshing(false);
-
-      // Update cache with fresh data
-      await WalletCache.cacheTransactions(
-        walletInfo.masterKeyId,
-        walletInfo.subWalletIndex,
-        txs
-      );
-
-      // Update activity flag
-      if (walletInfo) {
-        const hasActivity = txs.length > 0 || balanceRef.current > 0;
-        storageService.updateSubWalletActivity(
+        // Update cache with fresh data
+        await WalletCache.cacheTransactions(
           walletInfo.masterKeyId,
           walletInfo.subWalletIndex,
-          hasActivity
-        ).catch(err => console.warn('⚠️ [useWallet] Failed to update activity:', err));
+          txs
+        );
+
+        // Update activity flag
+        if (walletInfo) {
+          const hasActivity = txs.length > 0 || balanceRef.current > 0;
+          storageService.updateSubWalletActivity(
+            walletInfo.masterKeyId,
+            walletInfo.subWalletIndex,
+            hasActivity
+          ).catch(err => console.warn('⚠️ [useWallet] Failed to update activity:', err));
+        }
+      } catch (err) {
+        console.error('❌ [useWallet] Failed to refresh transactions:', err);
+        setIsRefreshing(false);
+      } finally {
+        console.log('🏁 [useWallet] refreshTransactions finished');
+        refreshTransactionsPromiseRef.current = null;
       }
-    } catch (err) {
-      console.error('❌ [useWallet] Failed to refresh transactions:', err);
-      setIsRefreshing(false);
-    }
+    };
+
+    refreshTransactionsPromiseRef.current = doRefresh();
+    return refreshTransactionsPromiseRef.current;
   }, []);
 
   // ========================================
@@ -715,15 +756,19 @@ export function useWallet(): WalletState & WalletActions {
     const checkAndSync = async (): Promise<void> => {
       try {
         if (!isMounted) return;
-        
+
         const sdkInitialized = BreezSparkService.isSDKInitialized();
 
         if (sdkInitialized && !isConnected && isMounted) {
+          console.log('🔌 [useWallet] SDK became available, setting connected and refreshing...');
           setIsConnected(true);
           // Refresh balance and transactions when SDK becomes available
           try {
+            console.log('🔄 [useWallet] Triggering balance refresh after SDK connect...');
             await refreshBalance();
+            console.log('🔄 [useWallet] Triggering transactions refresh after SDK connect...');
             await refreshTransactions();
+            console.log('✅ [useWallet] Post-SDK-connect refresh complete');
           } catch (refreshError) {
             console.error('❌ [useWallet] Refresh error in SDK sync:', refreshError);
           }
@@ -930,7 +975,7 @@ export function useWallet(): WalletState & WalletActions {
         await BreezSparkService.disconnectSDK().catch(() => {});
         
         // Initialize target
-        await BreezSparkService.initializeSDK(derivedMnemonic);
+        await BreezSparkService.initializeSDK(derivedMnemonic); // Temp connection for activity check - no notification registration needed
         
         // 4. Fetch transactions
         const payments = await BreezSparkService.listPayments();
@@ -951,7 +996,7 @@ export function useWallet(): WalletState & WalletActions {
             if (orgMnemonic) {
               const orgDerived = deriveSubWalletMnemonic(orgMnemonic, originalWallet.subWalletIndex);
               await BreezSparkService.disconnectSDK().catch(() => {});
-              await BreezSparkService.initializeSDK(orgDerived);
+              await BreezSparkService.initializeSDK(orgDerived, undefined, originalWallet.subWalletNickname);
               console.log('✅ [useWallet] Restored original wallet connection');
             }
           } catch (restoreError) {

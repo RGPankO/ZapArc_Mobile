@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.mobileapp",
+      "bundleIdentifier": "com.zaparcmobile.mobileapp",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }

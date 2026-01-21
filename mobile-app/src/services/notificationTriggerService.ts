@@ -19,10 +19,14 @@ interface NotificationResponse {
 export const NotificationTriggerService = {
   /**
    * Registers this device's push token with the backend, mapped to the Node ID
+   * @param nodeId - Lightning Node ID (public key)
+   * @param pushToken - Expo push token
+   * @param walletNickname - Optional wallet name to show in notifications
    */
   async registerDevice(
     nodeId: string,
-    pushToken: string
+    pushToken: string,
+    walletNickname?: string
   ): Promise<NotificationResponse> {
     try {
       console.log(`🔔 [Notification] Registering device for node ${nodeId}...`);
@@ -36,6 +40,7 @@ export const NotificationTriggerService = {
           pubKey: nodeId,
           expoPushToken: pushToken,
           platform: 'android', // You could use Platform.OS here
+          walletNickname: walletNickname,
         }),
       });
 

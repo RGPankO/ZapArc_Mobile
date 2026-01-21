@@ -25,13 +25,15 @@ const db = getFirestore();
  */
 function formatPushMessage(
   expoPushToken: string,
-  amount: number
+  amount: number,
+  walletNickname?: string
 ): ExpoPushMessage {
+  const walletInfo = walletNickname ? ` on ${walletNickname}` : '';
   return {
     to: expoPushToken,
     title: 'Payment Received',
-    body: `You received ${amount} sats!`,
-    data: { amount },
+    body: `You received ${amount} sats${walletInfo}!`,
+    data: { amount, walletNickname: walletNickname || '' },
   };
 }
 
@@ -107,7 +109,7 @@ export const registerDevice = onRequest(
       }
 
       const body = request.body as Partial<RegisterPushTokenRequest>;
-      const { pubKey, expoPushToken, platform } = body;
+      const { pubKey, expoPushToken, platform, walletNickname } = body;
 
       if (!pubKey || !expoPushToken) {
         response.status(400).json({
@@ -122,6 +124,7 @@ export const registerDevice = onRequest(
       await db.collection('users').doc(pubKey).set({
         expoPushToken,
         platform: platform || 'unknown',
+        walletNickname: walletNickname || undefined,
         updatedAt: new Date(),
       }, { merge: true });
 
@@ -175,12 +178,26 @@ export const sendTransactionNotification = onRequest(
       }
       
       // 2. If recipientPubKey provided, look it up in Firestore
+      // Store token + nickname pairs for personalized messages
+      interface TokenInfo {
+        token: string;
+        walletNickname?: string;
+      }
+      let tokenInfos: TokenInfo[] = [];
+
+      if (directToken) {
+        tokenInfos.push({ token: directToken });
+      }
+
       if (recipientPubKey) {
         const userDoc = await db.collection('users').doc(recipientPubKey).get();
         if (userDoc.exists) {
           const userData = userDoc.data();
           if (userData?.expoPushToken) {
-            tokensToSend.push(userData.expoPushToken);
+            tokenInfos.push({ 
+              token: userData.expoPushToken,
+              walletNickname: userData.walletNickname 
+            });
           } else {
             console.log(`⚠️ User ${recipientPubKey} found but no token.`);
           }
@@ -190,21 +207,26 @@ export const sendTransactionNotification = onRequest(
       }
 
       // Allow either direct token OR looked-up token
-      if (tokensToSend.length === 0) {
+      if (tokenInfos.length === 0) {
          response.status(404).json({
           success: false,
-          error: 'No valid recipient token found. Provide expoPushToken or specific valid recipientPubKey.',
+          error: 'No valid recipient token found. Provide expoPushToken or specify valid recipientPubKey.',
         } satisfies TransactionNotificationResponse);
         return;
       }
 
-      // Deduplicate tokens
-      tokensToSend = [...new Set(tokensToSend)];
+      // Deduplicate by token
+      const seenTokens = new Set<string>();
+      tokenInfos = tokenInfos.filter(info => {
+        if (seenTokens.has(info.token)) return false;
+        seenTokens.add(info.token);
+        return true;
+      });
 
-      // Send to all found tokens
+      // Send to all found tokens with personalized messages
       const results = await Promise.all(
-        tokensToSend.map(token => {
-          const message = formatPushMessage(token, amount);
+        tokenInfos.map(info => {
+          const message = formatPushMessage(info.token, amount, info.walletNickname);
           return sendPushNotification(message);
         })
       );
@@ -225,7 +247,7 @@ export const sendTransactionNotification = onRequest(
       // Success response
       response.status(200).json({
         success: true,
-        message: `Notification sent successfully to ${tokensToSend.length} device(s)`,
+        message: `Notification sent successfully to ${tokenInfos.length} device(s)`,
       } satisfies TransactionNotificationResponse);
     } catch (error) {
       // Handle unexpected errors

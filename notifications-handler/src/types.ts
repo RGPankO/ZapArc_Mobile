@@ -32,6 +32,8 @@ export interface RegisterPushTokenRequest {
   expoPushToken: string;
   /** Platform (android/ios) - optional for analytics */
   platform?: string;
+  /** Wallet nickname to show in notifications */
+  walletNickname?: string;
 }
 
 /**

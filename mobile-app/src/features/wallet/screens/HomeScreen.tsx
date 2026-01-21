@@ -77,6 +77,11 @@ export function HomeScreen(): React.JSX.Element {
     return format(sats, { hideBalance: !showBalance });
   };
 
+  // Debug: Log when balance changes
+  useEffect(() => {
+    console.log('💰 [HomeScreen] Balance prop changed to:', balance);
+  }, [balance]);
+
   // Prevent Android back button from navigating back to welcome/create screens
   // Only active when HomeScreen is focused - allows normal back nav from other screens
   useFocusEffect(
@@ -120,10 +125,11 @@ export function HomeScreen(): React.JSX.Element {
     const unsubscribe = onPaymentReceived((payment) => {
       // Check if this is a sync event or a real payment
       const isSyncEvent = payment.description === '__SYNC_EVENT__';
-      
+
       if (isSyncEvent) {
-        // Sync event - just refresh silently
+        console.log('🔄 [HomeScreen] Sync event received, refreshing...');
       } else {
+        console.log('🔔 [HomeScreen] Payment event received:', payment.type, payment.amountSat);
         // Show snackbar toast for SENT payments (not received - those get push notifications)
         if (payment.type === 'send' && payment.amountSat > 0) {
           const formattedAmount = payment.amountSat.toLocaleString();
@@ -131,10 +137,11 @@ export function HomeScreen(): React.JSX.Element {
           setSnackbarVisible(true);
         }
       }
-      
-      // Refresh balance and transactions
-      refreshBalance();
-      refreshTransactions();
+
+      // Refresh balance and transactions - use Promise.all to ensure both complete
+      Promise.all([refreshBalance(), refreshTransactions()])
+        .then(() => console.log('✅ [HomeScreen] Refresh after payment event complete'))
+        .catch((err) => console.error('❌ [HomeScreen] Refresh after payment event failed:', err));
     });
 
     return () => {
@@ -142,17 +149,19 @@ export function HomeScreen(): React.JSX.Element {
     };
   }, [refreshBalance, refreshTransactions]);
 
-  // Refresh transactions and settings when screen comes into focus
-  // This ensures the transaction list and currency display updates when returning from other screens
+  // Refresh balance, transactions and settings when screen comes into focus
+  // This ensures data updates when returning from other screens or opening from notification
   useFocusEffect(
     useCallback(() => {
       // Always refresh settings when screen comes into focus
       refreshSettings();
-      
+
       if (isConnected && !isLoading) {
+        // Refresh both balance and transactions to catch any updates
+        refreshBalance();
         refreshTransactions();
       }
-    }, [isConnected, isLoading, refreshTransactions, refreshSettings])
+    }, [isConnected, isLoading, refreshBalance, refreshTransactions, refreshSettings])
   );
 
   // Show payment success toast when returning from successful payment (via PaymentConfirmationScreen)

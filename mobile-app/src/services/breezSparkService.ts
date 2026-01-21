@@ -6,7 +6,8 @@
 // - Production builds
 import { BREEZ_API_KEY, BREEZ_STORAGE_DIR } from '../config';
 import * as Notifications from 'expo-notifications';
-import { sendPaymentReceivedNotification } from './notificationService';
+// Note: Local notifications disabled - FCM push handles payment notifications
+// import { sendPaymentReceivedNotification } from './notificationService';
 import { NotificationTriggerService } from './notificationTriggerService';
 
 // =============================================================================
@@ -157,10 +158,14 @@ function generateWalletStorageId(mnemonic: string): string {
 
 /**
  * Initialize the Breez SDK with a mnemonic
+ * @param mnemonic - The wallet mnemonic
+ * @param apiKey - Optional Breez API key
+ * @param walletNickname - Optional wallet name for push notifications
  */
 export async function initializeSDK(
   mnemonic: string,
-  apiKey?: string
+  apiKey?: string,
+  walletNickname?: string
 ): Promise<boolean> {
   const walletId = generateWalletStorageId(mnemonic);
 
@@ -235,7 +240,7 @@ export async function initializeSDK(
         if (nodeId) {
             const pushTokenData = await Notifications.getExpoPushTokenAsync();
             if (pushTokenData.data) {
-              await NotificationTriggerService.registerDevice(nodeId, pushTokenData.data);
+              await NotificationTriggerService.registerDevice(nodeId, pushTokenData.data, walletNickname);
               console.log('✅ [BreezSparkService] Registered for push notifications');
             }
         }
@@ -389,7 +394,11 @@ async function setupEventListeners(): Promise<void> {
             // Skip if: not received, no amount, or we recently sent this payment ourselves
             const wasRecentlySent = recentlySentPaymentIds.has(payment.id);
             if (isReceived && payment.amountSat > 0 && !wasRecentlySent) {
-              sendPaymentReceivedNotification(payment.amountSat, payment.description);
+              // NOTE: Local notification disabled - FCM push notifications now handle this
+              // to prevent duplicate notifications when both local and remote fire.
+              // The sender triggers a push notification via Cloud Function.
+              // sendPaymentReceivedNotification(payment.amountSat, payment.description);
+              console.log('🔔 [BreezSparkService] Payment received - push notification expected from sender');
             }
 
             // Notify all listeners (for UI refresh etc)
