@@ -9,12 +9,15 @@ import { Modal, Portal, Text, IconButton, Avatar, Divider } from 'react-native-p
 import { Contact } from '../types';
 import { ContactSearchBar } from './ContactSearchBar';
 import { useContactSearch } from '../hooks/useContactSearch';
+import { t } from '../../../services/i18nService';
 
 interface ContactSelectionModalProps {
   visible: boolean;
   onDismiss: () => void;
   onSelect: (contact: Contact) => void;
   contacts: Contact[];
+  /** Current user's Lightning Address to detect self */
+  myAddress?: string;
 }
 
 export function ContactSelectionModal({
@@ -22,6 +25,7 @@ export function ContactSelectionModal({
   onDismiss,
   onSelect,
   contacts,
+  myAddress,
 }: ContactSelectionModalProps): React.JSX.Element {
   const { searchQuery, setSearchQuery, filteredContacts } = useContactSearch(contacts);
 
@@ -39,6 +43,8 @@ export function ContactSelectionModal({
       .toUpperCase()
       .slice(0, 2);
 
+    const isSelf = myAddress ? item.lightningAddress.toLowerCase().trim() === myAddress.toLowerCase().trim() : false;
+
     return (
       <TouchableOpacity
         style={styles.contactItem}
@@ -48,11 +54,18 @@ export function ContactSelectionModal({
         <Avatar.Text
           size={40}
           label={initials}
-          style={styles.avatar}
+          style={[styles.avatar, isSelf && styles.avatarSelf]}
           labelStyle={styles.avatarLabel}
         />
         <View style={styles.contactInfo}>
-          <Text style={styles.contactName}>{item.name}</Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.contactName}>{item.name}</Text>
+            {isSelf && (
+              <View style={styles.selfBadge}>
+                <Text style={styles.selfBadgeText}>{t('addressBook.self')}</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.contactAddress}>{item.lightningAddress}</Text>
         </View>
       </TouchableOpacity>
@@ -64,7 +77,7 @@ export function ContactSelectionModal({
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyText}>
-        {searchQuery ? 'No contacts found' : 'No contacts saved yet'}
+        {searchQuery ? t('addressBook.noContactsFound') : t('addressBook.noContacts')}
       </Text>
     </View>
   );
@@ -77,7 +90,7 @@ export function ContactSelectionModal({
         contentContainerStyle={styles.modalContent}
       >
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Select Contact</Text>
+          <Text style={styles.headerTitle}>{t('addressBook.selectContact')}</Text>
           <IconButton
             icon="close"
             iconColor="#FFFFFF"
@@ -89,7 +102,7 @@ export function ContactSelectionModal({
         <ContactSearchBar
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholder="Search contacts..."
+          placeholder={t('addressBook.searchContacts')}
         />
 
         <FlatList
@@ -145,6 +158,9 @@ const styles = StyleSheet.create({
   avatar: {
     backgroundColor: '#FFC107',
   },
+  avatarSelf: {
+    backgroundColor: '#4CAF50',
+  },
   avatarLabel: {
     color: '#000000',
     fontWeight: 'bold',
@@ -152,6 +168,11 @@ const styles = StyleSheet.create({
   contactInfo: {
     marginLeft: 12,
     flex: 1,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   contactName: {
     fontSize: 16,
@@ -175,5 +196,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.5)',
     textAlign: 'center',
+  },
+  selfBadge: {
+    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  selfBadgeText: {
+    color: '#4CAF50',
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
 });

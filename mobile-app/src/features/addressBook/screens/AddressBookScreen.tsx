@@ -9,6 +9,7 @@ import { Text, IconButton, FAB, Divider, ActivityIndicator } from 'react-native-
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
+import { t } from '../../../services/i18nService';
 import { useAppTheme } from '../../../contexts/ThemeContext';
 import {
   getGradientColors,
@@ -18,6 +19,7 @@ import {
 import { Contact } from '../types';
 import { useContacts } from '../hooks/useContacts';
 import { useContactSearch } from '../hooks/useContactSearch';
+import { useLightningAddress } from '../../../hooks/useLightningAddress';
 import { ContactListItem } from '../components/ContactListItem';
 import { ContactSearchBar } from '../components/ContactSearchBar';
 import { EmptyAddressBook } from '../components/EmptyAddressBook';
@@ -27,10 +29,14 @@ export function AddressBookScreen(): React.JSX.Element {
   const { contacts, loading, refreshContacts } = useContacts();
   const { searchQuery, setSearchQuery, filteredContacts, isSearching } =
     useContactSearch(contacts);
+  const { addressInfo } = useLightningAddress();
 
   const gradientColors = getGradientColors(themeMode);
   const primaryTextColor = getPrimaryTextColor(themeMode);
   const secondaryTextColor = getSecondaryTextColor(themeMode);
+
+  // Get the current user's Lightning Address (normalized for comparison)
+  const myAddress = addressInfo?.lightningAddress?.toLowerCase().trim();
 
   // Refresh contacts when screen comes into focus (e.g., after adding a new contact)
   useFocusEffect(
@@ -48,15 +54,21 @@ export function AddressBookScreen(): React.JSX.Element {
   }, []);
 
   const renderContact = useCallback(
-    ({ item }: { item: Contact }) => (
-      <ContactListItem
-        contact={item}
-        onPress={handleContactPress}
-        primaryTextColor={primaryTextColor}
-        secondaryTextColor={secondaryTextColor}
-      />
-    ),
-    [handleContactPress, primaryTextColor, secondaryTextColor]
+    ({ item }: { item: Contact }) => {
+      // Check if this contact's address matches the user's own address
+      const isSelf = myAddress ? item.lightningAddress.toLowerCase().trim() === myAddress : false;
+      
+      return (
+        <ContactListItem
+          contact={item}
+          onPress={handleContactPress}
+          primaryTextColor={primaryTextColor}
+          secondaryTextColor={secondaryTextColor}
+          isSelf={isSelf}
+        />
+      );
+    },
+    [handleContactPress, primaryTextColor, secondaryTextColor, myAddress]
   );
 
   const renderSeparator = useCallback(
@@ -97,7 +109,7 @@ export function AddressBookScreen(): React.JSX.Element {
             onPress={() => router.back()}
           />
           <Text style={[styles.headerTitle, { color: primaryTextColor }]}>
-            Address Book
+            {t('addressBook.title')}
           </Text>
           <View style={styles.headerSpacer} />
         </View>

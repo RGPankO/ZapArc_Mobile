@@ -16,6 +16,7 @@ import {
   getPrimaryTextColor,
   getSecondaryTextColor,
 } from '../../../../utils/theme-helpers';
+import { t } from '../../../../services/i18nService';
 import { StyledTextInput } from '../../../../components';
 
 // =============================================================================
@@ -118,7 +119,7 @@ export function LightningAddressScreen(): React.JSX.Element {
 
   const handleRegister = useCallback(async () => {
     if (availabilityStatus !== 'available') {
-      Alert.alert('Error', 'Please check username availability first');
+      Alert.alert(t('common.error'), t('lightningAddressScreen.checkAvailability'));
       return;
     }
 
@@ -128,12 +129,12 @@ export function LightningAddressScreen(): React.JSX.Element {
       const result = await register(username, description || undefined);
 
       if (result.success) {
-        Alert.alert('Success', `Your Lightning Address is now: ${username}@breez.tips`);
+        Alert.alert(t('common.success'), t('lightningAddressScreen.addressRegistered', { address: `${username}@breez.tips` }));
         setUsername('');
         setDescription('');
         setAvailabilityStatus('unchecked');
       } else {
-        Alert.alert('Error', result.error || 'Failed to register Lightning Address');
+        Alert.alert(t('common.error'), result.error || 'Failed to register Lightning Address');
       }
     } finally {
       setIsRegistering(false);
@@ -142,21 +143,21 @@ export function LightningAddressScreen(): React.JSX.Element {
 
   const handleUnregister = useCallback(async () => {
     Alert.alert(
-      'Unregister Lightning Address',
-      `Are you sure you want to unregister ${addressInfo?.lightningAddress}? You may not be able to reclaim this username.`,
+      t('lightningAddressScreen.unregisterAddress'),
+      t('lightningAddressScreen.unregisterConfirm', { address: addressInfo?.lightningAddress || '' }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Unregister',
+          text: t('lightningAddressScreen.unregisterAddress'),
           style: 'destructive',
           onPress: async () => {
             setIsUnregistering(true);
             try {
               const result = await unregister();
               if (result.success) {
-                Alert.alert('Success', 'Lightning Address unregistered');
+                Alert.alert(t('common.success'), t('lightningAddressScreen.addressUnregistered'));
               } else {
-                Alert.alert('Error', result.error || 'Failed to unregister');
+                Alert.alert(t('common.error'), result.error || 'Failed to unregister');
               }
             } finally {
               setIsUnregistering(false);
@@ -174,7 +175,7 @@ export function LightningAddressScreen(): React.JSX.Element {
       await Clipboard.setStringAsync(addressInfo.lightningAddress);
       // Android's built-in clipboard notification provides feedback
     } catch {
-      Alert.alert('Error', 'Failed to copy address');
+      Alert.alert(t('common.error'), 'Failed to copy address');
     }
   }, [addressInfo]);
 
@@ -194,12 +195,12 @@ export function LightningAddressScreen(): React.JSX.Element {
               size={24}
               onPress={() => router.back()}
             />
-            <Text style={[styles.headerTitle, { color: primaryText }]}>Lightning Address</Text>
+            <Text style={[styles.headerTitle, { color: primaryText }]}>{t('lightningAddressScreen.title')}</Text>
             <View style={styles.headerSpacer} />
           </View>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#FFC107" />
-            <Text style={[styles.loadingText, { color: secondaryText }]}>Loading...</Text>
+            <Text style={[styles.loadingText, { color: secondaryText }]}>{t('common.loading')}</Text>
           </View>
         </SafeAreaView>
       </LinearGradient>
@@ -217,7 +218,7 @@ export function LightningAddressScreen(): React.JSX.Element {
             size={24}
             onPress={() => router.back()}
           />
-          <Text style={[styles.headerTitle, { color: primaryText }]}>Lightning Address</Text>
+          <Text style={[styles.headerTitle, { color: primaryText }]}>{t('lightningAddressScreen.title')}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -241,7 +242,7 @@ export function LightningAddressScreen(): React.JSX.Element {
                 {/* Address Display */}
                 <View style={styles.section}>
                   <Text style={[styles.sectionTitle, { color: primaryText }]}>
-                    Your Lightning Address
+                    {t('lightningAddressScreen.yourAddress')}
                   </Text>
                   <View style={styles.addressDisplay}>
                     <Text style={styles.addressText}>{addressInfo.lightningAddress}</Text>
@@ -256,17 +257,16 @@ export function LightningAddressScreen(): React.JSX.Element {
                       labelStyle={styles.copyButtonLabel}
                       icon="content-copy"
                     >
-                      Copy Address
+                      {t('lightningAddressScreen.copyAddress')}
                     </Button>
                   </View>
                 </View>
 
                 {/* Info Box */}
                 <View style={styles.infoBox}>
-                  <Text style={styles.infoTitle}>About Lightning Address</Text>
+                  <Text style={styles.infoTitle}>{t('lightningAddressScreen.aboutLightningAddress')}</Text>
                   <Text style={[styles.infoText, { color: secondaryText }]}>
-                    Share this address with anyone to receive Lightning payments. They can send
-                    sats to you using any wallet that supports Lightning Addresses.
+                    {t('lightningAddressScreen.aboutLightningAddressDesc')}
                   </Text>
                 </View>
 
@@ -280,7 +280,7 @@ export function LightningAddressScreen(): React.JSX.Element {
                     style={styles.unregisterButton}
                     textColor="#f44336"
                   >
-                    Unregister Address
+                    {t('lightningAddressScreen.unregisterAddress')}
                   </Button>
                 </View>
               </>
@@ -290,12 +290,12 @@ export function LightningAddressScreen(): React.JSX.Element {
                 {/* Registration Form */}
                 <View style={styles.section}>
                   <Text style={[styles.sectionTitle, { color: primaryText }]}>
-                    Claim Your Lightning Address
+                    {t('lightningAddressScreen.claimAddress')}
                   </Text>
 
                   {/* Username Input */}
                   <StyledTextInput
-                    label="Username"
+                    label={t('lightningAddressScreen.username')}
                     value={username}
                     onChangeText={handleUsernameChange}
                     placeholder="yourname"
@@ -324,8 +324,8 @@ export function LightningAddressScreen(): React.JSX.Element {
                             styles.statusTextUnavailable,
                         ]}
                       >
-                        {availabilityStatus === 'available' && '✓ Username is available!'}
-                        {availabilityStatus === 'unavailable' && '✗ Username is taken'}
+                        {availabilityStatus === 'available' && t('lightningAddressScreen.usernameAvailable')}
+                        {availabilityStatus === 'unavailable' && t('lightningAddressScreen.usernameTaken')}
                         {availabilityStatus === 'error' && validationError}
                       </Text>
                     </View>
@@ -340,7 +340,7 @@ export function LightningAddressScreen(): React.JSX.Element {
 
                   {/* Description Input (Optional) */}
                   <StyledTextInput
-                    label="Description (optional)"
+                    label={t('lightningAddressScreen.descriptionOptional')}
                     value={description}
                     onChangeText={setDescription}
                     placeholder="My Lightning Wallet"
@@ -359,7 +359,7 @@ export function LightningAddressScreen(): React.JSX.Element {
                       style={styles.checkButton}
                       textColor="#FFC107"
                     >
-                      Check Availability
+                      {t('lightningAddressScreen.checkAvailability')}
                     </Button>
 
                     <Button
@@ -373,36 +373,35 @@ export function LightningAddressScreen(): React.JSX.Element {
                       style={styles.registerButton}
                       labelStyle={styles.registerButtonLabel}
                     >
-                      Register Address
+                      {t('lightningAddressScreen.registerAddress')}
                     </Button>
                   </View>
                 </View>
 
                 {/* Info Box */}
                 <View style={styles.infoBox}>
-                  <Text style={styles.infoTitle}>What is a Lightning Address?</Text>
+                  <Text style={styles.infoTitle}>{t('lightningAddressScreen.whatIsLightningAddress')}</Text>
                   <Text style={[styles.infoText, { color: secondaryText }]}>
-                    A Lightning Address is like an email address for Bitcoin payments. Instead of
-                    generating invoices, people can send sats directly to your address.
+                    {t('lightningAddressScreen.whatIsLightningAddressDesc')}
                   </Text>
                   <Text style={[styles.infoText, { color: secondaryText, marginTop: 8 }]}>
-                    Example: yourname@breez.tips
+                    {t('lightningAddressScreen.example')}
                   </Text>
                 </View>
 
                 {/* Username Requirements */}
                 <View style={styles.requirementsBox}>
                   <Text style={[styles.requirementsTitle, { color: secondaryText }]}>
-                    Username Requirements
+                    {t('lightningAddressScreen.usernameRequirements')}
                   </Text>
                   <Text style={[styles.requirementsText, { color: secondaryText }]}>
-                    • 3-32 characters long
+                    • {t('lightningAddressScreen.requirement1')}
                   </Text>
                   <Text style={[styles.requirementsText, { color: secondaryText }]}>
-                    • Letters, numbers, hyphens, underscores only
+                    • {t('lightningAddressScreen.requirement2')}
                   </Text>
                   <Text style={[styles.requirementsText, { color: secondaryText }]}>
-                    • Must start and end with a letter or number
+                    • {t('lightningAddressScreen.requirement3')}
                   </Text>
                 </View>
               </>

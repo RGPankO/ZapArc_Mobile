@@ -7,6 +7,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
 import * as Sharing from 'expo-sharing';
+import { useAppTheme } from '../../src/contexts/ThemeContext';
+import {
+  getGradientColors,
+  getPrimaryTextColor,
+  getSecondaryTextColor,
+} from '../../src/utils/theme-helpers';
 import { BreezSparkService } from '../../src/services/breezSparkService';
 import { useCurrency, type InputCurrency } from '../../src/hooks/useCurrency';
 import { useLightningAddress } from '../../src/hooks/useLightningAddress';
@@ -24,6 +30,11 @@ const currencyLabels: Record<InputCurrency, string> = {
 };
 
 export default function ReceiveScreen() {
+  const { themeMode } = useAppTheme();
+  const gradientColors = getGradientColors(themeMode);
+  const primaryTextColor = getPrimaryTextColor(themeMode);
+  const secondaryTextColor = getSecondaryTextColor(themeMode);
+
   const { secondaryFiatCurrency, convertToSats, formatSatsWithFiat, rates, isLoadingRates } = useCurrency();
   const { addressInfo, isRegistered, isLoading: isLoadingAddress, refresh: refreshAddress } = useLightningAddress();
 
@@ -231,13 +242,13 @@ export default function ReceiveScreen() {
 
   if (step === 'invoice') {
     return (
-      <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.gradient}>
+      <LinearGradient colors={gradientColors} style={styles.gradient}>
         <SafeAreaView style={styles.container}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => router.back()}>
               <Text style={styles.backButton}>← Back</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Deposit Funds</Text>
+            <Text style={[styles.headerTitle, { color: primaryTextColor }]}>Deposit Funds</Text>
             <View style={styles.headerSpacer} />
           </View>
 
@@ -253,22 +264,22 @@ export default function ReceiveScreen() {
               </View>
             </View>
 
-            <Text style={styles.amountText}>
+            <Text style={[styles.amountText, { color: primaryTextColor }]}>
               Amount: {invoiceSatsAmount.toLocaleString()} sats
               {formatSatsWithFiat(invoiceSatsAmount).fiatDisplay && (
-                <Text style={styles.amountFiatText}>
+                <Text style={[styles.amountFiatText, { color: secondaryTextColor }]}>
                   {' '}({formatSatsWithFiat(invoiceSatsAmount).fiatDisplay})
                 </Text>
               )}
             </Text>
 
             <View style={styles.invoiceContainer}>
-              <Text style={styles.invoiceLabel}>Lightning Invoice:</Text>
+              <Text style={[styles.invoiceLabel, { color: secondaryTextColor }]}>Lightning Invoice:</Text>
               <ScrollView
                 style={styles.invoiceScroll}
                 contentContainerStyle={styles.invoiceScrollContent}
               >
-                <Text style={styles.invoiceText} selectable>
+                <Text style={[styles.invoiceText, { color: primaryTextColor }]} selectable>
                   {invoice}
                 </Text>
               </ScrollView>
@@ -283,8 +294,8 @@ export default function ReceiveScreen() {
             </View>
 
             <View style={styles.statusContainer}>
-              <Text style={styles.waitingText}>⏳ Waiting for payment...</Text>
-              <Text style={styles.expiryText}>
+              <Text style={[styles.waitingText, { color: primaryTextColor }]}>⏳ Waiting for payment...</Text>
+              <Text style={[styles.expiryText, { color: secondaryTextColor }]}>
                 Expires in: {getRemainingTime()}
               </Text>
             </View>
@@ -305,13 +316,13 @@ export default function ReceiveScreen() {
   }
 
   return (
-    <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.gradient}>
+    <LinearGradient colors={gradientColors} style={styles.gradient}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
             <Text style={styles.backButton}>← Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Deposit Funds</Text>
+          <Text style={[styles.headerTitle, { color: primaryTextColor }]}>Deposit Funds</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -322,7 +333,7 @@ export default function ReceiveScreen() {
               style={[styles.modeButton, receiveMode === 'invoice' && styles.modeButtonActive]}
               onPress={() => setReceiveMode('invoice')}
             >
-              <Text style={[styles.modeButtonText, receiveMode === 'invoice' && styles.modeButtonTextActive]}>
+              <Text style={[styles.modeButtonText, { color: receiveMode === 'invoice' ? '#1a1a2e' : secondaryTextColor }]}>
                 ⚡ Invoice
               </Text>
             </TouchableOpacity>
@@ -330,7 +341,7 @@ export default function ReceiveScreen() {
               style={[styles.modeButton, receiveMode === 'address' && styles.modeButtonActive]}
               onPress={() => setReceiveMode('address')}
             >
-              <Text style={[styles.modeButtonText, receiveMode === 'address' && styles.modeButtonTextActive]}>
+              <Text style={[styles.modeButtonText, { color: receiveMode === 'address' ? '#1a1a2e' : secondaryTextColor }]}>
                 📧 Address
               </Text>
             </TouchableOpacity>
@@ -341,7 +352,7 @@ export default function ReceiveScreen() {
             <>
               {isLoadingAddress ? (
                 <View style={styles.addressLoadingContainer}>
-                  <Text style={styles.addressLoadingText}>Loading...</Text>
+                  <Text style={[styles.addressLoadingText, { color: secondaryTextColor }]}>Loading...</Text>
                 </View>
               ) : isRegistered && addressInfo ? (
                 /* Registered - Show Address Card */
@@ -382,7 +393,7 @@ export default function ReceiveScreen() {
                   </View>
 
                   <View style={styles.addressInfoBox}>
-                    <Text style={styles.addressInfoText}>
+                    <Text style={[styles.addressInfoText, { color: secondaryTextColor }]}>
                       Share this address with anyone to receive Lightning payments instantly.
                     </Text>
                   </View>
@@ -390,8 +401,8 @@ export default function ReceiveScreen() {
               ) : (
                 /* Not Registered - Show Prompt */
                 <View style={styles.claimPromptCard}>
-                  <Text style={styles.claimPromptTitle}>Lightning Address</Text>
-                  <Text style={styles.claimPromptText}>
+                  <Text style={[styles.claimPromptTitle, { color: primaryTextColor }]}>Lightning Address</Text>
+                  <Text style={[styles.claimPromptText, { color: secondaryTextColor }]}>
                     Get a Lightning Address to receive payments without generating invoices.
                   </Text>
                   <Button
@@ -411,7 +422,7 @@ export default function ReceiveScreen() {
           {/* Invoice Mode */}
           {receiveMode === 'invoice' && (
             <>
-              <Text style={styles.label}>Enter the amount you want to deposit:</Text>
+              <Text style={[styles.label, { color: primaryTextColor }]}>Enter the amount you want to deposit:</Text>
 
               {/* Amount Input with Currency Selector */}
           <View style={styles.amountInputRow}>
@@ -429,7 +440,7 @@ export default function ReceiveScreen() {
               onDismiss={() => setCurrencyMenuVisible(false)}
               anchor={
                 <TouchableOpacity
-                  style={styles.currencySelector}
+                  style={[styles.currencySelector, { backgroundColor: gradientColors[1] || '#16213e' }]}
                   onPress={() => setCurrencyMenuVisible(true)}
                 >
                   <Text style={styles.currencySelectorText}>
@@ -437,14 +448,14 @@ export default function ReceiveScreen() {
                   </Text>
                 </TouchableOpacity>
               }
-              contentStyle={styles.currencyMenu}
+              contentStyle={[styles.currencyMenu, { backgroundColor: gradientColors[0] || '#1a1a2e' }]}
             >
               {currencyOptions.map((currency) => (
                 <Menu.Item
                   key={currency}
                   onPress={() => handleCurrencyChange(currency)}
                   title={currencyLabels[currency]}
-                  titleStyle={inputCurrency === currency ? styles.currencyMenuItemActive : undefined}
+                  titleStyle={inputCurrency === currency ? styles.currencyMenuItemActive : { color: primaryTextColor }}
                 />
               ))}
             </Menu>
@@ -471,10 +482,10 @@ export default function ReceiveScreen() {
                 key={preset}
                 mode="outlined"
                 onPress={() => handlePresetAmount(preset)}
-                style={styles.presetButton}
+                style={[styles.presetButton, { borderColor: secondaryTextColor }]}
                 contentStyle={styles.presetButtonContent}
                 labelStyle={styles.presetButtonLabel}
-                textColor="#FFFFFF"
+                textColor={primaryTextColor}
               >
                 {formatPresetLabel(preset)}
               </Button>
@@ -487,14 +498,19 @@ export default function ReceiveScreen() {
             value={description}
             onChangeText={setDescription}
             style={[styles.input, styles.descriptionInput]}
-            outlineColor="rgba(255, 255, 255, 0.3)"
+            outlineColor={secondaryTextColor}
             activeOutlineColor="#FFC107"
-            textColor="#FFFFFF"
-            placeholderTextColor="rgba(255, 255, 255, 0.5)"
+            textColor={primaryTextColor}
+            placeholderTextColor={secondaryTextColor}
             outlineStyle={styles.inputOutline}
             contentStyle={styles.inputContent}
             multiline
             numberOfLines={2}
+            theme={{
+              colors: {
+                onSurfaceVariant: secondaryTextColor, // Label color
+              }
+            }}
           />
 
           <Button

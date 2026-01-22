@@ -4,10 +4,17 @@ import { Text, Button, TextInput, Menu, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import {
+  getGradientColors,
+  getPrimaryTextColor,
+  getSecondaryTextColor,
+} from '../../src/utils/theme-helpers';
+import { useAppTheme } from '../../src/contexts/ThemeContext';
 import { BarCodeScanner } from 'expo-barcode-scanner';
 import { useWallet } from '../../src/hooks/useWallet';
 import { BreezSparkService } from '../../src/services/breezSparkService';
 import { useCurrency, type InputCurrency } from '../../src/hooks/useCurrency';
+import { useLightningAddress } from '../../src/hooks/useLightningAddress';
 import { StyledTextInput } from '../../src/components';
 import { useContacts } from '../../src/features/addressBook/hooks/useContacts';
 import { ContactSelectionModal } from '../../src/features/addressBook/components/ContactSelectionModal';
@@ -32,9 +39,15 @@ const currencyLabels: Record<InputCurrency, string> = {
 };
 
 export default function SendScreen() {
+  const { themeMode } = useAppTheme();
+  const gradientColors = getGradientColors(themeMode);
+  const primaryTextColor = getPrimaryTextColor(themeMode);
+  const secondaryTextColor = getSecondaryTextColor(themeMode);
+
   const { balance, refreshBalance } = useWallet();
   const { secondaryFiatCurrency, convertToSats, formatSatsWithFiat, rates, isLoadingRates } = useCurrency();
   const { contacts } = useContacts();
+  const { addressInfo } = useLightningAddress();
 
   const [step, setStep] = useState<SendStep>('input');
   const [paymentInput, setPaymentInput] = useState('');
@@ -321,13 +334,13 @@ export default function SendScreen() {
   // Render QR Scanner
   if (step === 'scanning') {
     return (
-      <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.gradient}>
+      <LinearGradient colors={gradientColors} style={styles.gradient}>
         <SafeAreaView style={styles.container}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => setStep('input')}>
               <Text style={styles.backButton}>← Back</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Scan QR Code</Text>
+            <Text style={[styles.headerTitle, { color: primaryTextColor }]}>Scan QR Code</Text>
             <View style={styles.headerSpacer} />
           </View>
 
@@ -368,43 +381,43 @@ export default function SendScreen() {
   // Render Payment Preview
   if (step === 'preview' && preview) {
     return (
-      <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.gradient}>
+      <LinearGradient colors={gradientColors} style={styles.gradient}>
         <SafeAreaView style={styles.container}>
           <View style={styles.header}>
             <TouchableOpacity onPress={handleBackToInput}>
               <Text style={styles.backButton}>← Back</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Withdraw Funds</Text>
+            <Text style={[styles.headerTitle, { color: primaryTextColor }]}>Withdraw Funds</Text>
             <View style={styles.headerSpacer} />
           </View>
 
           <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-            <Text style={styles.sectionTitle}>Payment Preview</Text>
+            <Text style={[styles.sectionTitle, { color: primaryTextColor }]}>Payment Preview</Text>
 
             <View style={styles.previewContainer}>
               <View style={styles.previewRow}>
-                <Text style={styles.previewLabel}>Recipient:</Text>
-                <Text style={styles.previewValue} numberOfLines={1} ellipsizeMode="middle">
+                <Text style={[styles.previewLabel, { color: secondaryTextColor }]}>Recipient:</Text>
+                <Text style={[styles.previewValue, { color: primaryTextColor }]} numberOfLines={1} ellipsizeMode="middle">
                   {preview.recipient}
                 </Text>
               </View>
 
               <View style={styles.previewRow}>
-                <Text style={styles.previewLabel}>Amount:</Text>
-                <Text style={styles.previewAmount}>
+                <Text style={[styles.previewLabel, { color: secondaryTextColor }]}>Amount:</Text>
+                <Text style={[styles.previewAmount, { color: primaryTextColor }]}>
                   {preview.amount.toLocaleString()} sats
                 </Text>
               </View>
 
               <View style={styles.previewRow}>
-                <Text style={styles.previewLabel}>Fee:</Text>
-                <Text style={styles.previewFee}>
+                <Text style={[styles.previewLabel, { color: secondaryTextColor }]}>Fee:</Text>
+                <Text style={[styles.previewFee, { color: secondaryTextColor }]}>
                   {preview.fee.toLocaleString()} sats
                 </Text>
               </View>
 
               <View style={[styles.previewRow, styles.previewTotal]}>
-                <Text style={styles.previewTotalLabel}>Total:</Text>
+                <Text style={[styles.previewTotalLabel, { color: primaryTextColor }]}>Total:</Text>
                 <Text style={styles.previewTotalAmount}>
                   {preview.total.toLocaleString()} sats
                 </Text>
@@ -412,8 +425,8 @@ export default function SendScreen() {
 
               {preview.description && (
                 <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Description:</Text>
-                  <Text style={styles.previewValue}>{preview.description}</Text>
+                  <Text style={[styles.previewLabel, { color: secondaryTextColor }]}>Description:</Text>
+                  <Text style={[styles.previewValue, { color: primaryTextColor }]}>{preview.description}</Text>
                 </View>
               )}
             </View>
@@ -423,8 +436,8 @@ export default function SendScreen() {
                 mode="outlined"
                 onPress={handleBackToInput}
                 disabled={isSending}
-                style={styles.cancelButton}
-                textColor="rgba(255, 255, 255, 0.6)"
+                style={[styles.cancelButton, { borderColor: secondaryTextColor }]}
+                textColor={secondaryTextColor}
               >
                 Preview Payment
               </Button>
@@ -449,36 +462,36 @@ export default function SendScreen() {
 
   // Render Input Form
   return (
-    <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.gradient}>
+    <LinearGradient colors={gradientColors} style={styles.gradient}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
             <Text style={styles.backButton}>← Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Withdraw Funds</Text>
+          <Text style={[styles.headerTitle, { color: primaryTextColor }]}>Withdraw Funds</Text>
           <View style={styles.headerSpacer} />
         </View>
 
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           <View style={styles.balanceContainer}>
-            <Text style={styles.balanceLabel}>Available Balance:</Text>
+            <Text style={[styles.balanceLabel, { color: secondaryTextColor }]}>Available Balance:</Text>
             <Text style={styles.balanceAmount}>{balance.toLocaleString()} sats</Text>
             {balanceDisplay.fiatDisplay && (
-              <Text style={styles.balanceFiat}>{balanceDisplay.fiatDisplay}</Text>
+              <Text style={[styles.balanceFiat, { color: secondaryTextColor }]}>{balanceDisplay.fiatDisplay}</Text>
             )}
           </View>
 
-          <Text style={styles.label}>Lightning Invoice or Address:</Text>
+          <Text style={[styles.label, { color: primaryTextColor }]}>Lightning Invoice or Address:</Text>
 
           {/* Selected contact indicator */}
           {selectedContact && (
             <View style={styles.selectedContactContainer}>
-              <Text style={styles.selectedContactLabel}>Sending to:</Text>
+              <Text style={[styles.selectedContactLabel, { color: secondaryTextColor }]}>Sending to:</Text>
               <View style={styles.selectedContactRow}>
-                <Text style={styles.selectedContactName}>{selectedContact.name}</Text>
+                <Text style={[styles.selectedContactName, { color: primaryTextColor }]}>{selectedContact.name}</Text>
                 <IconButton
                   icon="close"
-                  iconColor="rgba(255, 255, 255, 0.7)"
+                  iconColor={secondaryTextColor}
                   size={18}
                   onPress={handleClearContact}
                   style={styles.clearContactButton}
@@ -499,12 +512,17 @@ export default function SendScreen() {
                 }
               }}
               style={[styles.input, styles.inputWithButton]}
-              outlineColor="rgba(255, 255, 255, 0.3)"
+              outlineColor={secondaryTextColor}
               activeOutlineColor="#FFC107"
-              textColor="#FFFFFF"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              textColor={primaryTextColor}
+              placeholderTextColor={secondaryTextColor}
               multiline
               numberOfLines={3}
+            theme={{
+              colors: {
+                background: undefined, // Let it use default/parent theme
+              }
+            }}
             />
             {contacts.length > 0 && (
               <IconButton
@@ -533,9 +551,10 @@ export default function SendScreen() {
             onDismiss={() => setContactModalVisible(false)}
             onSelect={handleContactSelect}
             contacts={contacts}
+            myAddress={addressInfo?.lightningAddress}
           />
 
-          <Text style={styles.label}>Amount (leave empty for invoice amount):</Text>
+          <Text style={[styles.label, { color: primaryTextColor }]}>Amount (leave empty for invoice amount):</Text>
 
           {/* Amount Input with Currency Selector */}
           <View style={styles.amountInputRow}>
@@ -553,7 +572,7 @@ export default function SendScreen() {
               onDismiss={() => setCurrencyMenuVisible(false)}
               anchor={
                 <TouchableOpacity
-                  style={styles.currencySelector}
+                  style={[styles.currencySelector, { backgroundColor: gradientColors[1] || '#16213e' }]}
                   onPress={() => setCurrencyMenuVisible(true)}
                 >
                   <Text style={styles.currencySelectorText}>
@@ -561,14 +580,14 @@ export default function SendScreen() {
                   </Text>
                 </TouchableOpacity>
               }
-              contentStyle={styles.currencyMenu}
+              contentStyle={[styles.currencyMenu, { backgroundColor: gradientColors[0] || '#1a1a2e' }]}
             >
               {currencyOptions.map((currency) => (
                 <Menu.Item
                   key={currency}
                   onPress={() => handleCurrencyChange(currency)}
                   title={currencyLabels[currency]}
-                  titleStyle={inputCurrency === currency ? styles.currencyMenuItemActive : undefined}
+                  titleStyle={inputCurrency === currency ? styles.currencyMenuItemActive : { color: primaryTextColor }}
                 />
               ))}
             </Menu>
@@ -588,7 +607,7 @@ export default function SendScreen() {
             </View>
           )}
 
-          <Text style={styles.label}>Comment (optional):</Text>
+          <Text style={[styles.label, { color: primaryTextColor }]}>Comment (optional):</Text>
 
           <TextInput
             mode="outlined"
@@ -596,10 +615,15 @@ export default function SendScreen() {
             value={comment}
             onChangeText={setComment}
             style={styles.input}
-            outlineColor="rgba(255, 255, 255, 0.3)"
+            outlineColor={secondaryTextColor}
             activeOutlineColor="#FFC107"
-            textColor="#FFFFFF"
-            placeholderTextColor="rgba(255, 255, 255, 0.5)"
+            textColor={primaryTextColor}
+            placeholderTextColor={secondaryTextColor}
+            theme={{
+              colors: {
+                background: 'transparent',
+              }
+            }}
           />
 
           <Button

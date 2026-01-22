@@ -41,7 +41,7 @@ export function StyledTextInput({
   const defaultOutlineColor = themeMode === 'dark' 
     ? 'rgba(255, 255, 255, 0.3)' 
     : 'rgba(0, 0, 0, 0.3)';
-  const defaultActiveOutlineColor = '#FFC107'; // Brand gold
+  const defaultActiveOutlineColor = themeMode === 'dark' ? '#FFC107' : '#F57F17'; // Brand gold (darker for light mode)
   const defaultTextColor = primaryText;
   const defaultPlaceholderColor = secondaryText;
 

@@ -29,6 +29,7 @@ import {
   getSecondaryTextColor,
 } from '../../../utils/theme-helpers';
 import { validateLightningAddressResolves } from '../../../utils';
+import { t } from '../../../services/i18nService';
 import { VALIDATION_LIMITS } from '../types';
 import { useContacts } from '../hooks/useContacts';
 import {
@@ -152,7 +153,7 @@ export function AddContactScreen(): React.JSX.Element {
               onPress={() => router.back()}
             />
             <Text style={[styles.headerTitle, { color: primaryTextColor }]}>
-              Add Contact
+              {t('addressBook.addContact')}
             </Text>
             <Button
               mode="text"
@@ -161,7 +162,7 @@ export function AddContactScreen(): React.JSX.Element {
               disabled={saving}
               textColor="#FFC107"
             >
-              {verifying ? 'Verifying...' : 'Save'}
+              {verifying ? t('addressBook.verifying') : t('addressBook.save')}
             </Button>
           </View>
 
@@ -173,7 +174,7 @@ export function AddContactScreen(): React.JSX.Element {
             {/* Name Input */}
             <View style={styles.inputContainer}>
               <StyledTextInput
-                label="Name"
+                label={t('addressBook.name')}
                 value={name}
                 onChangeText={setName}
                 error={!!nameError}
@@ -187,7 +188,7 @@ export function AddContactScreen(): React.JSX.Element {
             {/* Lightning Address Input */}
             <View style={styles.inputContainer}>
               <StyledTextInput
-                label="Lightning Address"
+                label={t('addressBook.lightningAddress')}
                 value={lightningAddress}
                 onChangeText={setLightningAddress}
                 error={!!addressError}
@@ -204,7 +205,7 @@ export function AddContactScreen(): React.JSX.Element {
             {/* Notes Input */}
             <View style={styles.inputContainer}>
               <StyledTextInput
-                label="Notes (optional)"
+                label={t('addressBook.notesOptional')}
                 value={notes}
                 onChangeText={setNotes}
                 error={!!notesError}
@@ -228,7 +229,7 @@ export function AddContactScreen(): React.JSX.Element {
           onDismiss={() => setSnackbarVisible(false)}
           duration={3000}
           action={{
-            label: 'OK',
+            label: t('common.ok'),
             onPress: () => setSnackbarVisible(false),
           }}
         >

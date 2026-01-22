@@ -13,6 +13,8 @@ interface ContactListItemProps {
   onPress: (contact: Contact) => void;
   primaryTextColor: string;
   secondaryTextColor: string;
+  /** Whether this contact is the current user's own address */
+  isSelf?: boolean;
 }
 
 export function ContactListItem({
@@ -20,6 +22,7 @@ export function ContactListItem({
   onPress,
   primaryTextColor,
   secondaryTextColor,
+  isSelf = false,
 }: ContactListItemProps): React.JSX.Element {
   const initials = contact.name
     .split(' ')
@@ -30,14 +33,25 @@ export function ContactListItem({
 
   return (
     <List.Item
-      title={contact.name}
+      title={() => (
+        <View style={styles.titleContainer}>
+          <Text style={[styles.title, { color: primaryTextColor }]}>
+            {contact.name}
+          </Text>
+          {isSelf && (
+            <View style={styles.selfBadge}>
+              <Text style={styles.selfBadgeText}>self</Text>
+            </View>
+          )}
+        </View>
+      )}
       description={contact.lightningAddress}
       left={() => (
         <View style={styles.avatarContainer}>
           <Avatar.Text
             size={40}
             label={initials}
-            style={styles.avatar}
+            style={[styles.avatar, isSelf && styles.avatarSelf]}
             labelStyle={styles.avatarLabel}
           />
         </View>
@@ -46,7 +60,6 @@ export function ContactListItem({
         <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
       )}
       onPress={() => onPress(contact)}
-      titleStyle={[styles.title, { color: primaryTextColor }]}
       descriptionStyle={[styles.description, { color: secondaryTextColor }]}
       style={styles.listItem}
     />
@@ -65,9 +78,17 @@ const styles = StyleSheet.create({
   avatar: {
     backgroundColor: '#FFC107',
   },
+  avatarSelf: {
+    backgroundColor: '#4CAF50',
+  },
   avatarLabel: {
     color: '#000000',
     fontWeight: 'bold',
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   title: {
     fontSize: 16,
@@ -75,5 +96,19 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 13,
+  },
+  selfBadge: {
+    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  selfBadgeText: {
+    color: '#4CAF50',
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
 });

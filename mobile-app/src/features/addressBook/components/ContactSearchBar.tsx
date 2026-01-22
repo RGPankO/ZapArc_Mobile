@@ -7,6 +7,8 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { Searchbar } from 'react-native-paper';
 
+import { t } from '../../../services/i18nService';
+
 interface ContactSearchBarProps {
   value: string;
   onChangeText: (text: string) => void;
@@ -16,11 +18,13 @@ interface ContactSearchBarProps {
 export function ContactSearchBar({
   value,
   onChangeText,
-  placeholder = 'Search contacts...',
+  placeholder,
 }: ContactSearchBarProps): React.JSX.Element {
+  const defaultPlaceholder = t('addressBook.searchContacts');
+
   return (
     <Searchbar
-      placeholder={placeholder}
+      placeholder={placeholder || defaultPlaceholder}
       onChangeText={onChangeText}
       value={value}
       style={styles.searchBar}
