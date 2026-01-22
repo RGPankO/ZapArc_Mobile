@@ -42,6 +42,13 @@ export interface TransactionInfo {
   paymentRequest?: string;
 }
 
+export interface LightningAddressInfo {
+  lightningAddress: string;  // Full address: username@domain
+  username: string;          // Username part only
+  description: string;       // Description/display name
+  lnurl: string;            // LNURL representation
+}
+
 // =============================================================================
 // Native Module Detection
 // =============================================================================
@@ -776,6 +783,126 @@ export async function payLightningAddress(
   return await payInvoice(address, amountSat);
 }
 
+// =============================================================================
+// Lightning Address Registration (LNURL)
+// =============================================================================
+
+/**
+ * Check if a Lightning Address username is available
+ * @param username - Desired username (without @domain)
+ * @returns true if available, false if taken
+ */
+export async function checkLightningAddressAvailable(
+  username: string
+): Promise<boolean> {
+  if (!_isNativeAvailable || !sdkInstance) {
+    console.warn('⚠️ [BreezSparkService] checkLightningAddressAvailable: SDK not available');
+    return false;
+  }
+
+  try {
+    const request = { username };
+    const available = await sdkInstance.checkLightningAddressAvailable(request);
+    console.log(`✅ [BreezSparkService] Username "${username}" available:`, available);
+    return available;
+  } catch (error) {
+    console.error('❌ [BreezSparkService] checkLightningAddressAvailable failed:', error);
+    throw new Error(
+      error instanceof Error ? error.message : 'Failed to check username availability'
+    );
+  }
+}
+
+/**
+ * Register a Lightning Address
+ * @param username - Desired username (without @domain)
+ * @param description - Optional description for the address
+ * @returns Registered address information
+ */
+export async function registerLightningAddress(
+  username: string,
+  description?: string
+): Promise<LightningAddressInfo> {
+  if (!_isNativeAvailable || !sdkInstance) {
+    throw new Error('SDK not available. Please ensure the wallet is initialized.');
+  }
+
+  try {
+    const request = {
+      username,
+      description: description || '',
+    };
+    const result = await sdkInstance.registerLightningAddress(request);
+
+    const addressInfo: LightningAddressInfo = {
+      lightningAddress: result.lightningAddress || `${username}@breez.tips`,
+      username: result.username || username,
+      description: result.description || description || '',
+      lnurl: result.lnurl || '',
+    };
+
+    console.log('✅ [BreezSparkService] Lightning Address registered:', addressInfo.lightningAddress);
+    return addressInfo;
+  } catch (error) {
+    console.error('❌ [BreezSparkService] registerLightningAddress failed:', error);
+    throw new Error(
+      error instanceof Error ? error.message : 'Failed to register Lightning Address'
+    );
+  }
+}
+
+/**
+ * Get currently registered Lightning Address
+ * @returns Address info or null if not registered
+ */
+export async function getLightningAddress(): Promise<LightningAddressInfo | null> {
+  if (!_isNativeAvailable || !sdkInstance) {
+    console.warn('⚠️ [BreezSparkService] getLightningAddress: SDK not available');
+    return null;
+  }
+
+  try {
+    const result = await sdkInstance.getLightningAddress();
+
+    if (!result || !result.lightningAddress) {
+      console.log('ℹ️ [BreezSparkService] No Lightning Address registered');
+      return null;
+    }
+
+    const addressInfo: LightningAddressInfo = {
+      lightningAddress: result.lightningAddress,
+      username: result.username || result.lightningAddress.split('@')[0],
+      description: result.description || '',
+      lnurl: result.lnurl || '',
+    };
+
+    console.log('✅ [BreezSparkService] Got Lightning Address:', addressInfo.lightningAddress);
+    return addressInfo;
+  } catch (error) {
+    console.error('❌ [BreezSparkService] getLightningAddress failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Unregister/delete the current Lightning Address
+ */
+export async function unregisterLightningAddress(): Promise<void> {
+  if (!_isNativeAvailable || !sdkInstance) {
+    throw new Error('SDK not available. Please ensure the wallet is initialized.');
+  }
+
+  try {
+    await sdkInstance.deleteLightningAddress();
+    console.log('✅ [BreezSparkService] Lightning Address unregistered');
+  } catch (error) {
+    console.error('❌ [BreezSparkService] unregisterLightningAddress failed:', error);
+    throw new Error(
+      error instanceof Error ? error.message : 'Failed to unregister Lightning Address'
+    );
+  }
+}
+
 /**
  * Parse and validate a payment request
  */
@@ -978,6 +1105,11 @@ export const BreezSparkService = {
   payLightningAddress,
   parsePaymentRequest,
   addPaymentListener,
+  // Lightning Address Registration
+  checkLightningAddressAvailable,
+  registerLightningAddress,
+  getLightningAddress,
+  unregisterLightningAddress,
 };
 
 export default BreezSparkService;

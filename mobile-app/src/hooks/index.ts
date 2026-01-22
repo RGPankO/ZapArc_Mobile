@@ -15,6 +15,9 @@ export * from './useLanguage';
 // Settings
 export * from './useSettings';
 
+// Lightning Address
+export * from './useLightningAddress';
+
 // Theme
 export * from './useTheme';
 

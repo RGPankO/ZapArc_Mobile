@@ -34,11 +34,25 @@ export {
   payLightningAddress,
   parsePaymentRequest,
   addPaymentListener,
+  // Lightning Address Registration
+  checkLightningAddressAvailable,
+  registerLightningAddress,
+  getLightningAddress,
+  unregisterLightningAddress,
   type WalletBalance,
   type PaymentResult,
   type ReceivePaymentResult,
   type TransactionInfo,
+  type LightningAddressInfo,
 } from './breezSparkService';
+
+// Lightning Address service (validation, caching, sync)
+export {
+  LightningAddressService,
+  validateUsername,
+  type UsernameValidationResult,
+  type LightningAddressServiceResult,
+} from './lightningAddressService';
 
 // Location service (country detection)
 export {

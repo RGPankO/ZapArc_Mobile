@@ -2,16 +2,18 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { Text, Button, TextInput, Menu } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
 import * as Sharing from 'expo-sharing';
 import { BreezSparkService } from '../../src/services/breezSparkService';
 import { useCurrency, type InputCurrency } from '../../src/hooks/useCurrency';
+import { useLightningAddress } from '../../src/hooks/useLightningAddress';
 import { StyledTextInput } from '../../src/components';
 
 type ReceiveStep = 'input' | 'invoice';
+type ReceiveMode = 'invoice' | 'address';
 
 // Currency labels for display
 const currencyLabels: Record<InputCurrency, string> = {
@@ -23,15 +25,24 @@ const currencyLabels: Record<InputCurrency, string> = {
 
 export default function ReceiveScreen() {
   const { secondaryFiatCurrency, convertToSats, formatSatsWithFiat, rates, isLoadingRates } = useCurrency();
-  
+  const { addressInfo, isRegistered, isLoading: isLoadingAddress, refresh: refreshAddress } = useLightningAddress();
+
+  // Refresh Lightning Address state when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      refreshAddress();
+    }, [refreshAddress])
+  );
+
   const [step, setStep] = useState<ReceiveStep>('input');
+  const [receiveMode, setReceiveMode] = useState<ReceiveMode>('invoice');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [invoice, setInvoice] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [expiryTime, setExpiryTime] = useState<number | null>(null);
   const [invoiceSatsAmount, setInvoiceSatsAmount] = useState(0);
-  
+
   // Currency selection state
   const [inputCurrency, setInputCurrency] = useState<InputCurrency>('sats');
   const [currencyMenuVisible, setCurrencyMenuVisible] = useState(false);
@@ -176,6 +187,18 @@ export default function ReceiveScreen() {
     setAmount(''); // Reset amount when switching currencies
   }, []);
 
+  // Copy Lightning Address to clipboard
+  const handleCopyAddress = useCallback(async () => {
+    if (!addressInfo?.lightningAddress) return;
+    try {
+      await Clipboard.setStringAsync(addressInfo.lightningAddress);
+      // Android's built-in clipboard notification will show feedback
+    } catch (error) {
+      console.error('Failed to copy address:', error);
+      Alert.alert('Error', 'Failed to copy address');
+    }
+  }, [addressInfo]);
+
   // Calculate remaining time
   const getRemainingTime = useCallback(() => {
     if (!expiryTime) return '';
@@ -293,9 +316,104 @@ export default function ReceiveScreen() {
         </View>
 
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.label}>Enter the amount you want to deposit:</Text>
+          {/* Mode Toggle */}
+          <View style={styles.modeToggle}>
+            <TouchableOpacity
+              style={[styles.modeButton, receiveMode === 'invoice' && styles.modeButtonActive]}
+              onPress={() => setReceiveMode('invoice')}
+            >
+              <Text style={[styles.modeButtonText, receiveMode === 'invoice' && styles.modeButtonTextActive]}>
+                ⚡ Invoice
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeButton, receiveMode === 'address' && styles.modeButtonActive]}
+              onPress={() => setReceiveMode('address')}
+            >
+              <Text style={[styles.modeButtonText, receiveMode === 'address' && styles.modeButtonTextActive]}>
+                📧 Address
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-          {/* Amount Input with Currency Selector */}
+          {/* Lightning Address Mode */}
+          {receiveMode === 'address' && (
+            <>
+              {isLoadingAddress ? (
+                <View style={styles.addressLoadingContainer}>
+                  <Text style={styles.addressLoadingText}>Loading...</Text>
+                </View>
+              ) : isRegistered && addressInfo ? (
+                /* Registered - Show Address Card */
+                <View style={styles.addressCard}>
+                  <View style={styles.addressQrContainer}>
+                    <View style={styles.qrCodeWrapper}>
+                      <QRCode
+                        value={addressInfo.lightningAddress}
+                        size={200}
+                        backgroundColor="white"
+                        color="black"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.addressDisplay}>
+                    <Text style={styles.addressText}>{addressInfo.lightningAddress}</Text>
+                  </View>
+
+                  <View style={styles.addressActions}>
+                    <Button
+                      mode="contained"
+                      onPress={handleCopyAddress}
+                      style={styles.addressCopyButton}
+                      labelStyle={styles.addressCopyButtonLabel}
+                      icon="content-copy"
+                    >
+                      Copy
+                    </Button>
+                    <Button
+                      mode="outlined"
+                      onPress={() => router.push('/wallet/settings/lightning-address')}
+                      style={styles.addressManageButton}
+                      textColor="#FFC107"
+                    >
+                      Manage
+                    </Button>
+                  </View>
+
+                  <View style={styles.addressInfoBox}>
+                    <Text style={styles.addressInfoText}>
+                      Share this address with anyone to receive Lightning payments instantly.
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                /* Not Registered - Show Prompt */
+                <View style={styles.claimPromptCard}>
+                  <Text style={styles.claimPromptTitle}>Lightning Address</Text>
+                  <Text style={styles.claimPromptText}>
+                    Get a Lightning Address to receive payments without generating invoices.
+                  </Text>
+                  <Button
+                    mode="outlined"
+                    onPress={() => router.push('/wallet/settings/lightning-address')}
+                    style={styles.claimButton}
+                    textColor="#FFC107"
+                    icon="at"
+                  >
+                    Claim Address
+                  </Button>
+                </View>
+              )}
+            </>
+          )}
+
+          {/* Invoice Mode */}
+          {receiveMode === 'invoice' && (
+            <>
+              <Text style={styles.label}>Enter the amount you want to deposit:</Text>
+
+              {/* Amount Input with Currency Selector */}
           <View style={styles.amountInputRow}>
             <StyledTextInput
               label={`Amount in ${currencyLabels[inputCurrency]}`}
@@ -390,6 +508,8 @@ export default function ReceiveScreen() {
           >
             {isLoadingRates && inputCurrency !== 'sats' ? 'Loading rates...' : 'Generate Invoice'}
           </Button>
+            </>
+          )}
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
@@ -589,5 +709,116 @@ const styles = StyleSheet.create({
   amountFiatText: {
     fontWeight: 'normal',
     color: 'rgba(255, 255, 255, 0.7)',
+  },
+  // Mode toggle styles
+  modeToggle: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 20,
+  },
+  modeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modeButtonActive: {
+    backgroundColor: '#FFC107',
+  },
+  modeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  modeButtonTextActive: {
+    color: '#1a1a2e',
+  },
+  // Lightning Address styles
+  addressLoadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  addressLoadingText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 16,
+  },
+  addressCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    padding: 20,
+  },
+  addressQrContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  addressDisplay: {
+    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  addressText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFC107',
+    fontFamily: 'monospace',
+  },
+  addressActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  addressCopyButton: {
+    flex: 1,
+    backgroundColor: '#FFC107',
+    borderRadius: 8,
+  },
+  addressCopyButtonLabel: {
+    color: '#1a1a2e',
+    fontWeight: '600',
+  },
+  addressManageButton: {
+    flex: 1,
+    borderColor: '#FFC107',
+    borderRadius: 8,
+  },
+  addressInfoBox: {
+    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+  },
+  addressInfoText: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  // Claim prompt styles
+  claimPromptCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  claimPromptTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  claimPromptText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  claimButton: {
+    borderColor: '#FFC107',
+    borderRadius: 8,
   },
 });
