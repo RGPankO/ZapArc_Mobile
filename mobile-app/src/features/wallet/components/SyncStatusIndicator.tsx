@@ -5,6 +5,7 @@ import React, { useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text, IconButton, ActivityIndicator } from 'react-native-paper';
 import { useOfflineSync } from '../../../hooks/useOfflineSync';
+import { BRAND_COLOR } from '../../../utils/theme-helpers';
 
 // =============================================================================
 // Types
@@ -77,7 +78,7 @@ export function SyncStatusIndicator({
     return (
       <View style={[styles.container, styles.syncingContainer]}>
         <View style={styles.statusRow}>
-          <ActivityIndicator size="small" color="#FFC107" />
+          <ActivityIndicator size="small" color={BRAND_COLOR} />
           <Text style={styles.syncingText}>Syncing...</Text>
         </View>
       </View>
@@ -185,11 +186,11 @@ export function SyncButton({ size = 'medium', showLabel = false }: SyncButtonPro
       disabled={isSyncing || !isOnline}
     >
       {isSyncing ? (
-        <ActivityIndicator size={size === 'small' ? 'small' : 'small'} color="#FFC107" />
+        <ActivityIndicator size={size === 'small' ? 'small' : 'small'} color={BRAND_COLOR} />
       ) : (
         <IconButton
           icon="sync"
-          iconColor={isOnline ? '#FFC107' : 'rgba(255, 255, 255, 0.3)'}
+          iconColor={isOnline ? BRAND_COLOR : 'rgba(255, 255, 255, 0.3)'}
           size={iconSize}
         />
       )}
@@ -262,7 +263,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   syncingText: {
-    color: '#FFC107',
+    color: BRAND_COLOR,
     fontSize: 13,
     fontWeight: '500',
   },
@@ -314,7 +315,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   syncButtonLabel: {
-    color: '#FFC107',
+    color: BRAND_COLOR,
     fontSize: 14,
     marginLeft: 4,
   },

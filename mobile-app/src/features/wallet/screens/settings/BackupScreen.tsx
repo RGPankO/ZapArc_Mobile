@@ -19,7 +19,7 @@ import { useWallet } from '../../../../hooks/useWallet';
 import { storageService } from '../../../../services';
 import { useAppTheme } from '../../../../contexts/ThemeContext';
 import { useLanguage } from '../../../../hooks/useLanguage';
-import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../../utils/theme-helpers';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_COLOR } from '../../../../utils/theme-helpers';
 
 // =============================================================================
 // Component
@@ -209,7 +209,7 @@ export function BackupScreen(): React.JSX.Element {
                     >
                       <IconButton
                         icon="content-copy"
-                        iconColor="#FFC107"
+                        iconColor={BRAND_COLOR}
                         size={20}
                       />
                       <Text style={[styles.mnemonicActionText, { color: secondaryText }]}>Copy</Text>
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
   warningTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#FFC107',
+    color: BRAND_COLOR,
     marginBottom: 8,
   },
   warningText: {
@@ -410,7 +410,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   revealButton: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
   },
   revealButtonLabel: {
     color: '#1a1a2e',
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
   wordNumber: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#FFC107',
+    color: BRAND_COLOR,
     marginRight: 8,
     width: 20,
   },
@@ -504,12 +504,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#FFC107',
+    borderLeftColor: BRAND_COLOR,
   },
   infoTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFC107',
+    color: BRAND_COLOR,
     marginBottom: 12,
   },
   infoRow: {

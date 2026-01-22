@@ -8,6 +8,7 @@ import {
   getGradientColors,
   getPrimaryTextColor,
   getSecondaryTextColor,
+  BRAND_COLOR,
 } from '../../src/utils/theme-helpers';
 import { useAppTheme } from '../../src/contexts/ThemeContext';
 import { BarCodeScanner } from 'expo-barcode-scanner';
@@ -448,7 +449,7 @@ export default function SendScreen() {
                 loading={isSending}
                 disabled={isSending}
                 style={styles.sendButton}
-                buttonColor="#FFC107"
+                buttonColor={BRAND_COLOR}
                 textColor="#1a1a2e"
               >
                 Send Payment
@@ -513,7 +514,7 @@ export default function SendScreen() {
               }}
               style={[styles.input, styles.inputWithButton]}
               outlineColor={secondaryTextColor}
-              activeOutlineColor="#FFC107"
+              activeOutlineColor={BRAND_COLOR}
               textColor={primaryTextColor}
               placeholderTextColor={secondaryTextColor}
               multiline
@@ -527,7 +528,7 @@ export default function SendScreen() {
             {contacts.length > 0 && (
               <IconButton
                 icon="contacts"
-                iconColor="#FFC107"
+                iconColor={BRAND_COLOR}
                 size={24}
                 onPress={() => setContactModalVisible(true)}
                 style={styles.addressBookButton}
@@ -540,7 +541,7 @@ export default function SendScreen() {
             onPress={handleScanQR}
             icon="qrcode-scan"
             style={styles.scanButton}
-            textColor="#FFC107"
+            textColor={BRAND_COLOR}
           >
             Scan QR Code
           </Button>
@@ -616,12 +617,12 @@ export default function SendScreen() {
             onChangeText={setComment}
             style={styles.input}
             outlineColor={secondaryTextColor}
-            activeOutlineColor="#FFC107"
+            activeOutlineColor={BRAND_COLOR}
             textColor={primaryTextColor}
             placeholderTextColor={secondaryTextColor}
             theme={{
               colors: {
-                background: 'transparent',
+                background: undefined,
               }
             }}
           />
@@ -632,7 +633,7 @@ export default function SendScreen() {
             loading={isPreparing}
             disabled={isPreparing || !paymentInput.trim() || (inputCurrency !== 'sats' && isLoadingRates && amount !== '')}
             style={styles.previewButton}
-            buttonColor="#FFC107"
+            buttonColor={BRAND_COLOR}
             textColor="#1a1a2e"
           >
             Preview Payment
@@ -661,7 +662,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     fontSize: 16,
-    color: '#FFC107',
+    color: BRAND_COLOR,
     fontWeight: '600',
   },
   headerTitle: {
@@ -693,7 +694,7 @@ const styles = StyleSheet.create({
   balanceAmount: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#FFC107',
+    color: BRAND_COLOR,
   },
   label: {
     fontSize: 14,
@@ -706,7 +707,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   scanButton: {
-    borderColor: '#FFC107',
+    borderColor: BRAND_COLOR,
     marginBottom: 16,
   },
   previewButton: {
@@ -765,7 +766,7 @@ const styles = StyleSheet.create({
   previewTotalAmount: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#FFC107',
+    color: BRAND_COLOR,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -808,7 +809,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 40,
     height: 40,
-    borderColor: '#FFC107',
+    borderColor: BRAND_COLOR,
     borderWidth: 3,
   },
   cornerTopLeft: {
@@ -880,7 +881,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#FFC107',
+    borderColor: BRAND_COLOR,
     minWidth: 75,
     height: 56,
     alignItems: 'center',
@@ -888,7 +889,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   currencySelectorText: {
-    color: '#FFC107',
+    color: BRAND_COLOR,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -896,7 +897,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a2e',
   },
   currencyMenuItemActive: {
-    color: '#FFC107',
+    color: BRAND_COLOR,
     fontWeight: 'bold',
   },
   conversionPreview: {
@@ -912,7 +913,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   conversionText: {
-    color: '#FFC107',
+    color: BRAND_COLOR,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -940,7 +941,7 @@ const styles = StyleSheet.create({
   selectedContactName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFC107',
+    color: BRAND_COLOR,
   },
   clearContactButton: {
     margin: 0,

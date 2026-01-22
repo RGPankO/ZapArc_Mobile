@@ -7,6 +7,8 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { List, Text, Avatar } from 'react-native-paper';
 import { Contact } from '../types';
+import { BRAND_COLOR } from '../../../utils/theme-helpers';
+import { t } from '../../../services/i18nService';
 
 interface ContactListItemProps {
   contact: Contact;
@@ -40,7 +42,7 @@ export function ContactListItem({
           </Text>
           {isSelf && (
             <View style={styles.selfBadge}>
-              <Text style={styles.selfBadgeText}>self</Text>
+              <Text style={styles.selfBadgeText}>{t('addressBook.self')}</Text>
             </View>
           )}
         </View>
@@ -76,7 +78,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatar: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
   },
   avatarSelf: {
     backgroundColor: '#4CAF50',

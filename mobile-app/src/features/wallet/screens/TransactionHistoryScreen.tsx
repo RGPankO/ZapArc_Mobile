@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '../../../contexts/ThemeContext';
-import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor } from '../../../utils/theme-helpers';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor, BRAND_COLOR } from '../../../utils/theme-helpers';
 import { useWallet } from '../../../hooks/useWallet';
 import { useLanguage } from '../../../hooks/useLanguage';
 import { useCurrency } from '../../../hooks/useCurrency';
@@ -343,7 +343,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
-                tintColor="#FFC107"
+                tintColor={BRAND_COLOR}
               />
             }
           />
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   filterChipActive: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
   },
   filterChipText: {
     color: 'rgba(255, 255, 255, 0.7)',

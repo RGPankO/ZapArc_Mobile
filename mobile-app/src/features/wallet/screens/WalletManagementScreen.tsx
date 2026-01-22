@@ -25,7 +25,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '../../../contexts/ThemeContext';
-import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor } from '../../../utils/theme-helpers';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor, BRAND_COLOR } from '../../../utils/theme-helpers';
 import { useWallet } from '../../../hooks/useWallet';
 import { useWalletAuth } from '../../../hooks/useWalletAuth';
 import { storageService } from '../../../services';
@@ -537,11 +537,11 @@ export function WalletManagementScreen(): React.JSX.Element {
               disabled={!canAddSub || isSyncing}
             >
               {isSyncing ? (
-                <ActivityIndicator size="small" color="#FFC107" style={{ marginHorizontal: 12 }} />
+                <ActivityIndicator size="small" color={BRAND_COLOR} style={{ marginHorizontal: 12 }} />
               ) : (
                 <IconButton
                   icon="plus"
-                  iconColor={canAddSub ? '#FFC107' : 'rgba(255, 255, 255, 0.3)'}
+                  iconColor={canAddSub ? BRAND_COLOR : 'rgba(255, 255, 255, 0.3)'}
                   size={20}
                 />
               )}
@@ -717,7 +717,7 @@ export function WalletManagementScreen(): React.JSX.Element {
               onPress={handleRename}
               disabled={!newName.trim() || processing}
               loading={processing}
-              labelStyle={[styles.saveButtonLabel, { color: '#FFC107' }]}
+              labelStyle={[styles.saveButtonLabel, { color: BRAND_COLOR }]}
             >
               Save
             </Button>
@@ -935,7 +935,7 @@ export function WalletManagementScreen(): React.JSX.Element {
                     >
                       <IconButton
                         icon="content-copy"
-                        iconColor="#FFC107"
+                        iconColor={BRAND_COLOR}
                         size={20}
                       />
                       <Text style={[styles.mnemonicActionText, { color: secondaryTextColor }]}>Copy</Text>
@@ -999,7 +999,7 @@ export function WalletManagementScreen(): React.JSX.Element {
           <Text style={[styles.headerTitle, { color: primaryTextColor }]}>Manage Wallets</Text>
           <IconButton
             icon="plus"
-            iconColor="#FFC107"
+            iconColor={BRAND_COLOR}
             size={24}
             onPress={() => router.push('/wallet/welcome')}
           />
@@ -1016,7 +1016,7 @@ export function WalletManagementScreen(): React.JSX.Element {
         {/* Loading Overlay */}
         {processing && (
           <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color="#FFC107" />
+            <ActivityIndicator size="large" color={BRAND_COLOR} />
           </View>
         )}
 
@@ -1080,14 +1080,14 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255, 193, 7, 0.2)',
+    backgroundColor: 'rgba(247, 147, 26, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   masterKeyIconActive: {
     borderWidth: 2,
-    borderColor: '#FFC107',
+    borderColor: BRAND_COLOR,
   },
   masterKeyIconText: {
     fontSize: 20,
@@ -1178,7 +1178,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   restoreButtonLabel: {
-    color: '#FFC107',
+    color: BRAND_COLOR,
     fontSize: 12,
   },
   archivedSection: {
@@ -1202,7 +1202,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   addSubWalletText: {
-    color: '#FFC107',
+    color: BRAND_COLOR,
     fontSize: 14,
     fontWeight: '500',
   },
@@ -1259,7 +1259,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   primaryButtonLabel: {
-    color: '#FFC107',
+    color: BRAND_COLOR,
   },
   saveButtonLabel: {
     fontWeight: 'bold',
@@ -1291,7 +1291,7 @@ const styles = StyleSheet.create({
   },
   revealWarningText: {
     fontSize: 12,
-    color: '#FFC107',
+    color: BRAND_COLOR,
     textAlign: 'center',
     lineHeight: 18,
   },
@@ -1316,7 +1316,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   revealButton: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
   },
   revealButtonLabel: {
     color: '#1a1a2e',
@@ -1337,7 +1337,7 @@ const styles = StyleSheet.create({
   wordItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 193, 7, 0.2)',
+    backgroundColor: 'rgba(247, 147, 26, 0.2)',
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -1346,7 +1346,7 @@ const styles = StyleSheet.create({
   wordNumber: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: '#FFC107',
+    color: BRAND_COLOR,
     marginRight: 6,
     width: 16,
   },

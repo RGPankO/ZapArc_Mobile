@@ -7,6 +7,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text, Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { BRAND_COLOR } from '../../../utils/theme-helpers';
 
 interface EmptyAddressBookProps {
   onAddContact: () => void;
@@ -41,7 +42,7 @@ export function EmptyAddressBook({
           mode="contained"
           onPress={onAddContact}
           style={styles.button}
-          buttonColor="#FFC107"
+          buttonColor={BRAND_COLOR}
           textColor="#000000"
           icon="plus"
         >

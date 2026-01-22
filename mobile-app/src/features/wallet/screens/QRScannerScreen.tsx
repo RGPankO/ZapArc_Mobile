@@ -14,6 +14,7 @@ import { Text, IconButton, Button, ActivityIndicator } from 'react-native-paper'
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
+import { BRAND_COLOR } from '../../../utils/theme-helpers';
 
 
 // =============================================================================
@@ -172,7 +173,7 @@ export function QRScannerScreen(): React.JSX.Element {
   if (!permission) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#FFC107" />
+        <ActivityIndicator size="large" color={BRAND_COLOR} />
       </View>
     );
   }
@@ -264,7 +265,7 @@ export function QRScannerScreen(): React.JSX.Element {
             {/* Processing Indicator */}
             {isProcessing && (
               <View style={styles.processingOverlay}>
-                <ActivityIndicator size="large" color="#FFC107" />
+                <ActivityIndicator size="large" color={BRAND_COLOR} />
                 <Text style={styles.processingText}>Processing...</Text>
               </View>
             )}
@@ -345,7 +346,7 @@ export function QRScannerScreen(): React.JSX.Element {
             style={styles.switchModeButton}
             onPress={() => setScanMode('camera')}
           >
-            <IconButton icon="camera" iconColor="#FFC107" size={20} />
+            <IconButton icon="camera" iconColor={BRAND_COLOR} size={20} />
             <Text style={styles.switchModeText}>Use Camera Instead</Text>
           </TouchableOpacity>
         )}
@@ -397,7 +398,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   permissionButton: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
     borderRadius: 12,
     paddingHorizontal: 32,
   },
@@ -462,7 +463,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 40,
     height: 40,
-    borderColor: '#FFC107',
+    borderColor: BRAND_COLOR,
     borderWidth: 3,
   },
   cornerTopLeft: {
@@ -493,7 +494,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 40,
     height: 2,
-    backgroundColor: 'rgba(255, 193, 7, 0.8)',
+    backgroundColor: 'rgba(247, 147, 26, 0.8)',
     top: '50%',
     left: '50%',
     marginLeft: -20,
@@ -503,7 +504,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 2,
     height: 40,
-    backgroundColor: 'rgba(255, 193, 7, 0.8)',
+    backgroundColor: 'rgba(247, 147, 26, 0.8)',
     top: '50%',
     left: '50%',
     marginLeft: -1,
@@ -558,7 +559,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   submitButton: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
     borderRadius: 12,
   },
   submitButtonLabel: {
@@ -591,7 +592,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   rescanButtonText: {
-    color: '#FFC107',
+    color: BRAND_COLOR,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -602,7 +603,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   switchModeText: {
-    color: '#FFC107',
+    color: BRAND_COLOR,
     fontSize: 16,
   },
 });

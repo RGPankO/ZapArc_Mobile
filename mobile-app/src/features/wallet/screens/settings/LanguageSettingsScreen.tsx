@@ -10,7 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../../../hooks/useSettings';
 import { useLanguage } from '../../../../hooks/useLanguage';
 import { useAppTheme } from '../../../../contexts/ThemeContext';
-import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../../utils/theme-helpers';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_COLOR } from '../../../../utils/theme-helpers';
 
 // =============================================================================
 // Component
@@ -107,7 +107,7 @@ export function LanguageSettingsScreen(): React.JSX.Element {
                 <View style={styles.radioItem}>
                   <RadioButton.Android
                     value="auto"
-                    color="#FFC107"
+                    color={BRAND_COLOR}
                     uncheckedColor={secondaryText}
                   />
                   <View style={styles.radioContent}>
@@ -123,7 +123,7 @@ export function LanguageSettingsScreen(): React.JSX.Element {
                 <View style={styles.radioItem}>
                   <RadioButton.Android
                     value="en"
-                    color="#FFC107"
+                    color={BRAND_COLOR}
                     uncheckedColor={secondaryText}
                   />
                   <View style={styles.radioContent}>
@@ -137,7 +137,7 @@ export function LanguageSettingsScreen(): React.JSX.Element {
                 <View style={styles.radioItem}>
                   <RadioButton.Android
                     value="bg"
-                    color="#FFC107"
+                    color={BRAND_COLOR}
                     uncheckedColor={secondaryText}
                   />
                   <View style={styles.radioContent}>
@@ -276,12 +276,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#FFC107',
+    borderLeftColor: BRAND_COLOR,
   },
   infoTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFC107',
+    color: BRAND_COLOR,
     marginBottom: 8,
   },
   infoText: {
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   saveButton: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
     borderRadius: 12,
   },
   saveButtonLabel: {

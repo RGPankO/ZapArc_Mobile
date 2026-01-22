@@ -10,7 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useWallet } from '../../../hooks/useWallet';
 import { useCurrency } from '../../../hooks/useCurrency';
 import { useAppTheme } from '../../../contexts/ThemeContext';
-import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../utils/theme-helpers';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_COLOR } from '../../../utils/theme-helpers';
 
 // =============================================================================
 // Types
@@ -135,7 +135,7 @@ export function PaymentConfirmationScreen(): React.JSX.Element {
       >
         <SafeAreaView style={styles.container}>
           <View style={styles.centerContent}>
-            <ActivityIndicator size="large" color="#FFC107" />
+            <ActivityIndicator size="large" color={BRAND_COLOR} />
             <Text style={[styles.processingText, { color: primaryText }]}>Processing Payment...</Text>
             <Text style={[styles.processingSubtext, { color: secondaryText }]}>
               Please wait while your payment is being sent
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
     padding: 32,
   },
   amountCard: {
-    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    backgroundColor: 'rgba(247, 147, 26, 0.1)',
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
   amountValue: {
     fontSize: 48,
     fontWeight: 'bold',
-    color: '#FFC107',
+    color: BRAND_COLOR,
   },
   amountSecondary: {
     fontSize: 14,
@@ -438,7 +438,7 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#FFC107',
+    color: BRAND_COLOR,
   },
   divider: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -480,11 +480,11 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     flex: 1,
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
     borderRadius: 12,
   },
   confirmButtonDisabled: {
-    backgroundColor: 'rgba(255, 193, 7, 0.3)',
+    backgroundColor: 'rgba(247, 147, 26, 0.3)',
   },
   confirmButtonLabel: {
     color: '#1a1a2e',
@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
   successAmount: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#FFC107',
+    color: BRAND_COLOR,
     marginBottom: 4,
   },
   successAmountSecondary: {
@@ -541,7 +541,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   doneButton: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
     borderRadius: 12,
     paddingHorizontal: 32,
   },
@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   retryButton: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
     borderRadius: 12,
   },
   retryButtonLabel: {

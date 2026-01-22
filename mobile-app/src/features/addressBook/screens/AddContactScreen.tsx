@@ -27,6 +27,7 @@ import {
   getGradientColors,
   getPrimaryTextColor,
   getSecondaryTextColor,
+  BRAND_COLOR,
 } from '../../../utils/theme-helpers';
 import { validateLightningAddressResolves } from '../../../utils';
 import { t } from '../../../services/i18nService';
@@ -160,7 +161,7 @@ export function AddContactScreen(): React.JSX.Element {
               onPress={handleSave}
               loading={saving}
               disabled={saving}
-              textColor="#FFC107"
+              textColor={BRAND_COLOR}
             >
               {verifying ? t('addressBook.verifying') : t('addressBook.save')}
             </Button>

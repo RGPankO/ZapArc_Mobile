@@ -6,13 +6,13 @@ import React from 'react';
 import { StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { TextInput, TextInputProps } from 'react-native-paper';
 import { useAppTheme } from '../contexts/ThemeContext';
-import { getInputBackgroundColor, getPrimaryTextColor, getSecondaryTextColor } from '../utils/theme-helpers';
+import { getInputBackgroundColor, getPrimaryTextColor, getSecondaryTextColor, BRAND_COLOR } from '../utils/theme-helpers';
 
 // =============================================================================
 // Types
 // =============================================================================
 
-export interface StyledTextInputProps extends Omit<TextInputProps, 'theme'> {
+export interface StyledTextInputProps extends TextInputProps {
   // Allow passing additional style
   style?: StyleProp<ViewStyle>;
 }
@@ -41,7 +41,7 @@ export function StyledTextInput({
   const defaultOutlineColor = themeMode === 'dark' 
     ? 'rgba(255, 255, 255, 0.3)' 
     : 'rgba(0, 0, 0, 0.3)';
-  const defaultActiveOutlineColor = themeMode === 'dark' ? '#FFC107' : '#F57F17'; // Brand gold (darker for light mode)
+  const defaultActiveOutlineColor = BRAND_COLOR; // Brand gold
   const defaultTextColor = primaryText;
   const defaultPlaceholderColor = secondaryText;
 

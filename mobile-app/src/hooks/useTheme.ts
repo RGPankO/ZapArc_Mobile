@@ -6,6 +6,7 @@ import { MD3LightTheme, MD3DarkTheme } from 'react-native-paper';
 import type { MD3Theme } from 'react-native-paper';
 import { settingsService } from '../services';
 import type { ThemeMode } from '../features/settings/types';
+import { BRAND_COLOR } from '../utils/theme-helpers';
 
 // =============================================================================
 // Theme Definitions
@@ -16,7 +17,7 @@ const createLightTheme = (): MD3Theme => ({
   ...MD3LightTheme,
   colors: {
     ...MD3LightTheme.colors,
-    primary: '#FFC107', // Gold accent
+    primary: BRAND_COLOR, // Gold accent
     // Use transparent for outlined input label backgrounds
     // The actual screen background is handled by LinearGradient
     background: 'transparent',
@@ -31,7 +32,7 @@ const createDarkTheme = (): MD3Theme => ({
   ...MD3DarkTheme,
   colors: {
     ...MD3DarkTheme.colors,
-    primary: '#FFC107', // Gold accent
+    primary: BRAND_COLOR, // Gold accent
     // Use transparent for outlined input label backgrounds
     // The actual screen background is handled by LinearGradient
     background: 'transparent',

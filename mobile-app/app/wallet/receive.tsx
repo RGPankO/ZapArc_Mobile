@@ -12,6 +12,8 @@ import {
   getGradientColors,
   getPrimaryTextColor,
   getSecondaryTextColor,
+  getInputBackgroundColor,
+  BRAND_COLOR,
 } from '../../src/utils/theme-helpers';
 import { BreezSparkService } from '../../src/services/breezSparkService';
 import { useCurrency, type InputCurrency } from '../../src/hooks/useCurrency';
@@ -34,6 +36,7 @@ export default function ReceiveScreen() {
   const gradientColors = getGradientColors(themeMode);
   const primaryTextColor = getPrimaryTextColor(themeMode);
   const secondaryTextColor = getSecondaryTextColor(themeMode);
+  const inputBackgroundColor = getInputBackgroundColor(themeMode);
 
   const { secondaryFiatCurrency, convertToSats, formatSatsWithFiat, rates, isLoadingRates } = useCurrency();
   const { addressInfo, isRegistered, isLoading: isLoadingAddress, refresh: refreshAddress } = useLightningAddress();
@@ -287,7 +290,7 @@ export default function ReceiveScreen() {
                 mode="outlined"
                 onPress={handleCopyInvoice}
                 style={styles.copyButton}
-                textColor="#FFC107"
+                textColor={BRAND_COLOR}
               >
                 Copy
               </Button>
@@ -304,7 +307,7 @@ export default function ReceiveScreen() {
               mode="contained"
               onPress={handleNewInvoice}
               style={styles.newInvoiceButton}
-              buttonColor="#FFC107"
+              buttonColor={BRAND_COLOR}
               textColor="#1a1a2e"
             >
               New Invoice
@@ -386,7 +389,7 @@ export default function ReceiveScreen() {
                       mode="outlined"
                       onPress={() => router.push('/wallet/settings/lightning-address')}
                       style={styles.addressManageButton}
-                      textColor="#FFC107"
+                      textColor={BRAND_COLOR}
                     >
                       Manage
                     </Button>
@@ -409,7 +412,7 @@ export default function ReceiveScreen() {
                     mode="outlined"
                     onPress={() => router.push('/wallet/settings/lightning-address')}
                     style={styles.claimButton}
-                    textColor="#FFC107"
+                    textColor={BRAND_COLOR}
                     icon="at"
                   >
                     Claim Address
@@ -492,14 +495,13 @@ export default function ReceiveScreen() {
             ))}
           </View>
 
-          <TextInput
-            mode="outlined"
+          <StyledTextInput
             label="Description (optional)"
             value={description}
             onChangeText={setDescription}
-            style={[styles.input, styles.descriptionInput]}
+            style={[styles.input, styles.descriptionInput, { backgroundColor: inputBackgroundColor }]}
             outlineColor={secondaryTextColor}
-            activeOutlineColor="#FFC107"
+            activeOutlineColor={BRAND_COLOR}
             textColor={primaryTextColor}
             placeholderTextColor={secondaryTextColor}
             outlineStyle={styles.inputOutline}
@@ -508,6 +510,7 @@ export default function ReceiveScreen() {
             numberOfLines={2}
             theme={{
               colors: {
+                background: inputBackgroundColor,
                 onSurfaceVariant: secondaryTextColor, // Label color
               }
             }}
@@ -519,7 +522,7 @@ export default function ReceiveScreen() {
             loading={isGenerating}
             disabled={isGenerating || !amount || (inputCurrency !== 'sats' && isLoadingRates)}
             style={styles.generateButton}
-            buttonColor="#FFC107"
+            buttonColor={BRAND_COLOR}
             textColor="#1a1a2e"
           >
             {isLoadingRates && inputCurrency !== 'sats' ? 'Loading rates...' : 'Generate Invoice'}
@@ -550,7 +553,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     fontSize: 16,
-    color: '#FFC107',
+    color: BRAND_COLOR,
     fontWeight: '600',
   },
   headerTitle: {
@@ -647,7 +650,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   copyButton: {
-    borderColor: '#FFC107',
+    borderColor: BRAND_COLOR,
   },
   statusContainer: {
     alignItems: 'center',
@@ -682,7 +685,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#FFC107',
+    borderColor: BRAND_COLOR,
     minWidth: 75,
     height: 56,
     alignItems: 'center',
@@ -690,7 +693,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   currencySelectorText: {
-    color: '#FFC107',
+    color: BRAND_COLOR,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -698,7 +701,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a2e',
   },
   currencyMenuItemActive: {
-    color: '#FFC107',
+    color: BRAND_COLOR,
     fontWeight: 'bold',
   },
   conversionPreview: {
@@ -714,7 +717,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   conversionText: {
-    color: '#FFC107',
+    color: BRAND_COLOR,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -742,7 +745,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modeButtonActive: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
   },
   modeButtonText: {
     fontSize: 14,
@@ -780,7 +783,7 @@ const styles = StyleSheet.create({
   addressText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFC107',
+    color: BRAND_COLOR,
     fontFamily: 'monospace',
   },
   addressActions: {
@@ -790,7 +793,7 @@ const styles = StyleSheet.create({
   },
   addressCopyButton: {
     flex: 1,
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
     borderRadius: 8,
   },
   addressCopyButtonLabel: {
@@ -799,7 +802,7 @@ const styles = StyleSheet.create({
   },
   addressManageButton: {
     flex: 1,
-    borderColor: '#FFC107',
+    borderColor: BRAND_COLOR,
     borderRadius: 8,
   },
   addressInfoBox: {
@@ -834,7 +837,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   claimButton: {
-    borderColor: '#FFC107',
+    borderColor: BRAND_COLOR,
     borderRadius: 8,
   },
 });

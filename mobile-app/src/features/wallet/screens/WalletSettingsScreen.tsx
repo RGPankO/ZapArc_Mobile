@@ -10,7 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../../hooks/useSettings';
 import { useLanguage } from '../../../hooks/useLanguage';
 import { useAppTheme } from '../../../contexts/ThemeContext';
-import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../utils/theme-helpers';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_COLOR } from '../../../utils/theme-helpers';
 
 // =============================================================================
 // Component
@@ -103,7 +103,7 @@ export function WalletSettingsScreen(): React.JSX.Element {
               title={t('settings.language')}
               description={getLanguageDisplay()}
               left={(props) => (
-                <List.Icon {...props} icon="translate" color="#FFC107" />
+                <List.Icon {...props} icon="translate" color={BRAND_COLOR} />
               )}
               right={(props) => (
                 <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
@@ -120,7 +120,7 @@ export function WalletSettingsScreen(): React.JSX.Element {
               title={t('settings.theme')}
               description={t('settings.darkModeSettings')}
               left={(props) => (
-                <List.Icon {...props} icon="theme-light-dark" color="#FFC107" />
+                <List.Icon {...props} icon="theme-light-dark" color={BRAND_COLOR} />
               )}
               right={(props) => (
                 <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
@@ -137,7 +137,7 @@ export function WalletSettingsScreen(): React.JSX.Element {
               title={t('settings.notifications')}
               description={t('settings.manageNotifications')}
               left={(props) => (
-                <List.Icon {...props} icon="bell" color="#FFC107" />
+                <List.Icon {...props} icon="bell" color={BRAND_COLOR} />
               )}
               right={(props) => (
                 <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
@@ -161,7 +161,7 @@ export function WalletSettingsScreen(): React.JSX.Element {
                   : t('settings.customLnurl')
               }
               left={(props) => (
-                <List.Icon {...props} icon="wallet" color="#FFC107" />
+                <List.Icon {...props} icon="wallet" color={BRAND_COLOR} />
               )}
               right={(props) => (
                 <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
@@ -178,7 +178,7 @@ export function WalletSettingsScreen(): React.JSX.Element {
               title="Lightning Address"
               description="Receive payments with a simple address"
               left={(props) => (
-                <List.Icon {...props} icon="at" color="#FFC107" />
+                <List.Icon {...props} icon="at" color={BRAND_COLOR} />
               )}
               right={(props) => (
                 <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
@@ -195,7 +195,7 @@ export function WalletSettingsScreen(): React.JSX.Element {
               title="Address Book"
               description="Manage saved Lightning Addresses"
               left={(props) => (
-                <List.Icon {...props} icon="contacts" color="#FFC107" />
+                <List.Icon {...props} icon="contacts" color={BRAND_COLOR} />
               )}
               right={(props) => (
                 <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
@@ -212,7 +212,7 @@ export function WalletSettingsScreen(): React.JSX.Element {
               title={t('settings.defaultTipAmounts')}
               description={`${settings?.defaultPostingAmounts?.join(', ') || '100, 500, 1000'} ${t('wallet.sats')}`}
               left={(props) => (
-                <List.Icon {...props} icon="currency-btc" color="#FFC107" />
+                <List.Icon {...props} icon="currency-btc" color={BRAND_COLOR} />
               )}
               right={(props) => (
                 <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
@@ -229,7 +229,7 @@ export function WalletSettingsScreen(): React.JSX.Element {
               title={t('settings.displayCurrency')}
               description={getCurrencyDisplay()}
               left={(props) => (
-                <List.Icon {...props} icon="cash" color="#FFC107" />
+                <List.Icon {...props} icon="cash" color={BRAND_COLOR} />
               )}
               right={(props) => (
                 <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
@@ -245,7 +245,7 @@ export function WalletSettingsScreen(): React.JSX.Element {
               title={t('wallet.archivedWallets')}
               description={t('wallet.viewArchivedWallets')}
               left={(props) => (
-                <List.Icon {...props} icon="archive" color="#FFC107" />
+                <List.Icon {...props} icon="archive" color={BRAND_COLOR} />
               )}
               right={(props) => (
                 <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
@@ -267,7 +267,7 @@ export function WalletSettingsScreen(): React.JSX.Element {
                 settings?.biometricEnabled ? t('common.enabled') : t('common.disabled')
               }
               left={(props) => (
-                <List.Icon {...props} icon="fingerprint" color="#FFC107" />
+                <List.Icon {...props} icon="fingerprint" color={BRAND_COLOR} />
               )}
               right={(props) => (
                 <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
@@ -288,7 +288,7 @@ export function WalletSettingsScreen(): React.JSX.Element {
               title={t('settings.version')}
               description="1.0.0"
               left={(props) => (
-                <List.Icon {...props} icon="information" color="#FFC107" />
+                <List.Icon {...props} icon="information" color={BRAND_COLOR} />
               )}
               titleStyle={[styles.listTitle, { color: primaryTextColor }]}
               descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}

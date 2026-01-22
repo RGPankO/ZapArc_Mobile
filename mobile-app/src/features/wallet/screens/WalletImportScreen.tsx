@@ -21,7 +21,7 @@ import {
 } from '../../../utils/mnemonic';
 import { useWallet } from '../../../hooks/useWallet';
 import { useAppTheme } from '../../../contexts/ThemeContext';
-import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../utils/theme-helpers';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_COLOR } from '../../../utils/theme-helpers';
 
 // =============================================================================
 // Types
@@ -328,7 +328,7 @@ export function WalletImportScreen(): React.JSX.Element {
           <View style={styles.progressContainer}>
             <ProgressBar
               progress={progress}
-              color="#FFC107"
+              color={BRAND_COLOR}
               style={styles.progressBar}
             />
             <Text style={styles.progressText}>
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     borderRadius: 12,
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
     marginTop: 16,
   },
   buttonContent: {

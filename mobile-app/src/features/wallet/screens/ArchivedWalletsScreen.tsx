@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '../../../contexts/ThemeContext';
-import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../utils/theme-helpers';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_COLOR } from '../../../utils/theme-helpers';
 import { useWallet } from '../../../hooks/useWallet';
 import type { SubWalletEntry } from '../types';
 
@@ -111,7 +111,7 @@ export function ArchivedWalletsScreen(): React.JSX.Element {
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           {isLoading ? (
             <View style={styles.centerContent}>
-              <ActivityIndicator size="large" color="#FFC107" />
+              <ActivityIndicator size="large" color={BRAND_COLOR} />
             </View>
           ) : archivedWallets.length === 0 ? (
             <View style={styles.centerContent}>
@@ -139,7 +139,7 @@ export function ArchivedWalletsScreen(): React.JSX.Element {
 
       {(processing) && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#FFC107" />
+          <ActivityIndicator size="large" color={BRAND_COLOR} />
         </View>
       )}
     </LinearGradient>
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   restoreButton: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
     borderRadius: 8,
   },
   restoreButtonLabel: {

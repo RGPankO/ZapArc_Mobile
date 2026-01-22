@@ -288,7 +288,7 @@ const translations: Record<SupportedLanguage, TranslationSet> = {
       addressNotFound: 'Lightning Address not found',
       domainNotFound: 'Domain not found - check the address',
       verificationFailed: 'Address verification failed',
-      self: 'self',
+      self: 'Me',
       sendingTo: 'Sending to:',
     },
 
@@ -591,7 +591,7 @@ const translations: Record<SupportedLanguage, TranslationSet> = {
       addressNotFound: 'Lightning адресът не е намерен',
       domainNotFound: 'Домейнът не е намерен - проверете адреса',
       verificationFailed: 'Проверката на адреса е неуспешна',
-      self: 'аз',
+      self: 'Аз',
       sendingTo: 'Изпращане до:',
     },
 

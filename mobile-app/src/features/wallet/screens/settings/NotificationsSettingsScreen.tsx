@@ -13,6 +13,7 @@ import { useSettings } from '../../../../hooks/useSettings';
 import { useAppTheme } from '../../../../contexts/ThemeContext';
 import { useLanguage } from '../../../../hooks/useLanguage';
 import { NotificationTriggerService } from '../../../../services/notificationTriggerService';
+import { BRAND_COLOR } from '../../../../utils/theme-helpers';
 
 // =============================================================================
 // Types
@@ -252,7 +253,7 @@ export function NotificationsSettingsScreen(): React.JSX.Element {
                 mode="contained"
                 onPress={requestPermissions}
                 style={styles.enableButton}
-                buttonColor="#FFC107"
+                buttonColor={BRAND_COLOR}
                 textColor="#1a1a2e"
               >
                 {t('settings.enableNotifications')}
@@ -270,7 +271,7 @@ export function NotificationsSettingsScreen(): React.JSX.Element {
               title={t('settings.pushNotifications')}
               description={t('settings.pushNotificationsDescription')}
               left={(props) => (
-                <List.Icon {...props} icon="bell" color="#FFC107" />
+                <List.Icon {...props} icon="bell" color={BRAND_COLOR} />
               )}
               right={() => (
                 <Switch
@@ -321,7 +322,7 @@ export function NotificationsSettingsScreen(): React.JSX.Element {
                 title={t('settings.sendTestNotification')}
                 description={t('settings.sendTestNotificationDescription')}
                 left={(props) => (
-                  <List.Icon {...props} icon="bell-ring" color="#FFC107" />
+                  <List.Icon {...props} icon="bell-ring" color={BRAND_COLOR} />
                 )}
                 right={(props) => (
                   <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
@@ -397,7 +398,7 @@ const styles = StyleSheet.create({
   permissionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#FFC107',
+    color: BRAND_COLOR,
     marginBottom: 8,
   },
   permissionText: {

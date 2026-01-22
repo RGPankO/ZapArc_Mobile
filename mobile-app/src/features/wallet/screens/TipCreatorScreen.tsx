@@ -23,7 +23,7 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../../hooks/useSettings';
 import { useAppTheme } from '../../../contexts/ThemeContext';
-import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../utils/theme-helpers';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_COLOR } from '../../../utils/theme-helpers';
 
 // =============================================================================
 // Types
@@ -489,8 +489,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   checkboxChecked: {
-    backgroundColor: '#FFC107',
-    borderColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
+    borderColor: BRAND_COLOR,
   },
   checkmark: {
     color: '#1a1a2e',
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
   amountValueText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFC107',
+    color: BRAND_COLOR,
   },
   customAmountModal: {
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
@@ -575,7 +575,7 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     flex: 1,
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
   },
   confirmButtonLabel: {
     color: '#1a1a2e',
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
   previewCode: {
     fontFamily: 'monospace',
     fontSize: 12,
-    color: '#FFC107',
+    color: BRAND_COLOR,
     textAlign: 'center',
   },
   actionButtons: {
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   primaryButton: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
     borderRadius: 12,
     marginBottom: 12,
   },

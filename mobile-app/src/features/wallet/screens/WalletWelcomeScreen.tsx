@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
   },
   createButton: {
     borderRadius: 12,
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
   },
   buttonContent: {
     paddingVertical: 8,

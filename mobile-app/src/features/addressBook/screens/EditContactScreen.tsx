@@ -30,6 +30,7 @@ import {
   getGradientColors,
   getPrimaryTextColor,
   getSecondaryTextColor,
+  BRAND_COLOR,
 } from '../../../utils/theme-helpers';
 import { Contact, VALIDATION_LIMITS } from '../types';
 import { useContacts } from '../hooks/useContacts';
@@ -191,7 +192,7 @@ export function EditContactScreen(): React.JSX.Element {
             <View style={styles.headerSpacer} />
           </View>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FFC107" />
+            <ActivityIndicator size="large" color={BRAND_COLOR} />
           </View>
         </SafeAreaView>
       </LinearGradient>
@@ -255,7 +256,7 @@ export function EditContactScreen(): React.JSX.Element {
               onPress={handleSave}
               loading={saving}
               disabled={saving || deleting}
-              textColor="#FFC107"
+              textColor={BRAND_COLOR}
             >
               Save
             </Button>

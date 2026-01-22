@@ -21,7 +21,7 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../../../hooks/useSettings';
 import { useAppTheme } from '../../../../contexts/ThemeContext';
-import { getGradientColors, getPrimaryTextColor } from '../../../../utils/theme-helpers';
+import { getGradientColors, getPrimaryTextColor, BRAND_COLOR } from '../../../../utils/theme-helpers';
 
 // =============================================================================
 // Types
@@ -464,12 +464,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#FFC107',
+    borderLeftColor: BRAND_COLOR,
   },
   infoTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFC107',
+    color: BRAND_COLOR,
     marginBottom: 8,
   },
   infoText: {
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   saveButton: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
     borderRadius: 12,
   },
   saveButtonLabel: {

@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '../../../contexts/ThemeContext';
-import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor } from '../../../utils/theme-helpers';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor, BRAND_COLOR } from '../../../utils/theme-helpers';
 import { useWallet } from '../../../hooks/useWallet';
 import { useWalletAuth } from '../../../hooks/useWalletAuth';
 import type { MasterKeyEntry, SubWalletEntry } from '../types';
@@ -183,7 +183,7 @@ export function WalletSelectionScreen(): React.JSX.Element {
               >
                 <IconButton
                   icon="plus"
-                  iconColor="#FFC107"
+                  iconColor={BRAND_COLOR}
                   size={20}
                 />
                 <Text style={styles.addSubWalletText}>Add Sub-Wallet</Text>
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
   masterKeyHeaderActive: {
     backgroundColor: 'rgba(255, 193, 7, 0.1)',
     borderLeftWidth: 3,
-    borderLeftColor: '#FFC107',
+    borderLeftColor: BRAND_COLOR,
   },
   masterKeyInfo: {
     flexDirection: 'row',
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   addSubWalletText: {
-    color: '#FFC107',
+    color: BRAND_COLOR,
     fontSize: 14,
     fontWeight: '500',
   },
@@ -406,6 +406,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   createWalletButton: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
   },
 });

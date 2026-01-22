@@ -22,7 +22,7 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../../../hooks/useSettings';
 import { useAppTheme } from '../../../../contexts/ThemeContext';
-import { getGradientColors, getPrimaryTextColor } from '../../../../utils/theme-helpers';
+import { getGradientColors, getPrimaryTextColor, BRAND_COLOR } from '../../../../utils/theme-helpers';
 
 // =============================================================================
 // Types
@@ -184,7 +184,7 @@ export function DomainManagementScreen(): React.JSX.Element {
                 <Switch
                   value={autoTrustVerified}
                   onValueChange={setAutoTrustVerified}
-                  color="#FFC107"
+                  color={BRAND_COLOR}
                 />
               </View>
             </View>
@@ -208,7 +208,7 @@ export function DomainManagementScreen(): React.JSX.Element {
                 />
                 <IconButton
                   icon="plus-circle"
-                  iconColor="#FFC107"
+                  iconColor={BRAND_COLOR}
                   size={28}
                   onPress={handleAddDomain}
                 />
@@ -381,16 +381,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   infoBox: {
-    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    backgroundColor: 'rgba(247, 147, 26, 0.1)',
     borderRadius: 12,
     padding: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#FFC107',
+    borderLeftColor: BRAND_COLOR,
   },
   infoTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFC107',
+    color: BRAND_COLOR,
     marginBottom: 8,
   },
   infoText: {
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   saveButton: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
     borderRadius: 12,
   },
   saveButtonLabel: {

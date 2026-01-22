@@ -15,6 +15,7 @@ import {
   getGradientColors,
   getPrimaryTextColor,
   getSecondaryTextColor,
+  BRAND_COLOR,
 } from '../../../utils/theme-helpers';
 import { Contact } from '../types';
 import { useContacts } from '../hooks/useContacts';
@@ -122,7 +123,7 @@ export function AddressBookScreen(): React.JSX.Element {
         {/* Loading State */}
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FFC107" />
+            <ActivityIndicator size="large" color={BRAND_COLOR} />
           </View>
         ) : (
           <FlatList
@@ -140,7 +141,7 @@ export function AddressBookScreen(): React.JSX.Element {
               <RefreshControl
                 refreshing={isSearching}
                 onRefresh={refreshContacts}
-                tintColor="#FFC107"
+                tintColor={BRAND_COLOR}
               />
             }
           />
@@ -200,6 +201,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 16,
     bottom: 16,
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
   },
 });

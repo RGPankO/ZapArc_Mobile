@@ -398,8 +398,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   pinDotFilled: {
-    backgroundColor: '#FFC107',
-    borderColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
+    borderColor: BRAND_COLOR,
   },
   pinDotError: {
     borderColor: '#F44336',

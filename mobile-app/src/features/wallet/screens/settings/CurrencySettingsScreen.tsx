@@ -10,7 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../../../hooks/useSettings';
 import { useLanguage } from '../../../../hooks/useLanguage';
 import { useAppTheme } from '../../../../contexts/ThemeContext';
-import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../../utils/theme-helpers';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_COLOR } from '../../../../utils/theme-helpers';
 import type { PrimaryDenomination, FiatCurrency } from '../../../settings/types';
 
 // =============================================================================
@@ -171,7 +171,7 @@ export function CurrencySettingsScreen(): React.JSX.Element {
                   <View key={option.code} style={styles.radioItem}>
                     <RadioButton.Android
                       value={option.code}
-                      color="#FFC107"
+                      color={BRAND_COLOR}
                       uncheckedColor={secondaryText}
                     />
                     <View style={styles.radioContent}>
@@ -209,7 +209,7 @@ export function CurrencySettingsScreen(): React.JSX.Element {
                   <View key={option.code} style={styles.radioItem}>
                     <RadioButton.Android
                       value={option.code}
-                      color="#FFC107"
+                      color={BRAND_COLOR}
                       uncheckedColor={secondaryText}
                     />
                     <View style={styles.radioContent}>
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
   previewTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFC107',
+    color: BRAND_COLOR,
     marginBottom: 8,
   },
   previewText: {
@@ -380,12 +380,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#FFC107',
+    borderLeftColor: BRAND_COLOR,
   },
   infoTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFC107',
+    color: BRAND_COLOR,
     marginBottom: 8,
   },
   infoText: {

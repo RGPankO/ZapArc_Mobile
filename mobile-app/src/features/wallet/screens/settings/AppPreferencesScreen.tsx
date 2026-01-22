@@ -9,6 +9,7 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '../../../../contexts/ThemeContext';
 import { useLanguage } from '../../../../hooks/useLanguage';
+import { getGradientColors, BRAND_COLOR } from '../../../../utils/theme-helpers';
 
 // =============================================================================
 // Component
@@ -19,9 +20,7 @@ export function ThemeSettingsScreen(): React.JSX.Element {
   const { t } = useLanguage();
 
   // Dynamic gradient colors based on theme
-  const gradientColors = themeMode === 'dark'
-    ? ['#1a1a2e', '#16213e', '#0f3460']
-    : ['#f5f5f5', '#e8e8e8', '#d0d0d0'];
+  const gradientColors = getGradientColors(themeMode);
 
   return (
     <LinearGradient
@@ -50,12 +49,13 @@ export function ThemeSettingsScreen(): React.JSX.Element {
               title={t('settings.darkMode')}
               description={t('settings.useDarkTheme')}
               left={(props) => (
-                <List.Icon {...props} icon="theme-light-dark" color="#FFC107" />
+                <List.Icon {...props} icon="theme-light-dark" color={BRAND_COLOR} />
               )}
               right={() => (
                 <Switch
                   value={themeMode === 'dark'}
                   onValueChange={toggleTheme}
+                  color={BRAND_COLOR}
                 />
               )}
               titleStyle={[styles.listTitle, { color: theme.colors.onSurface }]}
@@ -103,6 +103,10 @@ const styles = StyleSheet.create({
   section: {
     marginTop: 24,
     paddingHorizontal: 16,
+  },
+  settingsList: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   sectionTitle: {
     fontSize: 14,

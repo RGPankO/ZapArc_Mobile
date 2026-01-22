@@ -15,6 +15,7 @@ import {
   getGradientColors,
   getPrimaryTextColor,
   getSecondaryTextColor,
+  BRAND_COLOR,
 } from '../../../../utils/theme-helpers';
 import { t } from '../../../../services/i18nService';
 import { StyledTextInput } from '../../../../components';
@@ -199,7 +200,7 @@ export function LightningAddressScreen(): React.JSX.Element {
             <View style={styles.headerSpacer} />
           </View>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FFC107" />
+            <ActivityIndicator size="large" color={BRAND_COLOR} />
             <Text style={[styles.loadingText, { color: secondaryText }]}>{t('common.loading')}</Text>
           </View>
         </SafeAreaView>
@@ -357,7 +358,7 @@ export function LightningAddressScreen(): React.JSX.Element {
                         isCheckingAvailability || !username || username.length < 3
                       }
                       style={styles.checkButton}
-                      textColor="#FFC107"
+                      textColor={BRAND_COLOR}
                     >
                       {t('lightningAddressScreen.checkAvailability')}
                     </Button>
@@ -476,7 +477,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   addressDisplay: {
-    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    backgroundColor: 'rgba(247, 147, 26, 0.1)',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
@@ -485,14 +486,14 @@ const styles = StyleSheet.create({
   addressText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#FFC107',
+    color: BRAND_COLOR,
     fontFamily: 'monospace',
   },
   actionButtons: {
     gap: 12,
   },
   copyButton: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
     borderRadius: 8,
   },
   copyButtonLabel: {
@@ -560,11 +561,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   checkButton: {
-    borderColor: '#FFC107',
+    borderColor: BRAND_COLOR,
     borderRadius: 8,
   },
   registerButton: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
     borderRadius: 8,
   },
   registerButtonLabel: {
@@ -572,17 +573,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   infoBox: {
-    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    backgroundColor: 'rgba(247, 147, 26, 0.1)',
     borderRadius: 12,
     padding: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#FFC107',
+    borderLeftColor: BRAND_COLOR,
     marginBottom: 16,
   },
   infoTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFC107',
+    color: BRAND_COLOR,
     marginBottom: 8,
   },
   infoText: {

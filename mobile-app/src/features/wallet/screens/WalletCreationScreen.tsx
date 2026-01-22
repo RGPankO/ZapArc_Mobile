@@ -19,7 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { generateMnemonic, generateMasterKeyNickname } from '../../../utils/mnemonic';
 import { useWallet } from '../../../hooks/useWallet';
 import { useAppTheme } from '../../../contexts/ThemeContext';
-import { getGradientColors } from '../../../utils/theme-helpers';
+import { getGradientColors, BRAND_COLOR } from '../../../utils/theme-helpers';
 
 // =============================================================================
 // Types
@@ -653,7 +653,7 @@ export function WalletCreationScreen(): React.JSX.Element {
           <View style={styles.progressContainer}>
             <ProgressBar
               progress={progress}
-              color="#FFC107"
+              color={BRAND_COLOR}
               style={styles.progressBar}
             />
             <Text style={styles.progressText}>
@@ -741,12 +741,12 @@ const styles = StyleSheet.create({
   },
   warningBox: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 193, 7, 0.2)',
+    backgroundColor: 'rgba(247, 147, 26, 0.2)',
     borderRadius: 12,
     padding: 16,
     marginBottom: 32,
     borderWidth: 1,
-    borderColor: 'rgba(255, 193, 7, 0.3)',
+    borderColor: 'rgba(247, 147, 26, 0.3)',
   },
   warningIcon: {
     fontSize: 24,
@@ -755,12 +755,12 @@ const styles = StyleSheet.create({
   warningText: {
     flex: 1,
     fontSize: 14,
-    color: '#FFC107',
+    color: BRAND_COLOR,
     lineHeight: 20,
   },
   primaryButton: {
     borderRadius: 12,
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
     marginTop: 24,
   },
   buttonContent: {
@@ -787,11 +787,11 @@ const styles = StyleSheet.create({
   },
   toggleButton: {
     padding: 12,
-    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    backgroundColor: 'rgba(247, 147, 26, 0.1)',
     borderRadius: 8,
   },
   toggleButtonText: {
-    color: '#FFC107',
+    color: BRAND_COLOR,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -895,7 +895,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   modeButtonActive: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
   },
   modeButtonText: {
     color: 'rgba(255, 255, 255, 0.6)',
@@ -922,10 +922,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   selectedWordsBox: {
-    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    backgroundColor: 'rgba(247, 147, 26, 0.1)',
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: 'rgba(255, 193, 7, 0.3)',
+    borderColor: 'rgba(247, 147, 26, 0.3)',
     borderStyle: 'dashed',
     padding: 12,
     minHeight: 120,
@@ -944,7 +944,7 @@ const styles = StyleSheet.create({
   selectedWordChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
     borderRadius: 20,
     paddingVertical: 6,
     paddingLeft: 8,

@@ -10,6 +10,7 @@ import { Contact } from '../types';
 import { ContactSearchBar } from './ContactSearchBar';
 import { useContactSearch } from '../hooks/useContactSearch';
 import { t } from '../../../services/i18nService';
+import { BRAND_COLOR } from '../../../utils/theme-helpers';
 
 interface ContactSelectionModalProps {
   visible: boolean;
@@ -156,7 +157,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   avatar: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
   },
   avatarSelf: {
     backgroundColor: '#4CAF50',

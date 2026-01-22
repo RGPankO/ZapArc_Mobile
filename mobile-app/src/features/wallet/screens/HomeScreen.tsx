@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '../../../contexts/ThemeContext';
-import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor } from '../../../utils/theme-helpers';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor, BRAND_COLOR } from '../../../utils/theme-helpers';
 import { useWallet } from '../../../hooks/useWallet';
 import { useWalletAuth } from '../../../hooks/useWalletAuth';
 import { useLanguage } from '../../../hooks/useLanguage';
@@ -308,7 +308,7 @@ export function HomeScreen(): React.JSX.Element {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor="#FFC107"
+              tintColor={BRAND_COLOR}
             />
           }
         >
@@ -316,7 +316,7 @@ export function HomeScreen(): React.JSX.Element {
           <View style={styles.balanceCard}>
             <Text style={[styles.balanceLabel, { color: secondaryTextColor }]}>{t('wallet.balance')}</Text>
             {isLoading && !balance ? (
-              <ActivityIndicator color="#FFC107" size="large" />
+              <ActivityIndicator color={BRAND_COLOR} size="large" />
             ) : (
               <>
                 <Text style={[styles.balanceAmount, { color: primaryTextColor }]}>
@@ -360,7 +360,7 @@ export function HomeScreen(): React.JSX.Element {
               icon="💡"
               label={t('payments.tip')}
               onPress={handleCreateTip}
-              color="#FFC107"
+              color={BRAND_COLOR}
             />
           </View>
 
@@ -375,7 +375,7 @@ export function HomeScreen(): React.JSX.Element {
           <View style={styles.transactionsContainer}>
             {isLoading && transactions.length === 0 ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator color="#FFC107" />
+                <ActivityIndicator color={BRAND_COLOR} />
                 <Text style={[styles.loadingText, { color: secondaryTextColor }]}>{t('common.loading')}</Text>
               </View>
             ) : transactions.length === 0 ? (
@@ -536,7 +536,7 @@ function QuickAction({
   icon,
   label,
   onPress,
-  color = '#FFC107',
+  color = BRAND_COLOR,
 }: QuickActionProps): React.JSX.Element {
   const { themeMode } = useAppTheme();
   const secondaryTextColor = getSecondaryTextColor(themeMode);
@@ -626,7 +626,7 @@ const styles = StyleSheet.create({
   },
   tapToReveal: {
     fontSize: 12,
-    color: '#FFC107',
+    color: BRAND_COLOR,
     marginTop: 8,
   },
   quickActionsContainer: {
@@ -665,7 +665,7 @@ const styles = StyleSheet.create({
   },
   seeAllButton: {
     fontSize: 14,
-    color: '#FFC107',
+    color: BRAND_COLOR,
   },
   transactionsContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -797,7 +797,7 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
   },
   statusPending: {
-    color: '#FFC107',
+    color: BRAND_COLOR,
   },
   statusFailed: {
     color: '#FF5252',

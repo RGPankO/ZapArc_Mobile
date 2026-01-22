@@ -10,7 +10,19 @@ import type { ThemeMode } from '../features/settings/types';
 export const getGradientColors = (themeMode: ThemeMode): [string, string, string] => {
   return themeMode === 'dark'
     ? ['#1a1a2e', '#16213e', '#0f3460'] // Dark gradient
-    : ['#f5f5f5', '#e8e8e8', '#d0d0d0']; // Light gradient
+    : ['#ffffff', '#ffffff', '#FAFAFA']; // Light gradient (very subtle to avoid keyboard resize shifts)
+};
+
+/**
+ * Get input background color for outlined TextInputs
+ * This should match the gradient background so the floating label
+ * can properly mask the border line
+ */
+export const getInputBackgroundColor = (themeMode: ThemeMode): string => {
+  // Use solid background to ensure label cutout works
+  return themeMode === 'dark'
+    ? '#16213e' 
+    : '#FFFFFF'; // White for light mode to look clean
 };
 
 /**
@@ -25,10 +37,8 @@ export const getCardBackgroundColor = (themeMode: ThemeMode): string => {
 /**
  * Get icon color based on theme (for non-branded icons)
  */
-export const getIconColor = (themeMode: ThemeMode): string => {
-  return themeMode === 'dark'
-    ? 'rgba(255, 255, 255, 0.6)' // Light icons on dark
-    : 'rgba(0, 0, 0, 0.6)';        // Dark icons on light
+export const getIconColor = (_themeMode: ThemeMode): string => {
+  return BRAND_COLOR; // User requested all icons to use brand color
 };
 
 /**
@@ -51,8 +61,9 @@ export const getSecondaryTextColor = (themeMode: ThemeMode): string => {
 
 /**
  * Brand color (gold) - consistent across themes
+ * Official Bitcoin Color: #F7931A
  */
-export const BRAND_COLOR = '#FFC107';
+export const BRAND_COLOR = '#F7931A';
 
 /**
  * Status colors - consistent across themes
@@ -63,15 +74,3 @@ export const STATUS_COLORS = {
   warning: '#FF9800',
   info: '#2196F3',
 } as const;
-
-/**
- * Get input background color for outlined TextInputs
- * This should match the gradient background so the floating label
- * can properly mask the border line
- */
-export const getInputBackgroundColor = (themeMode: ThemeMode): string => {
-  // Use the middle color of the gradient for best approximation
-  return themeMode === 'dark'
-    ? '#16213e' // Middle of dark gradient
-    : '#e8e8e8'; // Middle of light gradient
-};

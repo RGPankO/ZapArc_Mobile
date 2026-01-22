@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { Text, Button, Portal } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BRAND_COLOR } from '../../../utils/theme-helpers';
 
 // =============================================================================
 // Types
@@ -220,7 +221,7 @@ export function FeedbackProvider({ children }: FeedbackProviderProps): React.JSX
       <Modal visible={isLoading} transparent animationType="fade">
         <View style={styles.loadingOverlay}>
           <View style={styles.loadingContent}>
-            <ActivityIndicator size="large" color="#FFC107" />
+            <ActivityIndicator size="large" color={BRAND_COLOR} />
             {loadingMessage && (
               <Text style={styles.loadingText}>{loadingMessage}</Text>
             )}
@@ -382,7 +383,7 @@ export function LoadingOverlay({
   return (
     <View style={styles.loadingOverlay}>
       <View style={styles.loadingContent}>
-        <ActivityIndicator size="large" color="#FFC107" />
+        <ActivityIndicator size="large" color={BRAND_COLOR} />
         {message && <Text style={styles.loadingText}>{message}</Text>}
       </View>
     </View>
@@ -400,7 +401,7 @@ export function InlineLoading({
 }: InlineLoadingProps): React.JSX.Element {
   return (
     <View style={styles.inlineLoading}>
-      <ActivityIndicator size={size} color="#FFC107" />
+      <ActivityIndicator size={size} color={BRAND_COLOR} />
       {message && <Text style={styles.inlineLoadingText}>{message}</Text>}
     </View>
   );
@@ -527,7 +528,7 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     flex: 1,
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
     borderRadius: 12,
   },
   destructiveButton: {

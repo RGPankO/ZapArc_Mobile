@@ -17,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import QRCode from 'react-native-qrcode-svg';
 import { decodeTipRequest } from './TipCreatorScreen';
 import { useAppTheme } from '../../../contexts/ThemeContext';
-import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../utils/theme-helpers';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_COLOR } from '../../../utils/theme-helpers';
 
 // =============================================================================
 // Component
@@ -188,7 +188,7 @@ export function TipQRCodeScreen(): React.JSX.Element {
               <View style={styles.actionIcon}>
                 <IconButton
                   icon="content-copy"
-                  iconColor="#FFC107"
+                  iconColor={BRAND_COLOR}
                   size={24}
                 />
               </View>
@@ -199,7 +199,7 @@ export function TipQRCodeScreen(): React.JSX.Element {
               <View style={styles.actionIcon}>
                 <IconButton
                   icon="share-variant"
-                  iconColor="#FFC107"
+                  iconColor={BRAND_COLOR}
                   size={24}
                 />
               </View>
@@ -210,7 +210,7 @@ export function TipQRCodeScreen(): React.JSX.Element {
               <View style={styles.actionIcon}>
                 <IconButton
                   icon="download"
-                  iconColor="#FFC107"
+                  iconColor={BRAND_COLOR}
                   size={24}
                 />
               </View>
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   backButton: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
   },
   backButtonLabel: {
     color: '#1a1a2e',
@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   amountChip: {
-    backgroundColor: 'rgba(255, 193, 7, 0.2)',
+    backgroundColor: 'rgba(247, 147, 26, 0.2)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: 'rgba(255, 193, 7, 0.2)',
+    backgroundColor: 'rgba(247, 147, 26, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
@@ -438,6 +438,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   newTipButtonLabel: {
-    color: '#FFC107',
+    color: BRAND_COLOR,
   },
 });

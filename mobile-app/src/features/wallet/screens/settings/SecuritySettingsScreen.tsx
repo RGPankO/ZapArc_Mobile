@@ -11,7 +11,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { useSettings } from '../../../../hooks/useSettings';
 import { useLanguage } from '../../../../hooks/useLanguage';
 import { useAppTheme } from '../../../../contexts/ThemeContext';
-import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor } from '../../../../utils/theme-helpers';
+import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_COLOR } from '../../../../utils/theme-helpers';
 
 // =============================================================================
 // Component
@@ -146,7 +146,7 @@ export function SecuritySettingsScreen(): React.JSX.Element {
               <View style={styles.sectionHeader}>
                 <IconButton
                   icon={getBiometricIcon()}
-                  iconColor="#FFC107"
+                  iconColor={BRAND_COLOR}
                   size={28}
                   style={styles.sectionIcon}
                 />
@@ -167,7 +167,7 @@ export function SecuritySettingsScreen(): React.JSX.Element {
                   value={biometricEnabled}
                   onValueChange={handleBiometricToggle}
                   disabled={!biometricAvailable}
-                  color="#FFC107"
+                  color={BRAND_COLOR}
                 />
               </View>
 
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
   },
   warningText: {
     fontSize: 13,
-    color: '#FFC107',
+    color: BRAND_COLOR,
     lineHeight: 18,
   },
   switchRow: {
@@ -302,12 +302,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#FFC107',
+    borderLeftColor: BRAND_COLOR,
   },
   infoTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFC107',
+    color: BRAND_COLOR,
     marginBottom: 8,
   },
   infoText: {
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   saveButton: {
-    backgroundColor: '#FFC107',
+    backgroundColor: BRAND_COLOR,
     borderRadius: 12,
   },
   saveButtonLabel: {
