@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
-import { Text, Button, TextInput, Menu } from 'react-native-paper';
+import { Text, Button, TextInput, Menu, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,6 +9,9 @@ import { useWallet } from '../../src/hooks/useWallet';
 import { BreezSparkService } from '../../src/services/breezSparkService';
 import { useCurrency, type InputCurrency } from '../../src/hooks/useCurrency';
 import { StyledTextInput } from '../../src/components';
+import { useContacts } from '../../src/features/addressBook/hooks/useContacts';
+import { ContactSelectionModal } from '../../src/features/addressBook/components/ContactSelectionModal';
+import { Contact } from '../../src/features/addressBook/types';
 
 type SendStep = 'input' | 'preview' | 'scanning';
 
@@ -31,6 +34,7 @@ const currencyLabels: Record<InputCurrency, string> = {
 export default function SendScreen() {
   const { balance, refreshBalance } = useWallet();
   const { secondaryFiatCurrency, convertToSats, formatSatsWithFiat, rates, isLoadingRates } = useCurrency();
+  const { contacts } = useContacts();
 
   const [step, setStep] = useState<SendStep>('input');
   const [paymentInput, setPaymentInput] = useState('');
@@ -42,10 +46,14 @@ export default function SendScreen() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [prepareResponse, setPrepareResponse] = useState<any>(null);
   const [scanned, setScanned] = useState(false);
-  
+
   // Currency selection state
   const [inputCurrency, setInputCurrency] = useState<InputCurrency>('sats');
   const [currencyMenuVisible, setCurrencyMenuVisible] = useState(false);
+
+  // Address book state
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [contactModalVisible, setContactModalVisible] = useState(false);
 
   // Available currency options
   const currencyOptions: InputCurrency[] = useMemo(() => {
@@ -75,6 +83,19 @@ export default function SendScreen() {
     setInputCurrency(currency);
     setCurrencyMenuVisible(false);
     setAmount(''); // Reset amount when switching currencies
+  }, []);
+
+  // Handle contact selection from address book
+  const handleContactSelect = useCallback((contact: Contact) => {
+    setSelectedContact(contact);
+    setPaymentInput(contact.lightningAddress);
+    setContactModalVisible(false);
+  }, []);
+
+  // Clear selected contact
+  const handleClearContact = useCallback(() => {
+    setSelectedContact(null);
+    setPaymentInput('');
   }, []);
 
   // Auto-fill amount when invoice is pasted
@@ -242,10 +263,15 @@ export default function SendScreen() {
       setStep('preview');
     } catch (error) {
       console.error('Failed to prepare payment:', error);
-      Alert.alert(
-        'Error',
-        error instanceof Error ? error.message : 'Failed to prepare payment'
-      );
+      
+      // Provide more specific error message for Lightning Address resolution failures
+      let errorMessage = error instanceof Error ? error.message : 'Failed to prepare payment';
+      
+      if (errorMessage.includes('Network request failed') || errorMessage.includes('Failed to resolve')) {
+        errorMessage = 'Could not reach the Lightning Address provider. Please check the address is correct (e.g., user@wallet.com).';
+      }
+      
+      Alert.alert('Payment Error', errorMessage);
     } finally {
       setIsPreparing(false);
     }
@@ -444,19 +470,52 @@ export default function SendScreen() {
 
           <Text style={styles.label}>Lightning Invoice or Address:</Text>
 
-          <TextInput
-            mode="outlined"
-            placeholder="Paste Lightning invoice (lnbc...) or Lightning address (user@domain.com)"
-            value={paymentInput}
-            onChangeText={setPaymentInput}
-            style={styles.input}
-            outlineColor="rgba(255, 255, 255, 0.3)"
-            activeOutlineColor="#FFC107"
-            textColor="#FFFFFF"
-            placeholderTextColor="rgba(255, 255, 255, 0.5)"
-            multiline
-            numberOfLines={3}
-          />
+          {/* Selected contact indicator */}
+          {selectedContact && (
+            <View style={styles.selectedContactContainer}>
+              <Text style={styles.selectedContactLabel}>Sending to:</Text>
+              <View style={styles.selectedContactRow}>
+                <Text style={styles.selectedContactName}>{selectedContact.name}</Text>
+                <IconButton
+                  icon="close"
+                  iconColor="rgba(255, 255, 255, 0.7)"
+                  size={18}
+                  onPress={handleClearContact}
+                  style={styles.clearContactButton}
+                />
+              </View>
+            </View>
+          )}
+
+          <View style={styles.inputWithButtonRow}>
+            <TextInput
+              mode="outlined"
+              placeholder="Paste Lightning invoice (lnbc...) or Lightning address (user@domain.com)"
+              value={paymentInput}
+              onChangeText={(text) => {
+                setPaymentInput(text);
+                if (selectedContact && text !== selectedContact.lightningAddress) {
+                  setSelectedContact(null);
+                }
+              }}
+              style={[styles.input, styles.inputWithButton]}
+              outlineColor="rgba(255, 255, 255, 0.3)"
+              activeOutlineColor="#FFC107"
+              textColor="#FFFFFF"
+              placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              multiline
+              numberOfLines={3}
+            />
+            {contacts.length > 0 && (
+              <IconButton
+                icon="contacts"
+                iconColor="#FFC107"
+                size={24}
+                onPress={() => setContactModalVisible(true)}
+                style={styles.addressBookButton}
+              />
+            )}
+          </View>
 
           <Button
             mode="outlined"
@@ -467,6 +526,14 @@ export default function SendScreen() {
           >
             Scan QR Code
           </Button>
+
+          {/* Contact Selection Modal */}
+          <ContactSelectionModal
+            visible={contactModalVisible}
+            onDismiss={() => setContactModalVisible(false)}
+            onSelect={handleContactSelect}
+            contacts={contacts}
+          />
 
           <Text style={styles.label}>Amount (leave empty for invoice amount):</Text>
 
@@ -828,5 +895,43 @@ const styles = StyleSheet.create({
   conversionFiat: {
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 14,
+  },
+  // Address book integration styles
+  selectedContactContainer: {
+    backgroundColor: 'rgba(255, 193, 7, 0.15)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  selectedContactLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginBottom: 4,
+  },
+  selectedContactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  selectedContactName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFC107',
+  },
+  clearContactButton: {
+    margin: 0,
+  },
+  inputWithButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  inputWithButton: {
+    flex: 1,
+  },
+  addressBookButton: {
+    marginTop: 8,
+    marginLeft: 4,
+    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    borderRadius: 8,
   },
 });

@@ -912,27 +912,35 @@ export async function parsePaymentRequest(input: string): Promise<{
   amountSat?: number;
   description?: string;
 }> {
-  if (!_isNativeAvailable || !sdkInstance) {
-    // Fallback to simple string matching if SDK not available
-    const trimmed = input.trim().toLowerCase();
+  const trimmed = input.trim();
+  const trimmedLower = trimmed.toLowerCase();
 
-    if (trimmed.includes('@') && trimmed.includes('.')) {
+  // FIRST: Check for Lightning Address (user@domain.com) - handle locally, SDK doesn't support this
+  // Must check before SDK parsing because SDK throws InvalidInput for Lightning Addresses
+  if (trimmed.includes('@') && !trimmedLower.startsWith('lnurl') && !trimmedLower.startsWith('lnbc')) {
+    const parts = trimmed.split('@');
+    if (parts.length === 2 && parts[0] && parts[1] && parts[1].includes('.')) {
+      // Valid Lightning Address format - no amount embedded, user must specify
       return { type: 'lightningAddress', isValid: true };
     }
+  }
 
-    if (trimmed.startsWith('lnurl')) {
+  // For other types, try SDK if available
+  if (!_isNativeAvailable || !sdkInstance) {
+    // Fallback to simple string matching if SDK not available
+    if (trimmedLower.startsWith('lnurl')) {
       return { type: 'lnurl', isValid: true };
     }
 
-    if (trimmed.startsWith('lnbc') || trimmed.startsWith('lntb') || trimmed.startsWith('lnbcrt')) {
+    if (trimmedLower.startsWith('lnbc') || trimmedLower.startsWith('lntb') || trimmedLower.startsWith('lnbcrt')) {
       return { type: 'bolt11', isValid: true };
     }
 
-    if (trimmed.startsWith('bc1') || trimmed.startsWith('1') || trimmed.startsWith('3') || trimmed.startsWith('tb1')) {
+    if (trimmedLower.startsWith('bc1') || trimmedLower.startsWith('1') || trimmedLower.startsWith('3') || trimmedLower.startsWith('tb1')) {
       return { type: 'bitcoinAddress', isValid: true };
     }
 
-    if (trimmed.startsWith('sp1')) {
+    if (trimmedLower.startsWith('sp1')) {
       return { type: 'sparkAddress', isValid: true };
     }
 
@@ -941,7 +949,7 @@ export async function parsePaymentRequest(input: string): Promise<{
 
   try {
     // Use SDK to parse for full details including amount
-    const parsed = await sdkInstance.parse(input.trim());
+    const parsed = await sdkInstance.parse(trimmed);
 
     // Check the parsed result type
     if (parsed.tag === 'Bolt11Invoice' && parsed.inner) {
@@ -984,6 +992,7 @@ export async function parsePaymentRequest(input: string): Promise<{
 
 /**
  * Prepare a payment (get fee estimate)
+ * Handles both BOLT11 invoices and Lightning Addresses (via LNURL resolution)
  */
 export async function prepareSendPayment(
   paymentRequest: string,
@@ -994,8 +1003,82 @@ export async function prepareSendPayment(
     throw new Error('SDK not available');
   }
 
+  const trimmed = paymentRequest.trim();
+  
+  // Check if this is a Lightning Address (user@domain.com format)
+  if (trimmed.includes('@') && !trimmed.toLowerCase().startsWith('lnurl') && !trimmed.toLowerCase().startsWith('lnbc')) {
+    // Lightning Address needs to be resolved to LNURL pay endpoint first
+    const parts = trimmed.split('@');
+    if (parts.length === 2 && parts[0] && parts[1] && parts[1].includes('.')) {
+      const [username, domain] = parts;
+      const lnurlEndpoint = `https://${domain}/.well-known/lnurlp/${username}`;
+      
+      console.log('🔗 [BreezSparkService] Resolving Lightning Address:', trimmed);
+      console.log('🔗 [BreezSparkService] LNURL endpoint:', lnurlEndpoint);
+      
+      try {
+        // Step 1: Fetch LNURL pay data
+        const lnurlResponse = await fetch(lnurlEndpoint);
+        if (!lnurlResponse.ok) {
+          throw new Error(`Failed to resolve Lightning Address: HTTP ${lnurlResponse.status}`);
+        }
+        
+        const lnurlData = await lnurlResponse.json();
+        console.log('🔗 [BreezSparkService] LNURL data:', JSON.stringify(lnurlData));
+        
+        if (lnurlData.tag !== 'payRequest') {
+          throw new Error('Lightning Address does not support payments');
+        }
+        
+        // Validate amount against min/max
+        const amountMsat = (amountSat || 0) * 1000;
+        if (amountMsat < lnurlData.minSendable) {
+          throw new Error(`Amount too small. Minimum: ${Math.ceil(lnurlData.minSendable / 1000)} sats`);
+        }
+        if (amountMsat > lnurlData.maxSendable) {
+          throw new Error(`Amount too large. Maximum: ${Math.floor(lnurlData.maxSendable / 1000)} sats`);
+        }
+        
+        // Step 2: Request BOLT11 invoice from callback
+        const callbackUrl = new URL(lnurlData.callback);
+        callbackUrl.searchParams.set('amount', amountMsat.toString());
+        
+        console.log('🔗 [BreezSparkService] Fetching invoice from:', callbackUrl.toString());
+        
+        const invoiceResponse = await fetch(callbackUrl.toString());
+        if (!invoiceResponse.ok) {
+          throw new Error(`Failed to get invoice: HTTP ${invoiceResponse.status}`);
+        }
+        
+        const invoiceData = await invoiceResponse.json();
+        console.log('🔗 [BreezSparkService] Invoice response:', JSON.stringify(invoiceData));
+        
+        if (invoiceData.status === 'ERROR') {
+          throw new Error(invoiceData.reason || 'Failed to generate invoice');
+        }
+        
+        if (!invoiceData.pr) {
+          throw new Error('No invoice received from Lightning Address provider');
+        }
+        
+        // Step 3: Now prepare payment with the BOLT11 invoice
+        console.log('🔗 [BreezSparkService] Preparing payment with BOLT11:', invoiceData.pr.substring(0, 30) + '...');
+        
+        return await sdkInstance.prepareSendPayment({
+          paymentRequest: invoiceData.pr,
+          // Don't pass amount for BOLT11 with embedded amount
+        });
+        
+      } catch (error) {
+        console.error('❌ [BreezSparkService] Lightning Address resolution failed:', error);
+        throw error;
+      }
+    }
+  }
+
+  // For BOLT11, LNURL, or other formats, pass directly to SDK
   return await sdkInstance.prepareSendPayment({
-    paymentRequest,
+    paymentRequest: trimmed,
     amount: amountSat ? BigInt(amountSat) : undefined,
   });
 }

@@ -38,20 +38,21 @@ This implementation plan breaks down the Lightning Address Book feature into dis
     - _Requirements: 5.3, 5.5_
 
 - [ ] 3. Implement contact validation logic
-  - [ ] 3.1 Create ContactValidator module
+- [ ] 3.1 Create ContactValidator module
     - Implement `contactValidator.ts` with validation functions
     - Implement validateLightningAddress with regex pattern `^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
+    - Trim whitespace before validation and normalize to lowercase for duplicate checks
     - Implement validateName (1-100 chars, non-empty after trim)
     - Implement validateNotes (optional, max 500 chars)
     - Implement validateContactInput for complete validation
     - Return ValidationResult with descriptive error messages
     - _Requirements: 1.2, 1.3, 7.1, 8.1, 8.2, 10.3_
 
-  - [ ] 3.2 Write property test for Lightning Address validation
+- [ ] 3.2 Write property test for Lightning Address validation
     - **Property 2: Invalid Lightning Addresses are rejected**
     - **Property 21: Lightning Address validation is comprehensive**
     - **Validates: Requirements 1.2, 7.1, 7.2, 7.3**
-    - Generate valid addresses (should pass) and invalid addresses (should fail)
+    - Generate valid addresses that match the regex and invalid addresses that do not
 
   - [ ] 3.3 Write property test for display name validation
     - **Property 3: Invalid display names are rejected**
@@ -228,28 +229,28 @@ This implementation plan breaks down the Lightning Address Book feature into dis
 
 - [ ] 9. Set up navigation and routing
   - [ ] 9.1 Add Address Book routes to Expo Router
-    - Create route files in `app/(tabs)/addressBook/` directory
+    - Create route files under wallet settings: `mobile-app/app/wallet/settings/address-book/`
     - Create `index.tsx` for AddressBookScreen
     - Create `add.tsx` for AddContactScreen
     - Create `[id].tsx` for EditContactScreen (dynamic route)
     - Configure navigation options (titles, header buttons)
     - _Requirements: 9.1, 9.2_
 
-  - [ ] 9.2 Add Address Book tab to main navigation
-    - Add Address Book tab to bottom tab navigator
+  - [ ] 9.2 Add Address Book entry to Wallet Settings
+    - Add Address Book List.Item to `mobile-app/src/features/wallet/screens/WalletSettingsScreen.tsx`
     - Use appropriate icon (e.g., "contacts" or "book" from MaterialCommunityIcons)
-    - Set tab label to "Contacts" or "Address Book"
+    - Set label to "Contacts" or "Address Book"
     - _Requirements: 9.1, 9.3_
 
   - [ ] 9.3 Write navigation integration tests
-    - Test navigation from main tabs to Address Book
+    - Test navigation from Wallet Settings to Address Book
     - Test navigation from Address Book to Add Contact
     - Test navigation from Address Book to Edit Contact
     - Test back navigation preserves state
 
 - [ ] 10. Integrate with Send Payment flow
   - [ ] 10.1 Add contact selection to Send Payment screen
-    - Modify existing Send Payment screen to include address book icon/button next to Lightning Address input
+    - Modify existing Send Payment screen (`mobile-app/app/wallet/send.tsx`) to include address book icon/button next to Lightning Address input
     - Open ContactSelectionModal on button press
     - Auto-fill Lightning Address field when contact selected
     - Store selected contact in component state

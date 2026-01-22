@@ -192,6 +192,23 @@ export function WalletSettingsScreen(): React.JSX.Element {
             <Divider style={styles.divider} />
 
             <List.Item
+              title="Address Book"
+              description="Manage saved Lightning Addresses"
+              left={(props) => (
+                <List.Icon {...props} icon="contacts" color="#FFC107" />
+              )}
+              right={(props) => (
+                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
+              )}
+              onPress={() => router.push('/wallet/settings/address-book')}
+              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
+              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
+              style={styles.listItem}
+            />
+
+            <Divider style={styles.divider} />
+
+            <List.Item
               title={t('settings.defaultTipAmounts')}
               description={`${settings?.defaultPostingAmounts?.join(', ') || '100, 500, 1000'} ${t('wallet.sats')}`}
               left={(props) => (

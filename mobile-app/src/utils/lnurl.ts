@@ -99,6 +99,69 @@ export function isLightningAddress(input: string): boolean {
 }
 
 /**
+ * Validates if a Lightning Address resolves correctly by fetching its LNURL pay endpoint.
+ * This checks if the address actually exists and can receive payments.
+ *
+ * @param address - Lightning address (user@domain.tld)
+ * @returns Object with isValid flag and optional error message
+ */
+export async function validateLightningAddressResolves(
+  address: string
+): Promise<{ isValid: boolean; error?: string }> {
+  if (!isLightningAddress(address)) {
+    return { isValid: false, error: 'Invalid Lightning Address format' };
+  }
+
+  const [username, domain] = address.trim().split('@');
+  const lnurlEndpoint = `https://${domain}/.well-known/lnurlp/${username}`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = global.setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+    const response = await fetch(lnurlEndpoint, {
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    global.clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { isValid: false, error: 'Lightning Address not found' };
+      }
+      return { isValid: false, error: `Server error: ${response.status}` };
+    }
+
+    const data = await response.json();
+
+    // Verify it's a pay request
+    if (data.tag !== 'payRequest') {
+      return { isValid: false, error: 'Address does not support payments' };
+    }
+
+    // Verify required fields exist
+    if (!data.callback || !data.minSendable || !data.maxSendable) {
+      return { isValid: false, error: 'Invalid LNURL pay response' };
+    }
+
+    return { isValid: true };
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        return { isValid: false, error: 'Request timed out - check the domain' };
+      }
+      if (error.message.includes('Network request failed')) {
+        return { isValid: false, error: 'Domain not found - check the address' };
+      }
+    }
+    return { isValid: false, error: 'Failed to verify address' };
+  }
+}
+
+/**
  * Parse Lightning address into components
  *
  * @param address - Lightning address (user@domain)

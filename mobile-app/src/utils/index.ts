@@ -8,6 +8,7 @@ export {
   type ParsedLnurl,
   convertToLnurlEndpoint,
   isLightningAddress,
+  validateLightningAddressResolves,
   parseLightningAddress,
   isValidLnurlFormat,
   isValidLnurlOrAddress,

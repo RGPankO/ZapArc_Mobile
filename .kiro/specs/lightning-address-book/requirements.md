@@ -86,6 +86,15 @@ The Lightning Address Book feature enables users to save and manage Lightning Ad
 3. WHEN a payment is initiated with a selected contact, THE Send_Payment_Flow SHALL display the contact's display name in the confirmation screen
 4. WHEN a user clears a selected contact, THE Send_Payment_Flow SHALL clear the auto-filled Lightning Address field
 
+### Requirement 6.1: Send Flow Integration Location
+
+**User Story:** As a developer, I want the address book integration to target the actual Send screen, so that implementation is unambiguous.
+
+#### Acceptance Criteria
+
+1. THE Send Payment integration SHALL be implemented in the existing Send screen (`mobile-app/app/wallet/send.tsx`)
+2. THE contact selection UI SHALL be reachable from the Lightning Address input field on the Send screen
+
 ### Requirement 7: Validate Lightning Address Format
 
 **User Story:** As a wallet user, I want the app to validate Lightning Addresses before saving, so that I don't save invalid addresses that will fail during payment.
@@ -96,6 +105,16 @@ The Lightning Address Book feature enables users to save and manage Lightning Ad
 2. WHEN a Lightning Address contains invalid characters, THE Contact_Validator SHALL reject it and provide a descriptive error
 3. WHEN a Lightning Address is missing the @ symbol or domain, THE Contact_Validator SHALL reject it and provide a descriptive error
 4. WHEN a valid Lightning Address is provided, THE Contact_Validator SHALL accept it for storage
+
+### Requirement 7.1: Lightning Address Normalization
+
+**User Story:** As a wallet user, I want consistent handling of Lightning Address casing and whitespace, so that duplicates are detected reliably.
+
+#### Acceptance Criteria
+
+1. WHEN a Lightning Address is entered, THE Contact_Validator SHALL trim leading/trailing whitespace before validation
+2. WHEN checking for duplicates, THE Address_Book SHALL compare Lightning Addresses case-insensitively using a normalized lowercase form
+3. WHEN displaying a Lightning Address, THE app SHALL use a consistent casing strategy (original input or normalized lowercase), and document the chosen behavior in the design
 
 ### Requirement 8: Validate Contact Display Names
 
@@ -114,9 +133,18 @@ The Lightning Address Book feature enables users to save and manage Lightning Ad
 
 #### Acceptance Criteria
 
-1. WHEN the app main navigation is displayed, THE app SHALL provide a clearly labeled Address Book navigation item
+1. WHEN the wallet Settings screen is displayed, THE app SHALL provide a clearly labeled Address Book navigation item
 2. WHEN a user taps the Address Book navigation item, THE app SHALL navigate to the Address Book screen
 3. WHEN a user is on the Address Book screen, THE app SHALL indicate the current navigation state
+
+### Requirement 9.1: Navigation Placement Alignment
+
+**User Story:** As a developer, I want the Address Book entry to fit the current navigation structure, so that it matches the app's routing conventions.
+
+#### Acceptance Criteria
+
+1. THE Address Book route SHALL be defined under the wallet Settings navigation structure (e.g., `mobile-app/app/wallet/settings/`)
+2. THE navigation entry point SHALL be added to the Wallet Settings list (`mobile-app/src/features/wallet/screens/WalletSettingsScreen.tsx`) using the same pattern as other settings entries
 
 ### Requirement 10: Support Optional Contact Notes
 

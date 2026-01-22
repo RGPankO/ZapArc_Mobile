@@ -50,6 +50,23 @@ The design emphasizes simplicity, local-first storage, and seamless integration 
 
 ### Integration with Send Payment Flow
 
+**Send Screen Location:**
+- `mobile-app/app/wallet/send.tsx`
+
+### Navigation Placement
+
+**Settings Entry Location:**
+- Wallet Settings list: `mobile-app/src/features/wallet/screens/WalletSettingsScreen.tsx`
+- Route group: `mobile-app/app/wallet/settings/`
+
+**Route Naming (proposed):**
+- Address book list: `/wallet/settings/address-book`
+- Add contact: `/wallet/settings/address-book/add`
+- Edit contact: `/wallet/settings/address-book/[id]`
+
+**Placement in Settings (UX note):**
+- Place "Address Book" near the existing "Lightning Address" entry to keep receive/send related tools grouped.
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                   Send Payment Screen                        │
@@ -212,7 +229,8 @@ interface ContactValidator {
    - Must contain exactly one @ symbol
    - Local part (before @) must not be empty
    - Domain part (after @) must be valid domain format
-   - Case-insensitive comparison for duplicate detection
+   - Trim whitespace before validation
+   - Case-insensitive comparison for duplicate detection (normalize to lowercase)
 
 2. **Display Name**:
    - Must be non-empty after trimming whitespace
@@ -350,7 +368,7 @@ The Contact entity represents a saved Lightning Address with associated metadata
 **Invariants**:
 - `updatedAt` ≥ `createdAt` for all contacts
 - All stored contacts must pass validation rules
-- Lightning Addresses are stored in original case but compared case-insensitively
+- Lightning Addresses are stored in original case but compared case-insensitively; if normalization is chosen for display, use lowercase consistently
 
 ### Storage Schema
 
@@ -621,7 +639,7 @@ describe('Contact Creation Properties', () => {
 ```
 
 **Custom Generators**:
-- Lightning Address generator: `fc.emailAddress()` (close enough for testing)
+- Lightning Address generator: build strings that match `^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$` to avoid false failures
 - Contact generator: combine name, address, optional notes
 - Invalid address generator: strings that don't match pattern
 - Whitespace string generator: various whitespace combinations

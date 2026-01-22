@@ -5,12 +5,11 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import { Text, Button, IconButton, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
 import { useLightningAddress } from '../../../../hooks/useLightningAddress';
-import { useLanguage } from '../../../../hooks/useLanguage';
 import { useAppTheme } from '../../../../contexts/ThemeContext';
 import {
   getGradientColors,
@@ -35,12 +34,19 @@ export function LightningAddressScreen(): React.JSX.Element {
     refresh,
   } = useLightningAddress();
 
-  const { t } = useLanguage();
   const { themeMode } = useAppTheme();
 
   const gradientColors = getGradientColors(themeMode);
   const primaryText = getPrimaryTextColor(themeMode);
   const secondaryText = getSecondaryTextColor(themeMode);
+
+  // Refresh Lightning Address state when screen comes into focus
+  // This ensures the correct address is shown for the current wallet
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
 
   // Form state
   const [username, setUsername] = useState('');
