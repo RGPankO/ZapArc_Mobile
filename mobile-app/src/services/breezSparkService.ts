@@ -615,6 +615,8 @@ export async function payInvoice(
 
 /**
  * Generate a Lightning invoice to receive payment
+ * @param amountSat - Amount in sats (0 or undefined for "any amount" invoice)
+ * @param description - Optional description
  */
 export async function receivePayment(
   amountSat: number,
@@ -625,12 +627,22 @@ export async function receivePayment(
   }
 
   try {
-    // Create the payment method using the SDK's factory pattern
-    const paymentMethod = BreezSDK.ReceivePaymentMethod.Bolt11Invoice.new({
+    // Create the payment method - conditionally include amount for "any amount" invoices
+    const invoiceParams: {
+      description: string;
+      amountSats?: bigint;
+      expirySecs: number;
+    } = {
       description: description || '',
-      amountSats: BigInt(amountSat),
       expirySecs: 900, // 15 minutes
-    });
+    };
+
+    // Only include amount if specified (non-zero)
+    if (amountSat && amountSat > 0) {
+      invoiceParams.amountSats = BigInt(amountSat);
+    }
+
+    const paymentMethod = BreezSDK.ReceivePaymentMethod.Bolt11Invoice.new(invoiceParams);
 
     const response = await sdkInstance.receivePayment({
       paymentMethod,

@@ -482,59 +482,62 @@ export default function SendScreen() {
             )}
           </View>
 
-          <Text style={[styles.label, { color: primaryTextColor }]}>Lightning Invoice or Address:</Text>
+          <Text style={[styles.sectionLabel, { color: primaryTextColor }]}>Lightning Invoice or Address:</Text>
 
-          {/* Selected contact indicator */}
-          {selectedContact && (
+          {/* Show selected contact OR input field */}
+          {selectedContact ? (
             <View style={styles.selectedContactContainer}>
-              <Text style={[styles.selectedContactLabel, { color: secondaryTextColor }]}>Sending to:</Text>
-              <View style={styles.selectedContactRow}>
-                <Text style={[styles.selectedContactName, { color: primaryTextColor }]}>{selectedContact.name}</Text>
+              <View style={styles.selectedContactHeader}>
+                <Text style={styles.selectedContactName}>{selectedContact.name}</Text>
                 <IconButton
                   icon="close"
-                  iconColor={secondaryTextColor}
-                  size={18}
+                  iconColor="rgba(255, 255, 255, 0.7)"
+                  size={20}
                   onPress={handleClearContact}
                   style={styles.clearContactButton}
                 />
               </View>
+              <Text style={styles.selectedContactAddress} numberOfLines={1} ellipsizeMode="middle">
+                {selectedContact.lightningAddress}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.inputWithButtonRow}>
+              <TextInput
+                mode="outlined"
+                placeholder="Invoice or address..."
+                value={paymentInput}
+                onChangeText={(text) => {
+                  setPaymentInput(text);
+                }}
+                style={[styles.input, styles.inputWithButton]}
+                outlineColor={secondaryTextColor}
+                activeOutlineColor={BRAND_COLOR}
+                textColor={primaryTextColor}
+                placeholderTextColor={secondaryTextColor}
+                multiline
+                numberOfLines={2}
+                theme={{
+                  colors: {
+                    background: undefined,
+                  }
+                }}
+              />
+              {contacts.length > 0 && (
+                <TouchableOpacity
+                  style={styles.addressBookButton}
+                  onPress={() => setContactModalVisible(true)}
+                >
+                  <IconButton
+                    icon="contacts"
+                    iconColor={BRAND_COLOR}
+                    size={24}
+                    style={styles.addressBookIcon}
+                  />
+                </TouchableOpacity>
+              )}
             </View>
           )}
-
-          <View style={styles.inputWithButtonRow}>
-            <TextInput
-              mode="outlined"
-              placeholder="Paste Lightning invoice (lnbc...) or Lightning address (user@domain.com)"
-              value={paymentInput}
-              onChangeText={(text) => {
-                setPaymentInput(text);
-                if (selectedContact && text !== selectedContact.lightningAddress) {
-                  setSelectedContact(null);
-                }
-              }}
-              style={[styles.input, styles.inputWithButton]}
-              outlineColor={secondaryTextColor}
-              activeOutlineColor={BRAND_COLOR}
-              textColor={primaryTextColor}
-              placeholderTextColor={secondaryTextColor}
-              multiline
-              numberOfLines={3}
-            theme={{
-              colors: {
-                background: undefined, // Let it use default/parent theme
-              }
-            }}
-            />
-            {contacts.length > 0 && (
-              <IconButton
-                icon="contacts"
-                iconColor={BRAND_COLOR}
-                size={24}
-                onPress={() => setContactModalVisible(true)}
-                style={styles.addressBookButton}
-              />
-            )}
-          </View>
 
           <Button
             mode="outlined"
@@ -702,13 +705,21 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 16,
   },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 6,
+    marginTop: 12,
+  },
   input: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    marginBottom: 8,
+    marginBottom: 0,
   },
   scanButton: {
     borderColor: BRAND_COLOR,
-    marginBottom: 16,
+    marginTop: 10,
+    marginBottom: 10,
   },
   previewButton: {
     marginTop: 24,
@@ -923,17 +934,15 @@ const styles = StyleSheet.create({
   },
   // Address book integration styles
   selectedContactContainer: {
-    backgroundColor: 'rgba(255, 193, 7, 0.15)',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+    backgroundColor: 'rgba(255, 193, 7, 0.12)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 193, 7, 0.3)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 0,
   },
-  selectedContactLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
-    marginBottom: 4,
-  },
-  selectedContactRow: {
+  selectedContactHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -943,20 +952,32 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: BRAND_COLOR,
   },
+  selectedContactAddress: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginTop: 2,
+  },
   clearContactButton: {
-    margin: 0,
+    margin: -8,
   },
   inputWithButtonRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'stretch',
   },
   inputWithButton: {
     flex: 1,
   },
   addressBookButton: {
-    marginTop: 8,
-    marginLeft: 4,
     backgroundColor: 'rgba(255, 193, 7, 0.1)',
     borderRadius: 8,
+    marginLeft: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 52,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 193, 7, 0.3)',
+  },
+  addressBookIcon: {
+    margin: 0,
   },
 });

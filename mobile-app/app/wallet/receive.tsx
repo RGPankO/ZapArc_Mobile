@@ -116,17 +116,17 @@ export default function ReceiveScreen() {
   const handleGenerateInvoice = useCallback(async () => {
     const numAmount = parseFloat(amount);
     
-    if (!numAmount || numAmount <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0');
-      return;
-    }
-
-    // Convert to sats based on input currency
-    const satsAmount = convertToSats(numAmount, inputCurrency);
+    // Allow zero/empty amount for "any amount" invoices
+    let satsAmount = 0;
     
-    if (!satsAmount || satsAmount <= 0) {
-      Alert.alert('Conversion Error', 'Could not convert amount. Please check exchange rates.');
-      return;
+    if (numAmount && numAmount > 0) {
+      // Convert to sats based on input currency
+      satsAmount = convertToSats(numAmount, inputCurrency);
+      
+      if (!satsAmount || satsAmount <= 0) {
+        Alert.alert('Conversion Error', 'Could not convert amount. Please check exchange rates.');
+        return;
+      }
     }
 
     try {
@@ -268,11 +268,17 @@ export default function ReceiveScreen() {
             </View>
 
             <Text style={[styles.amountText, { color: primaryTextColor }]}>
-              Amount: {invoiceSatsAmount.toLocaleString()} sats
-              {formatSatsWithFiat(invoiceSatsAmount).fiatDisplay && (
-                <Text style={[styles.amountFiatText, { color: secondaryTextColor }]}>
-                  {' '}({formatSatsWithFiat(invoiceSatsAmount).fiatDisplay})
-                </Text>
+              {invoiceSatsAmount > 0 ? (
+                <>
+                  Amount: {invoiceSatsAmount.toLocaleString()} sats
+                  {formatSatsWithFiat(invoiceSatsAmount).fiatDisplay && (
+                    <Text style={[styles.amountFiatText, { color: secondaryTextColor }]}>
+                      {' '}({formatSatsWithFiat(invoiceSatsAmount).fiatDisplay})
+                    </Text>
+                  )}
+                </>
+              ) : (
+                <Text style={styles.anyAmountText}>Any Amount</Text>
               )}
             </Text>
 
@@ -425,7 +431,7 @@ export default function ReceiveScreen() {
           {/* Invoice Mode */}
           {receiveMode === 'invoice' && (
             <>
-              <Text style={[styles.label, { color: primaryTextColor }]}>Enter the amount you want to deposit:</Text>
+              <Text style={[styles.label, { color: primaryTextColor }]}>Enter amount (leave empty for any amount):</Text>
 
               {/* Amount Input with Currency Selector */}
           <View style={styles.amountInputRow}>
@@ -520,12 +526,12 @@ export default function ReceiveScreen() {
             mode="contained"
             onPress={handleGenerateInvoice}
             loading={isGenerating}
-            disabled={isGenerating || !amount || (inputCurrency !== 'sats' && isLoadingRates)}
+            disabled={isGenerating || (amount !== '' && inputCurrency !== 'sats' && isLoadingRates)}
             style={styles.generateButton}
             buttonColor={BRAND_COLOR}
             textColor="#1a1a2e"
           >
-            {isLoadingRates && inputCurrency !== 'sats' ? 'Loading rates...' : 'Generate Invoice'}
+            {isLoadingRates && inputCurrency !== 'sats' && amount !== '' ? 'Loading rates...' : (amount === '' ? 'Generate Any Amount Invoice' : 'Generate Invoice')}
           </Button>
             </>
           )}
@@ -728,6 +734,11 @@ const styles = StyleSheet.create({
   amountFiatText: {
     fontWeight: 'normal',
     color: 'rgba(255, 255, 255, 0.7)',
+  },
+  anyAmountText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: BRAND_COLOR,
   },
   // Mode toggle styles
   modeToggle: {

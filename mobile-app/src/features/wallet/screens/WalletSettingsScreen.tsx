@@ -153,6 +153,7 @@ export function WalletSettingsScreen(): React.JSX.Element {
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>{t('settings.walletConfiguration')}</Text>
 
+            {/* Wallet Type - TODO: Re-enable when feature is complete
             <List.Item
               title={t('settings.walletType')}
               description={
@@ -173,6 +174,7 @@ export function WalletSettingsScreen(): React.JSX.Element {
             />
 
             <Divider style={styles.divider} />
+            */}
 
             <List.Item
               title="Lightning Address"
