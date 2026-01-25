@@ -7,9 +7,12 @@ import {
   StyleSheet,
   Share,
   TouchableOpacity,
-  Alert,
+  Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import * as Sharing from 'expo-sharing';
+import RNFS from 'react-native-fs';
 import { Text, IconButton, Button } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -18,6 +21,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { decodeTipRequest } from './TipCreatorScreen';
 import { useAppTheme } from '../../../contexts/ThemeContext';
 import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_COLOR } from '../../../utils/theme-helpers';
+import { useFeedback } from '../components/FeedbackComponents';
 
 // =============================================================================
 // Component
@@ -27,6 +31,7 @@ export function TipQRCodeScreen(): React.JSX.Element {
   const params = useLocalSearchParams<{ encoded: string }>();
   const qrRef = useRef<any>(null);
   const { themeMode } = useAppTheme();
+  const { showSuccess, showError } = useFeedback();
 
   // Theme colors
   const gradientColors = getGradientColors(themeMode);
@@ -53,47 +58,68 @@ export function TipQRCodeScreen(): React.JSX.Element {
   }, [params.encoded]);
 
   // Handle copy
-  const handleCopy = useCallback(() => {
+  const handleCopy = useCallback(async () => {
     if (!params.encoded) return;
 
-    Clipboard.setString(params.encoded);
-  }, [params.encoded]);
+    await Clipboard.setStringAsync(params.encoded);
+    showSuccess('Copied to clipboard!');
+  }, [params.encoded, showSuccess]);
 
   // Handle save QR image
-  const handleSaveQR = useCallback(() => {
-    // TODO: Implement QR code image saving with react-native-view-shot
-    Alert.alert('Coming Soon', 'QR code saving will be available soon');
-  }, []);
+  const handleSaveQR = useCallback(async () => {
+    if (!qrRef.current) {
+      showError('QR code not ready');
+      return;
+    }
 
-  // Handle social share (with platform selection)
-  const handleSocialShare = useCallback(
-    async (platform: 'twitter' | 'nostr' | 'telegram' | 'whatsapp') => {
-      if (!params.encoded) return;
+    try {
+      // Get QR code as base64 data URL
+      qrRef.current.toDataURL(async (dataURL: string) => {
+        try {
+          const fileName = `tip-qr-${Date.now()}.png`;
+          const filePath = `${RNFS.CachesDirectoryPath}/${fileName}`;
 
-      let message = '';
-      const tipCode = params.encoded;
+          // Write base64 image to cache
+          await RNFS.writeFile(filePath, dataURL, 'base64');
 
-      switch (platform) {
-        case 'twitter':
-          message = `⚡ Support me with a Lightning tip!\n\n${tipCode}\n\n#Bitcoin #Lightning #ZapArc`;
-          break;
-        case 'nostr':
-          message = `⚡ Send me a tip via Lightning!\n\n${tipCode}`;
-          break;
-        case 'telegram':
-        case 'whatsapp':
-          message = `⚡ Hey! You can send me a Lightning tip:\n\n${tipCode}`;
-          break;
-      }
+          // Check if sharing is available and share the file
+          const isAvailable = await Sharing.isAvailableAsync();
+          if (isAvailable) {
+            await Sharing.shareAsync(`file://${filePath}`, {
+              mimeType: 'image/png',
+              dialogTitle: 'Save QR Code',
+            });
+            showSuccess('QR code ready to save!');
+          } else {
+            // On Android, try to save directly to Downloads
+            if (Platform.OS === 'android') {
+              const granted = await PermissionsAndroid.request(
+                PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE
+              );
+              if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+                const downloadPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+                await RNFS.copyFile(filePath, downloadPath);
+                showSuccess('QR code saved to Downloads!');
+              } else {
+                showError('Storage permission denied');
+              }
+            } else {
+              showError('Sharing not available on this device');
+            }
+          }
 
-      try {
-        await Share.share({ message });
-      } catch (error) {
-        console.error('Share failed:', error);
-      }
-    },
-    [params.encoded]
-  );
+          // Clean up cache file
+          await RNFS.unlink(filePath).catch(() => {});
+        } catch (error) {
+          console.error('Save QR failed:', error);
+          showError('Failed to save QR code');
+        }
+      });
+    } catch (error) {
+      console.error('Save QR failed:', error);
+      showError('Failed to save QR code');
+    }
+  }, [showSuccess, showError]);
 
   // Error state
   if (!tipRequest || !params.encoded) {
@@ -218,47 +244,6 @@ export function TipQRCodeScreen(): React.JSX.Element {
             </TouchableOpacity>
           </View>
 
-          {/* Social Share Buttons */}
-          <View style={styles.socialSection}>
-            <Text style={styles.socialTitle}>Share on:</Text>
-            <View style={styles.socialButtons}>
-              <TouchableOpacity
-                style={styles.socialButton}
-                onPress={() => handleSocialShare('twitter')}
-              >
-                <Text style={styles.socialButtonText}>𝕏</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.socialButton}
-                onPress={() => handleSocialShare('nostr')}
-              >
-                <Text style={styles.socialButtonText}>🦩</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.socialButton}
-                onPress={() => handleSocialShare('telegram')}
-              >
-                <Text style={styles.socialButtonText}>✈️</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.socialButton}
-                onPress={() => handleSocialShare('whatsapp')}
-              >
-                <Text style={styles.socialButtonText}>💬</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
-        {/* Create New Button */}
-        <View style={styles.bottomAction}>
-          <Button
-            mode="text"
-            onPress={() => router.back()}
-            labelStyle={styles.newTipButtonLabel}
-          >
-            Create New Tip Request
-          </Button>
         </View>
       </SafeAreaView>
     </LinearGradient>
@@ -391,7 +376,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 32,
-    marginBottom: 24,
   },
   actionButton: {
     alignItems: 'center',
@@ -408,36 +392,5 @@ const styles = StyleSheet.create({
   actionLabel: {
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.7)',
-  },
-  socialSection: {
-    alignItems: 'center',
-  },
-  socialTitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.5)',
-    marginBottom: 12,
-  },
-  socialButtons: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  socialButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  socialButtonText: {
-    fontSize: 20,
-  },
-  bottomAction: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-    alignItems: 'center',
-  },
-  newTipButtonLabel: {
-    color: BRAND_COLOR,
   },
 });

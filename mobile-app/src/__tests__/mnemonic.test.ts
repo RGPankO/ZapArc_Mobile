@@ -27,7 +27,7 @@ const TEST_MNEMONIC_1 =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 const TEST_MNEMONIC_2 =
   'zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong';
-const INVALID_MNEMONIC = 'invalid mnemonic phrase that should fail validation';
+const INVALID_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon';
 
 // =============================================================================
 // Mnemonic Generation Tests

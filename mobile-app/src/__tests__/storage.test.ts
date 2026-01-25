@@ -21,17 +21,9 @@ jest.mock('expo-crypto', () => {
       }
       return bytes;
     }),
-    digestStringAsync: jest.fn(async (_algorithm: unknown, data: string, _options?: unknown) => {
-      // Simple hash simulation for testing - just return a hex string
-      let hash = 0;
-      for (let i = 0; i < data.length; i++) {
-        const char = data.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32bit integer
-      }
-      // Pad to 64 chars (256 bits in hex)
-      const hashHex = Math.abs(hash).toString(16);
-      return hashHex.padStart(64, '0').repeat(2).slice(0, 64);
+    digestStringAsync: jest.fn(async (_algorithm: string, data: string) => {
+      const crypto = require('crypto');
+      return crypto.createHash('sha256').update(data).digest('hex');
     }),
     CryptoDigestAlgorithm: {
       SHA256: 'SHA-256',

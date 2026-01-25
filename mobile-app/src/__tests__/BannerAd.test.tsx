@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, waitFor, fireEvent } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PaperProvider } from 'react-native-paper';
 import { BannerAd } from '../features/ads';
 import { apiClient } from '../lib/apiClient';
 import { AdType } from '../types';
@@ -27,7 +28,9 @@ const renderWithClient = (ui: React.ReactElement) => {
   });
   
   return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <PaperProvider>{ui}</PaperProvider>
+    </QueryClientProvider>
   );
 };
 

@@ -3,8 +3,9 @@
 // The new PremiumScreen uses usePaymentPlans, usePaymentStatus, useProcessSubscription, useProcessPurchase hooks.
 
 import React from 'react';
-import { render, waitFor, screen } from '@testing-library/react-native';
+import { render, waitFor, screen, cleanup } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PaperProvider } from 'react-native-paper';
 import { PremiumScreen, PaymentPlan } from '../features/payments';
 import { PremiumStatus } from '../types';
 import { apiClient } from '../lib/apiClient';
@@ -27,7 +28,7 @@ jest.mock('../lib/apiClient', () => ({
 
 const mockApiClient = apiClient as jest.Mocked<typeof apiClient>;
 
-// Create wrapper with QueryClient
+// Create wrapper with QueryClient and PaperProvider
 const createWrapper = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -36,7 +37,9 @@ const createWrapper = () => {
     },
   });
   return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <PaperProvider>{children}</PaperProvider>
+    </QueryClientProvider>
   );
 };
 
@@ -68,6 +71,13 @@ describe('PremiumScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
+    cleanup();
   });
 
   it('should render loading state initially', () => {

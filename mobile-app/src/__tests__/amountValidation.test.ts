@@ -53,10 +53,12 @@ describe('Amount Validation', () => {
 
   const formatSats = (amount: number): string => {
     if (amount >= 1_000_000) {
-      return `${(amount / 1_000_000).toFixed(amount % 1_000_000 === 0 ? 0 : 2)}M sats`;
+      const value = amount / 1_000_000;
+      return `${Number(value.toFixed(2))}M sats`;
     }
     if (amount >= 1_000) {
-      return `${(amount / 1_000).toFixed(amount % 1_000 === 0 ? 0 : 1)}K sats`;
+      const value = amount / 1_000;
+      return `${Number(value.toFixed(1))}K sats`;
     }
     return `${amount} sats`;
   };

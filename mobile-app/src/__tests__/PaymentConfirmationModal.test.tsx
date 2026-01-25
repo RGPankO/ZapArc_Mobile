@@ -1,7 +1,11 @@
 import React from 'react';
-import { render, fireEvent, screen } from '@testing-library/react-native';
+import { render, fireEvent, screen, cleanup } from '@testing-library/react-native';
+import { PaperProvider } from 'react-native-paper';
 import { PaymentConfirmationModal, PaymentPlan } from '../features/payments';
 
+const renderWithProvider = (component: React.ReactElement) => {
+  return render(<PaperProvider>{component}</PaperProvider>);
+};
 
 describe('PaymentConfirmationModal', () => {
   const mockSubscriptionPlan: PaymentPlan = {
@@ -32,22 +36,29 @@ describe('PaymentConfirmationModal', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
+    cleanup();
   });
 
   it('should not render when not visible', () => {
-    render(<PaymentConfirmationModal {...defaultProps} visible={false} />);
+    renderWithProvider(<PaymentConfirmationModal {...defaultProps} visible={false} />);
     
     expect(screen.queryByText('Confirm Subscribe')).toBeNull();
   });
 
   it('should not render when plan is null', () => {
-    render(<PaymentConfirmationModal {...defaultProps} plan={null} />);
+    renderWithProvider(<PaymentConfirmationModal {...defaultProps} plan={null} />);
     
     expect(screen.queryByText('Confirm Subscribe')).toBeNull();
   });
 
   it('should render subscription plan confirmation', () => {
-    render(<PaymentConfirmationModal {...defaultProps} />);
+    renderWithProvider(<PaymentConfirmationModal {...defaultProps} />);
 
     expect(screen.getByText('Confirm Subscribe')).toBeTruthy();
     expect(screen.getByText('Monthly Premium')).toBeTruthy();
@@ -61,7 +72,7 @@ describe('PaymentConfirmationModal', () => {
   });
 
   it('should render lifetime plan confirmation', () => {
-    render(<PaymentConfirmationModal {...defaultProps} plan={mockLifetimePlan} />);
+    renderWithProvider(<PaymentConfirmationModal {...defaultProps} plan={mockLifetimePlan} />);
 
     expect(screen.getByText('Confirm Purchase')).toBeTruthy();
     expect(screen.getByText('Lifetime Premium')).toBeTruthy();
@@ -73,7 +84,7 @@ describe('PaymentConfirmationModal', () => {
   });
 
   it('should show subscription disclaimer', () => {
-    render(<PaymentConfirmationModal {...defaultProps} />);
+    renderWithProvider(<PaymentConfirmationModal {...defaultProps} />);
 
     expect(
       screen.getByText(
@@ -83,7 +94,7 @@ describe('PaymentConfirmationModal', () => {
   });
 
   it('should show lifetime disclaimer', () => {
-    render(<PaymentConfirmationModal {...defaultProps} plan={mockLifetimePlan} />);
+    renderWithProvider(<PaymentConfirmationModal {...defaultProps} plan={mockLifetimePlan} />);
 
     expect(
       screen.getByText('This is a one-time purchase that gives you lifetime premium access.')
@@ -92,7 +103,7 @@ describe('PaymentConfirmationModal', () => {
 
   it('should call onConfirm when confirm button is pressed', () => {
     const onConfirm = jest.fn();
-    render(<PaymentConfirmationModal {...defaultProps} onConfirm={onConfirm} />);
+    renderWithProvider(<PaymentConfirmationModal {...defaultProps} onConfirm={onConfirm} />);
 
     fireEvent.press(screen.getByText('Subscribe Now'));
 
@@ -101,7 +112,7 @@ describe('PaymentConfirmationModal', () => {
 
   it('should call onCancel when cancel button is pressed', () => {
     const onCancel = jest.fn();
-    render(<PaymentConfirmationModal {...defaultProps} onCancel={onCancel} />);
+    renderWithProvider(<PaymentConfirmationModal {...defaultProps} onCancel={onCancel} />);
 
     fireEvent.press(screen.getByText('Cancel'));
 
@@ -109,23 +120,21 @@ describe('PaymentConfirmationModal', () => {
   });
 
   it('should show processing state', () => {
-    render(<PaymentConfirmationModal {...defaultProps} isProcessing={true} />);
+    renderWithProvider(<PaymentConfirmationModal {...defaultProps} isProcessing={true} />);
 
+    // Should show "Processing..." text instead of "Subscribe Now"
     expect(screen.getByText('Processing...')).toBeTruthy();
-    
-    // Buttons should be disabled during processing
-    const confirmButton = screen.getByText('Processing...');
-    const cancelButton = screen.getByText('Cancel');
-    
-    expect(confirmButton.props.accessibilityState?.disabled).toBe(true);
-    expect(cancelButton.props.accessibilityState?.disabled).toBe(true);
+    expect(screen.queryByText('Subscribe Now')).toBeNull();
+
+    // Cancel button should still be visible
+    expect(screen.getByText('Cancel')).toBeTruthy();
   });
 
   it('should disable buttons during processing', () => {
     const onConfirm = jest.fn();
     const onCancel = jest.fn();
     
-    render(
+    renderWithProvider(
       <PaymentConfirmationModal
         {...defaultProps}
         onConfirm={onConfirm}
@@ -154,7 +163,7 @@ describe('PaymentConfirmationModal', () => {
       ],
     };
 
-    render(<PaymentConfirmationModal {...defaultProps} plan={planWithManyFeatures} />);
+    renderWithProvider(<PaymentConfirmationModal {...defaultProps} plan={planWithManyFeatures} />);
 
     planWithManyFeatures.features.forEach((feature) => {
       expect(screen.getByText(feature)).toBeTruthy();

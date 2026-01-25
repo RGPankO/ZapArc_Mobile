@@ -1,15 +1,41 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
 import { PaperProvider } from 'react-native-paper';
+import { ThemeProvider } from '../contexts/ThemeContext';
 import SettingsScreen from '../../app/(main)/settings';
 
-// Mock the userService
-jest.mock('../services/userService', () => ({
-  userService: {
-    changePassword: jest.fn(),
-    deleteAccount: jest.fn(),
-    logout: jest.fn(),
-  },
+// Mock the hooks
+jest.mock('../hooks', () => ({
+  useChangePassword: jest.fn().mockReturnValue({
+    mutate: jest.fn(),
+    isPending: false,
+  }),
+  useDeleteAccount: jest.fn().mockReturnValue({
+    mutate: jest.fn(),
+    isPending: false,
+  }),
+  useSettings: jest.fn().mockReturnValue({
+    settings: {
+      notificationsEnabled: true,
+    },
+    setNotificationsEnabled: jest.fn(),
+  }),
+}));
+
+jest.mock('../features/profile/hooks', () => ({
+  useLogout: jest.fn().mockReturnValue({
+    mutate: jest.fn(),
+    isPending: false,
+  }),
+}));
+
+// Mock the context
+jest.mock('../contexts/ThemeContext', () => ({
+  ThemeProvider: ({ children }: any) => children,
+  useAppTheme: jest.fn().mockReturnValue({
+    themeMode: 'light',
+    toggleTheme: jest.fn(),
+  }),
 }));
 
 // Mock expo-router
@@ -22,9 +48,11 @@ jest.mock('expo-router', () => ({
 
 const renderWithProvider = (component: React.ReactElement) => {
   return render(
-    <PaperProvider>
-      {component}
-    </PaperProvider>
+    <ThemeProvider>
+      <PaperProvider>
+        {component}
+      </PaperProvider>
+    </ThemeProvider>
   );
 };
 

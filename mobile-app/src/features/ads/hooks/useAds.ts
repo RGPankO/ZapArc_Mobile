@@ -104,17 +104,17 @@ export interface AdDisplayState {
  * Replaces the adManager service
  */
 export function useAdManager(adType: AdType) {
-  const { data: shouldShowAds = true, isLoading: checkingPremium } = useShouldShowAds();
+  const { data: shouldShowAds, isLoading: checkingPremium } = useShouldShowAds();
   const { data: adConfig, isLoading: loadingAd, error: adError } = useAd(adType, {
-    enabled: shouldShowAds,
+    enabled: !!shouldShowAds,
   });
   const { mutate: trackMutate } = useTrackAdAnalytics();
 
   const state: AdDisplayState = {
-    isLoading: checkingPremium || loadingAd,
+    isLoading: checkingPremium || (!!shouldShowAds && loadingAd),
     adConfig: adConfig || null,
     error: adError?.message || null,
-    shouldShow: shouldShowAds && !!adConfig,
+    shouldShow: !!shouldShowAds && !!adConfig,
   };
 
   const trackImpression = useCallback(() => {

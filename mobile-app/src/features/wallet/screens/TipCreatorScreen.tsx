@@ -23,7 +23,9 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../../hooks/useSettings';
 import { useAppTheme } from '../../../contexts/ThemeContext';
+import { useLightningAddress } from '../../../hooks/useLightningAddress';
 import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_COLOR } from '../../../utils/theme-helpers';
+import { useFeedback } from '../components/FeedbackComponents';
 
 // =============================================================================
 // Types
@@ -92,6 +94,8 @@ export function decodeTipRequest(encoded: string): TipRequest | null {
 export function TipCreatorScreen(): React.JSX.Element {
   const { settings } = useSettings();
   const { themeMode } = useAppTheme();
+  const { showSuccess } = useFeedback();
+  const { addressInfo, isRegistered } = useLightningAddress();
 
   // Theme colors
   const gradientColors = getGradientColors(themeMode);
@@ -178,11 +182,12 @@ export function TipCreatorScreen(): React.JSX.Element {
   }, [tipRequest]);
 
   // Handle copy
-  const handleCopy = useCallback(() => {
+  const handleCopy = useCallback(async () => {
     if (!tipRequest) return;
 
-    Clipboard.setString(tipRequest.encoded);
-  }, [tipRequest]);
+    await Clipboard.setStringAsync(tipRequest.encoded);
+    showSuccess('Copied to clipboard!');
+  }, [tipRequest, showSuccess]);
 
   // Navigate to QR display
   const handleShowQR = useCallback(() => {
@@ -236,6 +241,32 @@ export function TipCreatorScreen(): React.JSX.Element {
               autoCapitalize="none"
               autoCorrect={false}
             />
+
+            {/* Use My Address Button */}
+            {isRegistered && addressInfo && (
+              <TouchableOpacity
+                style={styles.useMyAddressButton}
+                onPress={() => setAddress(addressInfo.lightningAddress)}
+              >
+                <IconButton
+                  icon="account-check"
+                  iconColor={BRAND_COLOR}
+                  size={20}
+                  style={styles.useMyAddressIcon}
+                />
+                <View style={styles.useMyAddressContent}>
+                  <Text style={styles.useMyAddressLabel}>Use My Address</Text>
+                  <Text style={styles.useMyAddressValue} numberOfLines={1}>
+                    {addressInfo.lightningAddress}
+                  </Text>
+                </View>
+                <IconButton
+                  icon="chevron-right"
+                  iconColor="rgba(255, 255, 255, 0.5)"
+                  size={20}
+                />
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Custom LNURL (optional) */}
@@ -472,6 +503,32 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   input: {
+  },
+  useMyAddressButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(247, 147, 26, 0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(247, 147, 26, 0.3)',
+    marginTop: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  useMyAddressIcon: {
+    margin: 0,
+  },
+  useMyAddressContent: {
+    flex: 1,
+  },
+  useMyAddressLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.6)',
+  },
+  useMyAddressValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: BRAND_COLOR,
   },
   toggleRow: {
     flexDirection: 'row',

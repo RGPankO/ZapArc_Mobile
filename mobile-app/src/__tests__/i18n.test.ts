@@ -121,14 +121,14 @@ describe('LocationService', () => {
       expect(result?.countryCode).toBe('BG');
     });
 
-    it('should return null when permission not granted', async () => {
+    it('should fall back to IP-based detection when permission not granted', async () => {
       (Location.getForegroundPermissionsAsync as jest.Mock).mockResolvedValue({
         status: 'denied',
       });
 
       const result = await locationService.getCurrentLocation();
 
-      expect(result).toBeNull();
+      expect(result).not.toBeNull();
     });
   });
 });
