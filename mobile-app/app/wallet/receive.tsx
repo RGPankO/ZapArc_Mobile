@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { Text, Button, TextInput, Menu } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,10 +15,11 @@ import {
   getInputBackgroundColor,
   BRAND_COLOR,
 } from '../../src/utils/theme-helpers';
-import { BreezSparkService } from '../../src/services/breezSparkService';
+import { BreezSparkService, onPaymentReceived } from '../../src/services/breezSparkService';
 import { useCurrency, type InputCurrency } from '../../src/hooks/useCurrency';
 import { useLightningAddress } from '../../src/hooks/useLightningAddress';
 import { StyledTextInput } from '../../src/components';
+import { useFeedback } from '../../src/features/wallet/components/FeedbackComponents';
 
 type ReceiveStep = 'input' | 'invoice';
 type ReceiveMode = 'invoice' | 'address';
@@ -40,6 +41,7 @@ export default function ReceiveScreen() {
 
   const { secondaryFiatCurrency, convertToSats, formatSatsWithFiat, rates, isLoadingRates } = useCurrency();
   const { addressInfo, isRegistered, isLoading: isLoadingAddress, refresh: refreshAddress } = useLightningAddress();
+  const { showSuccess } = useFeedback();
 
   // Refresh Lightning Address state when screen comes into focus
   useFocusEffect(
@@ -226,7 +228,7 @@ export default function ReceiveScreen() {
 
   // Timer update (simple approach)
   const [, setTick] = useState(0);
-  React.useEffect(() => {
+  useEffect(() => {
     if (step === 'invoice' && expiryTime) {
       const interval = setInterval(() => {
         setTick(t => t + 1);
@@ -242,6 +244,25 @@ export default function ReceiveScreen() {
       return () => clearInterval(interval);
     }
   }, [step, expiryTime, handleNewInvoice]);
+
+  // Listen for incoming payment when invoice is displayed
+  useEffect(() => {
+    if (step !== 'invoice' || !invoice) return;
+
+    const unsubscribe = onPaymentReceived((payment) => {
+      // Skip sync events
+      if (payment.description === '__SYNC_EVENT__') return;
+
+      // Check if this is a received payment
+      if (payment.type === 'receive' && payment.amountSat > 0) {
+        const formattedAmount = payment.amountSat.toLocaleString();
+        showSuccess(`Payment received: ${formattedAmount} sats`);
+        router.replace('/wallet/home');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [step, invoice, showSuccess]);
 
   if (step === 'invoice') {
     return (

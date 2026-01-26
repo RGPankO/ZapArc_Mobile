@@ -211,7 +211,7 @@ export function FeedbackProvider({ children }: FeedbackProviderProps): React.JSX
       {children}
 
       {/* Toast Container */}
-      <View style={[styles.toastContainer, { top: insets.top + 10 }]}>
+      <View style={[styles.toastContainer, { bottom: insets.bottom + 80 }]}>
         {toasts.map((toast) => (
           <ToastItem key={toast.id} toast={toast} />
         ))}
@@ -285,11 +285,11 @@ interface ToastItemProps {
 }
 
 function ToastItem({ toast }: ToastItemProps): React.JSX.Element {
-  const translateY = useRef(new Animated.Value(-100)).current;
+  const translateY = useRef(new Animated.Value(100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Animate in
+    // Animate in (slide up from bottom)
     Animated.parallel([
       Animated.spring(translateY, {
         toValue: 0,
@@ -304,11 +304,11 @@ function ToastItem({ toast }: ToastItemProps): React.JSX.Element {
       }),
     ]).start();
 
-    // Animate out before removal
+    // Animate out before removal (slide down)
     const hideTimeout = global.setTimeout(() => {
       Animated.parallel([
         Animated.timing(translateY, {
-          toValue: -100,
+          toValue: 100,
           duration: 200,
           useNativeDriver: true,
         }),

@@ -282,8 +282,8 @@ export function PinEntryScreen(): React.JSX.Element {
             <View key={rowIndex} style={styles.keypadRow}>
               {row.map((key, keyIndex) => {
                 if (key === '') {
-                  // Biometric button or empty space
-                  return biometricAvailable ? (
+                  // Biometric button or empty space (only show if available AND enabled in settings)
+                  return biometricAvailable && biometricEnabled ? (
                     <TouchableOpacity
                       key={keyIndex}
                       style={styles.keypadKey}
@@ -334,8 +334,8 @@ export function PinEntryScreen(): React.JSX.Element {
           ))}
         </View>
 
-        {/* Biometric Button Label */}
-        {biometricAvailable && (
+        {/* Biometric Button Label - only show if available AND enabled in settings */}
+        {biometricAvailable && biometricEnabled && (
           <TouchableOpacity
             style={styles.biometricLabel}
             onPress={handleBiometricUnlock}
