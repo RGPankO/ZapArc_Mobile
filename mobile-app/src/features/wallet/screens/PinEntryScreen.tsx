@@ -296,7 +296,7 @@ export function PinEntryScreen(): React.JSX.Element {
                       />
                     </TouchableOpacity>
                   ) : (
-                    <View key={keyIndex} style={styles.keypadKey} />
+                    <View key={keyIndex} style={styles.keypadKeyEmpty} />
                   );
                 }
 
@@ -431,6 +431,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  keypadKeyEmpty: {
+    width: 72,
+    height: 72,
   },
   keypadKeyText: {
     fontSize: 28,

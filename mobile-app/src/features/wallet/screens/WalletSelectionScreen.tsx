@@ -1,15 +1,14 @@
 // Wallet Selection Screen
 // Hierarchical wallet list with master keys and sub-wallets
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   FlatList,
 } from 'react-native';
-import { Text, IconButton, Button, useTheme, Divider } from 'react-native-paper';
+import { Text, IconButton, Button } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,7 +16,7 @@ import { useAppTheme } from '../../../contexts/ThemeContext';
 import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor, BRAND_COLOR } from '../../../utils/theme-helpers';
 import { useWallet } from '../../../hooks/useWallet';
 import { useWalletAuth } from '../../../hooks/useWalletAuth';
-import type { MasterKeyEntry, SubWalletEntry } from '../types';
+import type { MasterKeyEntry } from '../types';
 
 // =============================================================================
 // Component
@@ -31,12 +30,10 @@ export function WalletSelectionScreen(): React.JSX.Element {
   const iconColor = getIconColor(themeMode);
 
   const { masterKeys, activeWalletInfo } = useWallet();
-  const { selectSubWallet, currentMasterKeyId, isUnlocked } = useWalletAuth();
+  const { currentMasterKeyId } = useWalletAuth();
 
   // State - expand all master keys by default
   const [expandedMasterKeys, setExpandedMasterKeys] = useState<Set<string>>(new Set());
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
 
   // Expand all master keys when they load
   useEffect(() => {
@@ -67,32 +64,17 @@ export function WalletSelectionScreen(): React.JSX.Element {
 
   const handleSelectWallet = useCallback(
     async (masterKeyId: string, subWalletIndex: number) => {
-      // Always require PIN if not unlocked, or if switching to a different master key
-      if (!isUnlocked || masterKeyId !== currentMasterKeyId) {
-        // Navigate to unlock page with selected wallet
-        router.replace({
-          pathname: '/wallet/unlock',
-          params: { masterKeyId, subWalletIndex: subWalletIndex.toString() },
-        });
-        return;
-      }
-
-      // Same master key and already unlocked - use selectSubWallet which will reinitialize SDK
-      try {
-        setIsLoading(true);
-        // No need to clear state manually, useWallet hook handles cache loading on active wallet change
-        const success = await selectSubWallet(subWalletIndex);
-
-        if (success) {
-          router.replace('/wallet/home');
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to select wallet');
-      } finally {
-        setIsLoading(false);
-      }
+      // Always require PIN verification when selecting a wallet from this screen.
+      // This ensures security because this screen can be accessed from:
+      // 1. The PIN screen's "Switch Wallet" button (needs re-auth)
+      // 2. Other places where re-auth may be required
+      // The isUnlocked state is not reliable for determining if re-auth is needed.
+      router.replace({
+        pathname: '/wallet/unlock',
+        params: { masterKeyId, subWalletIndex: subWalletIndex.toString() },
+      });
     },
-    [isUnlocked, currentMasterKeyId, selectSubWallet]
+    []
   );
 
   // ========================================
