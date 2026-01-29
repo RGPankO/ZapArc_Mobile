@@ -376,13 +376,12 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
         setIsLoading(true);
         setError(null);
 
-        // If selecting a different master key, verify PIN
-        if (masterKeyId !== currentMasterKeyId) {
-          const isValid = await storageService.verifyMasterKeyPin(masterKeyId, pin);
-          if (!isValid) {
-            setError('Invalid PIN');
-            return false;
-          }
+        // SECURITY: Always verify PIN when selecting via wallet selection screen
+        // This is called from WalletSelectionScreen which requires re-authentication
+        const isValid = await storageService.verifyMasterKeyPin(masterKeyId, pin);
+        if (!isValid) {
+          setError('Invalid PIN');
+          return false;
         }
 
         // CRITICAL PATH: Set active wallet and unlock immediately
@@ -420,7 +419,9 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
               console.log('✅ [useWalletAuth] SDK reinitialized (background)');
             }
           } catch (sdkError) {
-            console.error('❌ [useWalletAuth] SDK reinitialization failed:', sdkError);
+            // Use warn instead of error to prevent red screen in dev mode
+            // This is a non-fatal error - SDK just won't be ready
+            console.warn('⚠️ [useWalletAuth] SDK reinitialization failed:', sdkError);
           }
         })();
 

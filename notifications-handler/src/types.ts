@@ -6,17 +6,25 @@
  * Request interface for transaction notifications
  */
 export interface TransactionNotificationRequest {
-  /** 
+  /**
    * Expo push token (e.g., "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]")
-   * Required if recipientPubKey is not provided
+   * Required if recipientPubKey/recipientLightningAddress is not provided
    */
   expoPushToken?: string;
 
   /**
    * Recipient's Lightning Node ID (Public Key)
    * Used to look up the push token if not provided directly
+   * NOTE: For Breez Spark users, this is the LSP's pubkey (shared by all users)
    */
   recipientPubKey?: string;
+
+  /**
+   * Recipient's Lightning Address (e.g., user@domain.com)
+   * Used to look up the push token - unique per wallet
+   * Preferred over recipientPubKey for Breez Spark users
+   */
+  recipientLightningAddress?: string;
 
   /** Amount in satoshis (positive integer) */
   amount: number;

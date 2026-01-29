@@ -6,6 +6,7 @@
 // - Production builds
 import { BREEZ_API_KEY, BREEZ_STORAGE_DIR } from '../config';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 // Note: Local notifications disabled - FCM push handles payment notifications
 // import { sendPaymentReceivedNotification } from './notificationService';
 import { NotificationTriggerService } from './notificationTriggerService';
@@ -241,15 +242,52 @@ export async function initializeSDK(
 
     console.log('✅ [BreezSparkService] SDK initialized');
 
-    // Register for notifications
+    // Register for notifications with BOTH Lightning Address and nodeId
+    // Lightning Address is unique per wallet (for LN Address payments)
+    // nodeId is needed for invoice payments (may be LSP pubkey for Spark)
     try {
-        const nodeId = await getNodeId();
-        if (nodeId) {
-            const pushTokenData = await Notifications.getExpoPushTokenAsync();
-            if (pushTokenData.data) {
-              await NotificationTriggerService.registerDevice(nodeId, pushTokenData.data, walletNickname);
-              console.log('✅ [BreezSparkService] Registered for push notifications');
+        // Get project ID (required for iOS push tokens)
+        const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+        if (!projectId) {
+            console.warn('⚠️ [BreezSparkService] No project ID found - push notifications may not work on iOS');
+        }
+
+        const pushTokenData = await Notifications.getExpoPushTokenAsync(
+            projectId ? { projectId } : undefined
+        );
+        if (pushTokenData.data) {
+            const registrationPromises: Promise<unknown>[] = [];
+
+            // Register with Lightning Address (unique per wallet)
+            const lnAddress = await getLightningAddress();
+            if (lnAddress?.lightningAddress) {
+                registrationPromises.push(
+                    NotificationTriggerService.registerDevice(
+                        lnAddress.lightningAddress,
+                        pushTokenData.data,
+                        walletNickname
+                    ).then(() => {
+                        console.log('✅ [BreezSparkService] Registered with Lightning Address:', lnAddress.lightningAddress);
+                    })
+                );
             }
+
+            // Also register with nodeId (for invoice-based payments)
+            const nodeId = await getNodeId();
+            if (nodeId) {
+                registrationPromises.push(
+                    NotificationTriggerService.registerDevice(
+                        nodeId,
+                        pushTokenData.data,
+                        walletNickname
+                    ).then(() => {
+                        console.log('✅ [BreezSparkService] Registered with nodeId:', nodeId.substring(0, 16) + '...');
+                    })
+                );
+            }
+
+            // Wait for all registrations
+            await Promise.allSettled(registrationPromises);
         }
     } catch (e) {
         console.warn('⚠️ [BreezSparkService] Notification registration warning:', e);
@@ -570,33 +608,49 @@ export async function payInvoice(
             try {
               // Attempt to extract destination from payment request
               const parsed = await sdkInstance.parse(paymentRequest);
-              
-              // DEBUG LOGGING
-              console.log('🔍 [BreezSparkService] Parsed invoice structure:', JSON.stringify(parsed, null, 2));
 
-              let destinationPubkey: string | undefined;
-              
-              if (parsed.tag === 'Bolt11Invoice' && parsed.inner) {
-                 const innerData = Array.isArray(parsed.inner) ? parsed.inner[0] : parsed.inner;
-                 // Try multiple known fields
-                 destinationPubkey = innerData?.payeePubkey || innerData?.destination || innerData?.nodeId; 
-                 console.log('🔍 [BreezSparkService] Extracted pubkey from Bolt11:', destinationPubkey);
+              // DEBUG LOGGING
+              console.log('🔍 [BreezSparkService] Parsed payment request:', JSON.stringify(parsed, null, 2));
+
+              let recipientIdentifier: string | undefined;
+              let identifierType: 'lightningAddress' | 'pubKey' = 'pubKey';
+
+              // Check if this is a Lightning Address (preferred - unique per wallet)
+              if (parsed.tag === 'LightningAddress' && parsed.inner) {
+                const innerData = Array.isArray(parsed.inner) ? parsed.inner[0] : parsed.inner;
+                recipientIdentifier = innerData?.lightningAddress || innerData?.address;
+                identifierType = 'lightningAddress';
+                console.log('🔍 [BreezSparkService] Detected Lightning Address:', recipientIdentifier);
               }
-              
-              if (destinationPubkey) {
-                   console.log('🔔 [BreezSparkService] Triggering notification for recipient:', destinationPubkey);
+              // Also check if input looks like a Lightning Address (user@domain format)
+              else if (paymentRequest.includes('@') && !paymentRequest.startsWith('ln')) {
+                recipientIdentifier = paymentRequest.toLowerCase().trim();
+                identifierType = 'lightningAddress';
+                console.log('🔍 [BreezSparkService] Input is Lightning Address:', recipientIdentifier);
+              }
+              // Fall back to Bolt11 invoice parsing (may have LSP pubkey, not unique)
+              else if (parsed.tag === 'Bolt11Invoice' && parsed.inner) {
+                 const innerData = Array.isArray(parsed.inner) ? parsed.inner[0] : parsed.inner;
+                 recipientIdentifier = innerData?.payeePubkey || innerData?.destination || innerData?.nodeId;
+                 console.log('🔍 [BreezSparkService] Extracted pubkey from Bolt11:', recipientIdentifier);
+              }
+
+              if (recipientIdentifier) {
+                   console.log(`🔔 [BreezSparkService] Triggering notification (${identifierType}):`, recipientIdentifier);
                    // Send async without awaiting so we don't block the UI
                    NotificationTriggerService.sendTransactionNotification(
-                       { pubKey: destinationPubkey }, 
-                       _amountSat || 0 // use amount provided or from invoice
+                       identifierType === 'lightningAddress'
+                         ? { lightningAddress: recipientIdentifier }
+                         : { pubKey: recipientIdentifier },
+                       _amountSat || 0
                    )
                    .then(res => console.log('🔔 [BreezSparkService] Trigger result:', res))
                    .catch(e => console.warn('🔔 [BreezSparkService] Trigger failed:', e));
               } else {
-                  console.warn('⚠️ [BreezSparkService] Could not find destination PubKey in invoice');
+                  console.warn('⚠️ [BreezSparkService] Could not find recipient identifier');
               }
           } catch (err) {
-              console.warn('⚠️ [BreezSparkService] Failed to parse invoice for notification:', err);
+              console.warn('⚠️ [BreezSparkService] Failed to parse payment request for notification:', err);
           }
     }
 
@@ -1097,14 +1151,37 @@ export async function prepareSendPayment(
 
 /**
  * Send a prepared payment
+ * @param prepareResponse - The response from prepareSendPayment
+ * @param originalPaymentRequest - Original payment request (for notification trigger)
+ * @param amountSat - Amount in sats (for notification)
+ * @param idempotencyKey - Optional idempotency key
  */
 export async function sendPayment(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   prepareResponse: any,
+  originalPaymentRequest?: string,
+  amountSat?: number,
   idempotencyKey?: string
 ): Promise<PaymentResult> {
-  if (!_isNativeAvailable || !sdkInstance) {
-    return { success: false, error: 'SDK not available' };
+  // Retry logic for temporary SDK unavailability (e.g., during wallet switch)
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 500;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    if (!_isNativeAvailable) {
+      return { success: false, error: 'SDK not available (native module missing)' };
+    }
+
+    if (!sdkInstance) {
+      if (attempt < MAX_RETRIES) {
+        console.log(`⏳ [BreezSparkService] SDK instance not ready, retrying in ${RETRY_DELAY_MS}ms (attempt ${attempt}/${MAX_RETRIES})`);
+        await new Promise(resolve => global.setTimeout(resolve, RETRY_DELAY_MS));
+        continue;
+      }
+      return { success: false, error: 'SDK not available (not initialized)' };
+    }
+
+    break; // SDK is available, proceed
   }
 
   try {
@@ -1122,6 +1199,68 @@ export async function sendPayment(
       global.setTimeout(() => {
         recentlySentPaymentIds.delete(paymentId);
       }, SENT_PAYMENT_TRACKING_MS);
+
+      // Trigger notification to recipient
+      try {
+        let recipientIdentifier: string | undefined;
+        let identifierType: 'lightningAddress' | 'pubKey' = 'pubKey';
+
+        // Method 1: Check if original input is a Lightning Address (most reliable)
+        if (originalPaymentRequest?.includes('@') && !originalPaymentRequest.startsWith('ln')) {
+          recipientIdentifier = originalPaymentRequest.toLowerCase().trim();
+          identifierType = 'lightningAddress';
+          console.log('🔍 [BreezSparkService] Input is Lightning Address:', recipientIdentifier);
+        }
+
+        // Method 2: Try to get destination from payment result (like web extension)
+        if (!recipientIdentifier && response.payment) {
+          const payment = response.payment as Record<string, unknown>;
+          const details = payment.details as Record<string, unknown> | undefined;
+          const destPubkey = details?.destinationPubkey || details?.destination || payment.destinationPubkey;
+          if (destPubkey && typeof destPubkey === 'string') {
+            recipientIdentifier = destPubkey;
+            identifierType = 'pubKey';
+            console.log('🔍 [BreezSparkService] Got destination from payment result:', recipientIdentifier?.substring(0, 20) + '...');
+          }
+        }
+
+        // Method 3: Fall back to parsing original input
+        if (!recipientIdentifier && originalPaymentRequest && sdkInstance) {
+          try {
+            const parsed = await sdkInstance.parse(originalPaymentRequest);
+            console.log('🔍 [BreezSparkService] Parsed for notification:', parsed?.tag);
+
+            if (parsed.tag === 'LightningAddress' && parsed.inner) {
+              const innerData = Array.isArray(parsed.inner) ? parsed.inner[0] : parsed.inner;
+              recipientIdentifier = innerData?.lightningAddress || innerData?.address;
+              identifierType = 'lightningAddress';
+            } else if (parsed.tag === 'Bolt11Invoice' && parsed.inner) {
+              const innerData = Array.isArray(parsed.inner) ? parsed.inner[0] : parsed.inner;
+              recipientIdentifier = innerData?.payeePubkey || innerData?.destination || innerData?.nodeId;
+              identifierType = 'pubKey';
+            }
+          } catch (parseErr) {
+            console.warn('⚠️ [BreezSparkService] Parse failed, continuing with other methods:', parseErr);
+          }
+        }
+
+        if (recipientIdentifier) {
+          console.log(`🔔 [BreezSparkService] Triggering notification (${identifierType}):`, recipientIdentifier);
+          // Send async without awaiting so we don't block the UI
+          NotificationTriggerService.sendTransactionNotification(
+            identifierType === 'lightningAddress'
+              ? { lightningAddress: recipientIdentifier }
+              : { pubKey: recipientIdentifier },
+            amountSat || 0
+          )
+          .then(res => console.log('🔔 [BreezSparkService] Notification result:', res))
+          .catch(e => console.warn('🔔 [BreezSparkService] Notification failed:', e));
+        } else {
+          console.warn('⚠️ [BreezSparkService] Could not find recipient identifier for notification');
+        }
+      } catch (err) {
+        console.warn('⚠️ [BreezSparkService] Failed to trigger notification:', err);
+      }
     }
 
     return {

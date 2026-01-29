@@ -119,16 +119,22 @@ export const registerDevice = onRequest(
         return;
       }
 
+      // Normalize the key (Lightning Address should be lowercase)
+      // This handles both node IDs (hex pubkeys) and Lightning Addresses (user@domain)
+      const normalizedKey = pubKey.includes('@')
+        ? pubKey.toLowerCase().trim()
+        : pubKey;
+
       // Store in Firestore
-      // Collection: 'users' -> Document: <pubKey>
-      await db.collection('users').doc(pubKey).set({
+      // Collection: 'users' -> Document: <pubKey or lightningAddress>
+      await db.collection('users').doc(normalizedKey).set({
         expoPushToken,
         platform: platform || 'unknown',
         walletNickname: walletNickname || undefined,
         updatedAt: new Date(),
       }, { merge: true });
 
-      console.log(`✅ Registered token for user ${pubKey.substring(0, 8)}...`);
+      console.log(`✅ Registered token for user ${normalizedKey.substring(0, 20)}...`);
 
       response.status(200).json({
         success: true,
@@ -162,7 +168,7 @@ export const sendTransactionNotification = onRequest(
 
       // Parse request body
       const body = request.body as Partial<TransactionNotificationRequest>;
-      const { expoPushToken: directToken, recipientPubKey, amount } = body;
+      const { expoPushToken: directToken, recipientPubKey, recipientLightningAddress, amount } = body;
 
       // Validate inputs
       if (!amount) {
@@ -194,15 +200,37 @@ export const sendTransactionNotification = onRequest(
         if (userDoc.exists) {
           const userData = userDoc.data();
           if (userData?.expoPushToken) {
-            tokenInfos.push({ 
+            tokenInfos.push({
               token: userData.expoPushToken,
-              walletNickname: userData.walletNickname 
+              walletNickname: userData.walletNickname
             });
           } else {
             console.log(`⚠️ User ${recipientPubKey} found but no token.`);
           }
         } else {
           console.log(`⚠️ User ${recipientPubKey} not found in registry.`);
+        }
+      }
+
+      // 3. If recipientLightningAddress provided, look it up in Firestore
+      // Lightning Address is unique per wallet (unlike nodeId for Breez Spark users)
+      if (recipientLightningAddress) {
+        // Normalize Lightning Address (lowercase, trim)
+        const normalizedAddress = recipientLightningAddress.toLowerCase().trim();
+        const userDoc = await db.collection('users').doc(normalizedAddress).get();
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          if (userData?.expoPushToken) {
+            tokenInfos.push({
+              token: userData.expoPushToken,
+              walletNickname: userData.walletNickname
+            });
+            console.log(`✅ Found token for Lightning Address ${normalizedAddress}`);
+          } else {
+            console.log(`⚠️ Lightning Address ${normalizedAddress} found but no token.`);
+          }
+        } else {
+          console.log(`⚠️ Lightning Address ${normalizedAddress} not found in registry.`);
         }
       }
 

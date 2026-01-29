@@ -366,7 +366,9 @@ class StorageService {
       console.log('✅ [StorageService] GET_MASTER_KEY_MNEMONIC SUCCESS');
       return mnemonic;
     } catch (error) {
-      console.error('❌ [StorageService] GET_MASTER_KEY_MNEMONIC FAILED', error);
+      // Use warn instead of error to prevent red screen in dev mode
+      // This is a recoverable error - we return null and caller handles it
+      console.warn('⚠️ [StorageService] GET_MASTER_KEY_MNEMONIC FAILED', error);
       return null;
     }
   }

@@ -89,6 +89,7 @@ export async function deriveKeyFromPin(pin: string): Promise<Uint8Array> {
     saltedPin,
     { encoding: Crypto.CryptoEncoding.HEX }
   );
+  hash = hash.toLowerCase();
 
   // Perform multiple iterations for key stretching
   // Using reduced iterations for mobile performance, but still secure
@@ -100,6 +101,7 @@ export async function deriveKeyFromPin(pin: string): Promise<Uint8Array> {
       hash + saltedPin,
       { encoding: Crypto.CryptoEncoding.HEX }
     );
+    hash = hash.toLowerCase();
   }
 
   // Return first 32 bytes (256 bits) as the key
@@ -219,6 +221,10 @@ export async function decryptData(
     }
 
     if (!integrityValid) {
+      console.warn('⚠️ [Crypto] Integrity mismatch:', {
+        stored: bytesToHex(storedIntegrity),
+        calculated: bytesToHex(expectedIntegrity),
+      });
       throw new Error('Data integrity check failed - invalid PIN or corrupted data');
     }
 
@@ -235,7 +241,7 @@ export async function decryptData(
 
     return bytesToString(decryptedBytes);
   } catch (error) {
-    console.error('❌ [Crypto] Decryption failed:', error);
+    console.warn('⚠️ [Crypto] Decryption failed:', error);
     throw new Error('Failed to decrypt data - invalid PIN or corrupted data');
   }
 }

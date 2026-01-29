@@ -7,8 +7,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   Alert,
   BackHandler,
+  Keyboard,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Button, Text, ProgressBar } from 'react-native-paper';
@@ -547,7 +549,12 @@ export function WalletCreationScreen(): React.JSX.Element {
           mode="outlined"
           label="Enter PIN"
           value={pin}
-          onChangeText={setPin}
+          onChangeText={(text) => {
+            setPin(text);
+            if (text.length === 6) {
+              Keyboard.dismiss();
+            }
+          }}
           secureTextEntry
           keyboardType="numeric"
           maxLength={6}
@@ -558,7 +565,12 @@ export function WalletCreationScreen(): React.JSX.Element {
           mode="outlined"
           label="Confirm PIN"
           value={confirmPin}
-          onChangeText={setConfirmPin}
+          onChangeText={(text) => {
+            setConfirmPin(text);
+            if (text.length === 6) {
+              Keyboard.dismiss();
+            }
+          }}
           secureTextEntry
           keyboardType="numeric"
           maxLength={6}
@@ -630,42 +642,44 @@ export function WalletCreationScreen(): React.JSX.Element {
       colors={gradientColors}
       style={styles.gradient}
     >
-      <SafeAreaView style={styles.container}>
-        {/* Header with navigation */}
-        <View style={styles.header}>
-          {currentStep === 'generate' ? (
-            <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
-              <Text style={styles.headerButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          ) : currentStep !== 'complete' ? (
-            <TouchableOpacity onPress={handleGoBack} style={styles.headerButton}>
-              <Text style={styles.headerButtonText}>← Back</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.headerButton} />
-          )}
-          
-          <View style={styles.headerSpacer} />
-        </View>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <SafeAreaView style={styles.container}>
+          {/* Header with navigation */}
+          <View style={styles.header}>
+            {currentStep === 'generate' ? (
+              <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
+                <Text style={styles.headerButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            ) : currentStep !== 'complete' ? (
+              <TouchableOpacity onPress={handleGoBack} style={styles.headerButton}>
+                <Text style={styles.headerButtonText}>← Back</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.headerButton} />
+            )}
 
-        {/* Progress Bar */}
-        {currentStep !== 'complete' && (
-          <View style={styles.progressContainer}>
-            <ProgressBar
-              progress={progress}
-              color={BRAND_COLOR}
-              style={styles.progressBar}
-            />
-            <Text style={styles.progressText}>
-              Step {['generate', 'backup', 'verify', 'pin'].indexOf(currentStep) + 1} of 4
-            </Text>
+            <View style={styles.headerSpacer} />
           </View>
-        )}
 
-        {/* Content */}
-        {renderCurrentStep()}
+          {/* Progress Bar */}
+          {currentStep !== 'complete' && (
+            <View style={styles.progressContainer}>
+              <ProgressBar
+                progress={progress}
+                color={BRAND_COLOR}
+                style={styles.progressBar}
+              />
+              <Text style={styles.progressText}>
+                Step {['generate', 'backup', 'verify', 'pin'].indexOf(currentStep) + 1} of 4
+              </Text>
+            </View>
+          )}
 
-      </SafeAreaView>
+          {/* Content */}
+          {renderCurrentStep()}
+
+        </SafeAreaView>
+      </TouchableWithoutFeedback>
     </LinearGradient>
   );
 }

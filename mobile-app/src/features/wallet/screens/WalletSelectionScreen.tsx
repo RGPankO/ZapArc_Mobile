@@ -201,13 +201,35 @@ export function WalletSelectionScreen(): React.JSX.Element {
 
         {/* Wallet List */}
         {masterKeys.length > 0 ? (
-          <FlatList
-            data={masterKeys}
-            keyExtractor={(item) => item.id}
-            renderItem={renderMasterKey}
-            contentContainerStyle={styles.listContent}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-          />
+          <View style={styles.listWrapper}>
+            <FlatList
+              data={masterKeys}
+              keyExtractor={(item) => item.id}
+              renderItem={renderMasterKey}
+              contentContainerStyle={styles.listContent}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
+            />
+            
+            {/* Add New Wallet Button - Recovery option for forgotten PIN */}
+            <View style={styles.addNewWalletContainer}>
+              <TouchableOpacity
+                style={styles.addNewWalletButton}
+                onPress={() => router.push('/wallet/welcome')}
+              >
+                <IconButton
+                  icon="plus-circle-outline"
+                  iconColor={BRAND_COLOR}
+                  size={24}
+                />
+                <Text style={[styles.addNewWalletText, { color: primaryTextColor }]}>
+                  Add New Wallet
+                </Text>
+              </TouchableOpacity>
+              <Text style={[styles.addNewWalletHint, { color: secondaryTextColor }]}>
+                Forgot your PIN? Create a new wallet to start fresh.
+              </Text>
+            </View>
+          </View>
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateIcon}>📭</Text>
@@ -389,5 +411,35 @@ const styles = StyleSheet.create({
   },
   createWalletButton: {
     backgroundColor: BRAND_COLOR,
+  },
+  listWrapper: {
+    flex: 1,
+  },
+  addNewWalletContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+  },
+  addNewWalletButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 193, 7, 0.3)',
+  },
+  addNewWalletText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: -4,
+  },
+  addNewWalletHint: {
+    fontSize: 12,
+    marginTop: 8,
+    textAlign: 'center',
   },
 });

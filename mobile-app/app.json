@@ -15,6 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.zaparcmobile.mobileapp",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -72,7 +73,20 @@
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan QR codes."
         }
       ],
-      "expo-secure-store"
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to access your location to suggest local currency and region settings."
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#1a1a2e"
+        }
+      ]
     ],
     "extra": {
       "router": {},

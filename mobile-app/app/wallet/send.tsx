@@ -11,7 +11,7 @@ import {
   BRAND_COLOR,
 } from '../../src/utils/theme-helpers';
 import { useAppTheme } from '../../src/contexts/ThemeContext';
-import { BarCodeScanner } from 'expo-barcode-scanner';
+import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { useWallet } from '../../src/hooks/useWallet';
 import { BreezSparkService } from '../../src/services/breezSparkService';
 import { useCurrency, type InputCurrency } from '../../src/hooks/useCurrency';
@@ -57,7 +57,7 @@ export default function SendScreen() {
   const [preview, setPreview] = useState<PaymentPreview | null>(null);
   const [isPreparing, setIsPreparing] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
   const [prepareResponse, setPrepareResponse] = useState<any>(null);
   const [scanned, setScanned] = useState(false);
 
@@ -112,39 +112,42 @@ export default function SendScreen() {
     setPaymentInput('');
   }, []);
 
-  // Auto-fill amount when invoice is pasted
+  // Auto-fill amount when invoice is pasted (debounced to avoid excessive parsing)
   useEffect(() => {
-    const checkAndFillAmount = async () => {
-      if (!paymentInput.trim()) return;
+    const trimmedInput = paymentInput.trim();
+    if (!trimmedInput) return;
 
+    // Debounce parsing to avoid excessive calls while typing
+    const timeoutId = setTimeout(async () => {
       try {
-        const parsed = await BreezSparkService.parsePaymentRequest(paymentInput);
+        const parsed = await BreezSparkService.parsePaymentRequest(trimmedInput);
         console.log('🔍 [Send] Parsed:', parsed.type, 'Valid:', parsed.isValid, 'Amount:', parsed.amountSat);
 
         if (parsed.isValid && parsed.amountSat !== undefined) {
           console.log('✅ [Send] Auto-filling amount:', parsed.amountSat);
           setAmount(parsed.amountSat.toString());
-        } else {
-          console.log('⚠️ [Send] No amount in invoice or invalid');
         }
+        // Don't log warning for Lightning Addresses - they never have amounts
       } catch (error) {
-        console.error('❌ [Send] Failed to parse payment request:', error);
+        // Only log if it looks like a complete input (not mid-typing)
+        if (trimmedInput.length > 10) {
+          console.error('❌ [Send] Failed to parse payment request:', error);
+        }
       }
-    };
+    }, 500); // 500ms debounce
 
-    checkAndFillAmount();
+    return () => clearTimeout(timeoutId);
   }, [paymentInput]);
 
-  // Request camera permissions for QR scanner
-  const requestCameraPermission = useCallback(async () => {
-    const { status } = await BarCodeScanner.requestPermissionsAsync();
-    setHasPermission(status === 'granted');
-    return status === 'granted';
-  }, []);
-
   const handleScanQR = useCallback(async () => {
-    const granted = await requestCameraPermission();
-    if (granted) {
+    if (permission?.granted) {
+      setScanned(false); // Reset scanned flag
+      setStep('scanning');
+      return;
+    }
+
+    const response = await requestPermission();
+    if (response.granted) {
       setScanned(false); // Reset scanned flag
       setStep('scanning');
     } else {
@@ -153,10 +156,10 @@ export default function SendScreen() {
         'Camera permission is required to scan QR codes'
       );
     }
-  }, [requestCameraPermission]);
+  }, [permission, requestPermission]);
 
   const handleBarCodeScanned = useCallback(
-    async ({ data }: { type: string; data: string }) => {
+    async ({ data }: BarcodeScanningResult) => {
       if (scanned) return; // Prevent multiple scans
       setScanned(true);
 
@@ -299,7 +302,11 @@ export default function SendScreen() {
     try {
       setIsSending(true);
 
-      const result = await BreezSparkService.sendPayment(prepareResponse);
+      const result = await BreezSparkService.sendPayment(
+        prepareResponse,
+        paymentInput,  // Original payment request for notification
+        preview.amount // Amount for notification
+      );
 
       if (result.success) {
         // Refresh balance immediately
@@ -346,9 +353,13 @@ export default function SendScreen() {
           </View>
 
           <View style={styles.scannerContainer}>
-            <BarCodeScanner
-              onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+            <CameraView
               style={StyleSheet.absoluteFillObject}
+              facing="back"
+              barcodeScannerSettings={{
+                barcodeTypes: ['qr'],
+              }}
+              onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
             />
             {/* Scan Frame Overlay - matches QRScannerScreen */}
             <View style={styles.overlay}>

@@ -7,6 +7,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { Button, Text, ProgressBar } from 'react-native-paper';
 import { StyledTextInput } from '../../../components';
@@ -243,7 +245,12 @@ export function WalletImportScreen(): React.JSX.Element {
           mode="outlined"
           label="Enter PIN"
           value={pin}
-          onChangeText={setPin}
+          onChangeText={(text) => {
+            setPin(text);
+            if (text.length === 6) {
+              Keyboard.dismiss();
+            }
+          }}
           secureTextEntry
           keyboardType="numeric"
           maxLength={6}
@@ -254,7 +261,12 @@ export function WalletImportScreen(): React.JSX.Element {
           mode="outlined"
           label="Confirm PIN"
           value={confirmPin}
-          onChangeText={setConfirmPin}
+          onChangeText={(text) => {
+            setConfirmPin(text);
+            if (text.length === 6) {
+              Keyboard.dismiss();
+            }
+          }}
           secureTextEntry
           keyboardType="numeric"
           maxLength={6}
@@ -322,34 +334,36 @@ export function WalletImportScreen(): React.JSX.Element {
       colors={gradientColors}
       style={styles.gradient}
     >
-      <SafeAreaView style={styles.container}>
-        {/* Progress Bar */}
-        {currentStep !== 'complete' && (
-          <View style={styles.progressContainer}>
-            <ProgressBar
-              progress={progress}
-              color={BRAND_COLOR}
-              style={styles.progressBar}
-            />
-            <Text style={styles.progressText}>
-              Step {['input', 'pin'].indexOf(currentStep) + 1} of 2
-            </Text>
-          </View>
-        )}
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <SafeAreaView style={styles.container}>
+          {/* Progress Bar */}
+          {currentStep !== 'complete' && (
+            <View style={styles.progressContainer}>
+              <ProgressBar
+                progress={progress}
+                color={BRAND_COLOR}
+                style={styles.progressBar}
+              />
+              <Text style={styles.progressText}>
+                Step {['input', 'pin'].indexOf(currentStep) + 1} of 2
+              </Text>
+            </View>
+          )}
 
-        {/* Content */}
-        {renderCurrentStep()}
+          {/* Content */}
+          {renderCurrentStep()}
 
-        {/* Back Button */}
-        {currentStep === 'pin' && (
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => setCurrentStep('input')}
-          >
-            <Text style={styles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
-        )}
-      </SafeAreaView>
+          {/* Back Button */}
+          {currentStep === 'pin' && (
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => setCurrentStep('input')}
+            >
+              <Text style={styles.backButtonText}>← Back</Text>
+            </TouchableOpacity>
+          )}
+        </SafeAreaView>
+      </TouchableWithoutFeedback>
     </LinearGradient>
   );
 }

@@ -417,7 +417,11 @@ export function useWallet(): WalletState & WalletActions {
            setTransactions([]);
         }
 
-        // 3. Reconnect Breez SDK with the new wallet's mnemonic
+        // 3. Update full wallet state BEFORE reconnecting SDK
+        // This ensures refreshBalance uses correct wallet info when polling effect triggers
+        await loadWalletData();
+
+        // 4. Reconnect Breez SDK with the new wallet's mnemonic
         if (pin) {
           try {
             const mnemonic = await storageService.getMasterKeyMnemonic(masterKeyId, pin);
@@ -433,10 +437,6 @@ export function useWallet(): WalletState & WalletActions {
             console.warn('⚠️ [useWallet] SDK reconnection failed:', sdkError);
           }
         }
-
-        // 4. Update full wallet state (storage wrapper)
-        // This updates activeWalletInfo which triggers the useEffect to refreshBalance again
-        await loadWalletData();
 
         console.log('✅ [useWallet] Switched to wallet:', {
           masterKeyId,

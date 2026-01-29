@@ -75,12 +75,12 @@ class LocationService {
    * Get location by IP address (no permission required)
    * Uses free IP geolocation API as fallback
    */
-  async getLocationByIP(): Promise<LocationInfo | null> {
+    async getLocationByIP(): Promise<LocationInfo | null> {
     try {
       console.log('📍 [LocationService] Attempting IP-based geolocation...');
       
-      // Use ip-api.com (free, no API key required, 45 requests/minute limit)
-      const response = await fetch('http://ip-api.com/json/?fields=status,countryCode,lat,lon', {
+      // Use ipwho.is (free, no API key required, supports HTTPS)
+      const response = await fetch('https://ipwho.is/', {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -93,21 +93,21 @@ class LocationService {
 
       const data = await response.json();
       
-      if (data.status !== 'success') {
+      if (!data.success) {
         throw new Error('IP geolocation returned failure status');
       }
 
-      const isInBulgaria = data.countryCode === 'BG';
+      const isInBulgaria = data.country_code === 'BG';
       
       const locationInfo: LocationInfo = {
-        latitude: data.lat || 0,
-        longitude: data.lon || 0,
-        countryCode: data.countryCode || null,
+        latitude: data.latitude || 0,
+        longitude: data.longitude || 0,
+        countryCode: data.country_code || null,
         isInBulgaria,
       };
 
       console.log('✅ [LocationService] IP geolocation result:', {
-        countryCode: data.countryCode,
+        countryCode: data.country_code,
         isInBulgaria,
       });
 
@@ -131,9 +131,10 @@ class LocationService {
       }
 
       // Check permission for GPS location
-      const hasPermission = await this.hasPermission();
+      // Check and request permission for GPS location
+      const { granted } = await this.requestPermission();
       
-      if (hasPermission) {
+      if (granted) {
         console.log('📍 [LocationService] Getting current location via GPS...');
         
         try {
@@ -167,7 +168,7 @@ class LocationService {
           console.warn('⚠️ [LocationService] GPS failed, trying IP fallback:', gpsError);
         }
       } else {
-        console.log('📍 [LocationService] No GPS permission, using IP-based detection');
+        console.log('📍 [LocationService] GPS permission denied, using IP-based detection');
       }
 
       // Fallback to IP-based geolocation

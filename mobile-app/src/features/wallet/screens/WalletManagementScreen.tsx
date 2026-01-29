@@ -7,7 +7,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   Alert,
+  Keyboard,
 } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Clipboard from 'expo-clipboard';
@@ -763,7 +765,12 @@ export function WalletManagementScreen(): React.JSX.Element {
             <StyledTextInput
               style={styles.pinInputField}
               value={pinInput}
-              onChangeText={setPinInput}
+              onChangeText={(text) => {
+                setPinInput(text);
+                if (text.length === 6) {
+                  Keyboard.dismiss();
+                }
+              }}
               label="PIN"
               placeholder="Enter PIN to confirm"
               secureTextEntry
@@ -987,45 +994,47 @@ export function WalletManagementScreen(): React.JSX.Element {
       colors={gradientColors}
       style={styles.gradient}
     >
-      <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <IconButton
-            icon="arrow-left"
-            iconColor={iconColor}
-            size={24}
-            onPress={() => router.back()}
-          />
-          <Text style={[styles.headerTitle, { color: primaryTextColor }]}>Manage Wallets</Text>
-          <IconButton
-            icon="plus"
-            iconColor={BRAND_COLOR}
-            size={24}
-            onPress={() => router.push('/wallet/welcome')}
-          />
-        </View>
-
-        {/* Wallet List */}
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-        >
-          {masterKeys.map(renderMasterKey)}
-        </ScrollView>
-
-        {/* Loading Overlay */}
-        {processing && (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color={BRAND_COLOR} />
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <SafeAreaView style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <IconButton
+              icon="arrow-left"
+              iconColor={iconColor}
+              size={24}
+              onPress={() => router.back()}
+            />
+            <Text style={[styles.headerTitle, { color: primaryTextColor }]}>Manage Wallets</Text>
+            <IconButton
+              icon="plus"
+              iconColor={BRAND_COLOR}
+              size={24}
+              onPress={() => router.push('/wallet/welcome')}
+            />
           </View>
-        )}
 
-        {/* Modals */}
-        {renderDeleteModal()}
-        {renderAddSubWalletModal()}
-        {renderRenameModal()}
-        {renderRevealPhraseModal()}
-      </SafeAreaView>
+          {/* Wallet List */}
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {masterKeys.map(renderMasterKey)}
+          </ScrollView>
+
+          {/* Loading Overlay */}
+          {processing && (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="large" color={BRAND_COLOR} />
+            </View>
+          )}
+
+          {/* Modals */}
+          {renderDeleteModal()}
+          {renderAddSubWalletModal()}
+          {renderRenameModal()}
+          {renderRevealPhraseModal()}
+        </SafeAreaView>
+      </TouchableWithoutFeedback>
     </LinearGradient>
   );
 }

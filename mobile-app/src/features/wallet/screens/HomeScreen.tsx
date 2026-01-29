@@ -837,7 +837,7 @@ const styles = StyleSheet.create({
   },
   snackbarWrapper: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 24,
     left: 16,
     right: 16,
   },

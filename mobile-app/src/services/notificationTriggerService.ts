@@ -1,6 +1,7 @@
 /**
  * Service to trigger transaction notifications via Firebase Cloud Functions.
  */
+import { Platform } from 'react-native';
 
 // URL of the deployed Cloud Function
 const BASE_URL = 'https://europe-west3-investave-1337.cloudfunctions.net';
@@ -55,14 +56,14 @@ export const NotificationTriggerService = {
           body: JSON.stringify({
             pubKey: nodeId,
             expoPushToken: pushToken,
-            platform: 'android',
+            platform: Platform.OS,
             walletNickname: walletNickname,
           }),
         });
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error(`❌ [Notification] Registration Failed (attempt ${attempt}): ${errorText}`);
+          console.warn(`⚠️ [Notification] Registration Failed (attempt ${attempt}): ${errorText}`);
           
           // Retry on server errors (5xx), not client errors (4xx)
           if (response.status >= 500 && attempt < MAX_RETRIES) {
@@ -82,7 +83,7 @@ export const NotificationTriggerService = {
         return result;
 
       } catch (error) {
-        console.error(`❌ [Notification] Registration network error (attempt ${attempt}):`, error);
+        console.warn(`⚠️ [Notification] Registration network error (attempt ${attempt}):`, error);
         
         // Retry on network errors
         if (attempt < MAX_RETRIES) {
@@ -99,19 +100,20 @@ export const NotificationTriggerService = {
 
   /**
    * Triggers a push notification to the recipient device.
-   * Can use either direct token (legacy) or recipient PubKey (lookup).
+   * Can use direct token, recipient PubKey, or Lightning Address for lookup.
    */
   async sendTransactionNotification(
-    recipient: { pushToken?: string; pubKey?: string },
+    recipient: { pushToken?: string; pubKey?: string; lightningAddress?: string },
     amountSats: number
   ): Promise<NotificationResponse> {
     try {
-      if (!recipient.pushToken && !recipient.pubKey) {
-        return { success: false, error: 'Must provide either pushToken or pubKey' };
+      if (!recipient.pushToken && !recipient.pubKey && !recipient.lightningAddress) {
+        return { success: false, error: 'Must provide pushToken, pubKey, or lightningAddress' };
       }
 
-      console.log(`🔔 [Notification] Sending ${amountSats} sats notification to ${recipient.pubKey || recipient.pushToken}...`);
-      
+      const identifier = recipient.lightningAddress || recipient.pubKey || recipient.pushToken;
+      console.log(`🔔 [Notification] Sending ${amountSats} sats notification to ${identifier}...`);
+
       const response = await fetch(NOTIFICATION_ENDPOINT, {
         method: 'POST',
         headers: {
@@ -120,13 +122,14 @@ export const NotificationTriggerService = {
         body: JSON.stringify({
           expoPushToken: recipient.pushToken,
           recipientPubKey: recipient.pubKey,
+          recipientLightningAddress: recipient.lightningAddress,
           amount: amountSats,
         }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`❌ [Notification] HTTP Error ${response.status}: ${errorText}`);
+        console.warn(`⚠️ [Notification] HTTP Error ${response.status}: ${errorText}`);
         return {
           success: false,
           error: `HTTP Error ${response.status}: ${errorText}`,
@@ -137,7 +140,7 @@ export const NotificationTriggerService = {
       console.log('✅ [Notification] Result:', result);
       return result;
     } catch (error) {
-      console.error('❌ [Notification] Network request failed:', error);
+      console.warn('⚠️ [Notification] Network request failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown network error',
