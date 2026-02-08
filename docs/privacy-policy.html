@@ -22,12 +22,12 @@
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
         h1 {
-            color: #e94560;
+            color: #FFC107;
             font-size: 2rem;
             margin-bottom: 0.5rem;
         }
         h2 {
-            color: #e94560;
+            color: #FFC107;
             font-size: 1.3rem;
             margin-top: 2rem;
             margin-bottom: 0.75rem;
@@ -37,65 +37,63 @@
         p, li { margin-bottom: 0.75rem; }
         ul { padding-left: 1.5rem; }
         .effective-date { color: #888; font-size: 0.9rem; margin-bottom: 2rem; }
-        a { color: #e94560; }
-        .app-name { font-weight: bold; color: #e94560; }
+        a { color: #FFC107; }
+        .app-name { font-weight: bold; color: #FFC107; }
+        .highlight { background: #1a2a4a; padding: 1rem; border-radius: 8px; margin: 1rem 0; border-left: 3px solid #FFC107; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Privacy Policy</h1>
+        <h1>⚡ ZapArc Privacy Policy</h1>
         <p class="effective-date">Effective date: February 8, 2026</p>
 
-        <p><span class="app-name">ZapArc</span> ("we", "our", or "the app") is committed to protecting your privacy. This Privacy Policy explains what information we collect, how we use it, and your choices.</p>
+        <div class="highlight">
+            <p><strong>In short:</strong> ZapArc does not collect, store, or transmit any personal data to external servers. All your data stays on your device.</p>
+        </div>
 
-        <h2>1. Information We Collect</h2>
+        <h2>1. Overview</h2>
+        <p><span class="app-name">ZapArc</span> is a self-custodial Bitcoin Lightning wallet. The app is designed with privacy as a core principle. We do not operate servers that collect your data, and we do not have access to your wallet, keys, or transaction history.</p>
 
-        <p><strong>Account Information:</strong> When you create an account, we collect your email address and password (stored securely as a hash). If you sign in with Google, we receive your name and email from Google.</p>
-
-        <p><strong>Camera Access:</strong> The app requests camera permission solely to scan QR codes. Images from the camera are processed locally on your device and are not stored or transmitted.</p>
-
-        <p><strong>Location Data:</strong> The app may request your location to suggest local currency and region settings. Location data is used only on your device and is not sent to our servers.</p>
-
-        <p><strong>Push Notifications:</strong> We use Firebase Cloud Messaging to deliver push notifications. A device token is stored to enable this service.</p>
-
-        <p><strong>Payment Information:</strong> The app supports Bitcoin Lightning payments via the Breez SDK. Payment transactions are processed on the Lightning Network. We do not collect or store your wallet keys or payment details on our servers.</p>
-
-        <h2>2. How We Use Your Information</h2>
+        <h2>2. Data Storage</h2>
+        <p>All data is stored <strong>locally on your device</strong> using encrypted secure storage:</p>
         <ul>
-            <li>To provide and maintain the app's functionality</li>
-            <li>To authenticate your identity and manage your account</li>
-            <li>To send push notifications you have opted into</li>
-            <li>To process payments you initiate</li>
-            <li>To improve the app experience</li>
+            <li>Wallet keys and seed phrases</li>
+            <li>PIN and security settings</li>
+            <li>Transaction history</li>
+            <li>Address book contacts</li>
+            <li>App preferences (language, currency, theme)</li>
+        </ul>
+        <p>None of this data is transmitted to our servers. We do not have servers that receive user data.</p>
+
+        <h2>3. Device Permissions</h2>
+        <p><strong>Camera:</strong> Used solely to scan QR codes for Lightning payments. Camera images are processed locally and are never stored or transmitted.</p>
+        <p><strong>Location:</strong> May be used to suggest local currency settings. Location data is processed on-device only and is never sent externally.</p>
+        <p><strong>Notifications:</strong> Used for local payment and wallet notifications. No personal data is collected through the notification system.</p>
+
+        <h2>4. Third-Party Services</h2>
+        <p><strong>Breez SDK:</strong> ZapArc uses the Breez SDK to connect to the Bitcoin Lightning Network. When you send or receive payments, transaction data is processed through Lightning Network nodes as required by the protocol. Please refer to the <a href="https://breez.technology/privacy-policy/" target="_blank">Breez SDK Privacy Policy</a> for details.</p>
+
+        <h2>5. Data We Do NOT Collect</h2>
+        <ul>
+            <li>No email addresses or passwords</li>
+            <li>No personal identification information</li>
+            <li>No analytics or usage tracking</li>
+            <li>No device identifiers</li>
+            <li>No advertising data</li>
         </ul>
 
-        <h2>3. Data Sharing</h2>
-        <p>We do not sell your personal data. We may share information with:</p>
-        <ul>
-            <li><strong>Firebase (Google):</strong> For authentication, push notifications, and analytics</li>
-            <li><strong>Breez SDK:</strong> For processing Lightning Network payments</li>
-        </ul>
-        <p>These services have their own privacy policies governing data use.</p>
+        <h2>6. Data Security</h2>
+        <p>Your wallet data is encrypted on your device using your PIN. If you uninstall the app or lose your device without a backup, your wallet data cannot be recovered by us or anyone else. You are responsible for backing up your seed phrase.</p>
 
-        <h2>4. Data Storage and Security</h2>
-        <p>Account data is stored on secure servers. Sensitive credentials are stored locally on your device using encrypted secure storage. We implement industry-standard security measures to protect your data.</p>
+        <h2>7. Children's Privacy</h2>
+        <p>ZapArc is not directed at children under 13. The app does not knowingly collect any data from anyone, including children.</p>
 
-        <h2>5. Your Rights</h2>
-        <ul>
-            <li><strong>Access & Delete:</strong> You can view your profile data in the app and delete your account at any time from the settings screen.</li>
-            <li><strong>Permissions:</strong> You can revoke camera and location permissions at any time through your device settings.</li>
-            <li><strong>Notifications:</strong> You can disable push notifications through your device settings.</li>
-        </ul>
+        <h2>8. Changes to This Policy</h2>
+        <p>We may update this Privacy Policy if the app's functionality changes. Updates will be posted on this page with a revised effective date.</p>
 
-        <h2>6. Children's Privacy</h2>
-        <p>The app is not directed at children under 13. We do not knowingly collect personal information from children.</p>
-
-        <h2>7. Changes to This Policy</h2>
-        <p>We may update this Privacy Policy from time to time. Changes will be posted on this page with an updated effective date.</p>
-
-        <h2>8. Contact Us</h2>
+        <h2>9. Contact</h2>
         <p>If you have questions about this Privacy Policy, contact us at:</p>
-        <p><a href="mailto:w4nt3d2@gmail.com">w4nt3d2@gmail.com</a></p>
+        <p>📧 <a href="mailto:w4nt3d2@gmail.com">w4nt3d2@gmail.com</a></p>
     </div>
 </body>
 </html>
