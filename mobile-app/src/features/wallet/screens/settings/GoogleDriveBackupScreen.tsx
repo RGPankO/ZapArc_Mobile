@@ -212,11 +212,42 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
   // Backup Operations
   // ==========================================================================
 
-  const handleCreateBackup = async (): Promise<void> => {
-    if (!activeMasterKey) {
-      Alert.alert(t('common.error'), 'No active wallet found');
+  // Which master key to back up
+  const [selectedMasterKeyId, setSelectedMasterKeyId] = useState<string | null>(null);
+
+  const getSelectedMasterKey = () => {
+    if (selectedMasterKeyId) {
+      return masterKeys.find((k) => k.id === selectedMasterKeyId) || activeMasterKey;
+    }
+    return activeMasterKey;
+  };
+
+  const handleCreateBackup = async (masterKeyId?: string): Promise<void> => {
+    const keys = masterKeys || [];
+    const targetId = masterKeyId || activeMasterKey?.id;
+
+    if (!targetId) {
+      Alert.alert(t('common.error'), 'No wallet found');
       return;
     }
+
+    // If multiple wallets and no specific one chosen, let user pick
+    if (!masterKeyId && keys.length > 1) {
+      Alert.alert(
+        'Select Wallet to Back Up',
+        'Which wallet do you want to back up?',
+        [
+          ...keys.map((key) => ({
+            text: key.nickname || key.id.substring(0, 8),
+            onPress: () => handleCreateBackup(key.id),
+          })),
+          { text: t('common.cancel'), style: 'cancel' as const },
+        ]
+      );
+      return;
+    }
+
+    setSelectedMasterKeyId(targetId);
 
     // Authenticate first
     const authenticated = await authenticateUser();
@@ -232,7 +263,8 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
   };
 
   const handleConfirmCreateBackup = async (): Promise<void> => {
-    if (!activeMasterKey) return;
+    const targetKey = getSelectedMasterKey();
+    if (!targetKey) return;
 
     // Validate password
     if (!passwordStrength?.isValid) {
@@ -251,13 +283,13 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
       // This is intentional: we only back up the master seed, NOT individual sub-wallet
       // mnemonics. Sub-wallets are derived from the master seed using BIP-85, so
       // restoring the master seed allows regenerating all sub-wallets.
-      const pin = await storageService.getBiometricPin(activeMasterKey.id);
+      const pin = await storageService.getBiometricPin(targetKey.id);
       if (!pin) {
         Alert.alert(t('common.error'), 'PIN not available');
         return;
       }
 
-      const mnemonic = await getMnemonic(activeMasterKey.id, pin);
+      const mnemonic = await getMnemonic(targetKey.id, pin);
       if (!mnemonic) {
         Alert.alert(t('common.error'), 'Could not retrieve seed phrase');
         return;
@@ -267,8 +299,8 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
       const result = await googleDriveBackupService.createBackup(
         mnemonic,
         password,
-        activeMasterKey.id,
-        activeMasterKey.nickname
+        targetKey.id,
+        targetKey.nickname
       );
 
       if (result.success) {
@@ -726,14 +758,12 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
                     backups.map((backup) => (
                       <View key={backup.id} style={styles.backupItem}>
                         <View style={styles.backupInfo}>
-                          <Text style={[styles.backupDate, { color: primaryText }]}>
+                          <Text style={[styles.backupWalletName, { color: primaryText }]}>
+                            {backup.walletName || 'Unknown Wallet'}
+                          </Text>
+                          <Text style={[styles.backupDate, { color: secondaryText }]}>
                             {formatDate(backup.timestamp)}
                           </Text>
-                          {backup.walletName && (
-                            <Text style={[styles.backupWallet, { color: secondaryText }]}>
-                              {backup.walletName}
-                            </Text>
-                          )}
                         </View>
                         <View style={styles.backupActions}>
                           <TouchableOpacity
@@ -912,9 +942,13 @@ const styles = StyleSheet.create({
   backupInfo: {
     flex: 1,
   },
+  backupWalletName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
   backupDate: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 12,
+    marginTop: 2,
   },
   backupWallet: {
     fontSize: 12,

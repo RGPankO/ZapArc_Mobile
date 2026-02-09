@@ -356,14 +356,16 @@ class GoogleDriveBackupService {
       const accessToken = await this.getValidAccessToken();
       const folderId = await this.getOrCreateBackupFolder();
 
-      // Create file name
-      const fileName = `zaparc_backup_${walletId}_${Date.now()}.json`;
+      // Create file name — include wallet name for easy identification
+      const safeName = (walletName || 'Wallet').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 30);
+      const fileName = `zaparc_backup_${safeName}_${Date.now()}.json`;
 
       // Prepare multipart upload
       const metadata = {
         name: fileName,
         parents: [folderId],
         mimeType: 'application/json',
+        description: `ZapArc wallet backup: ${walletName || 'Unknown wallet'}`,
       };
 
       const boundary = 'backup_boundary_' + Date.now();
@@ -445,17 +447,26 @@ class GoogleDriveBackupService {
 
       // Parse metadata from backup files
       const backups: BackupMetadata[] = data.files
+        .filter((file) => file.name.startsWith('zaparc_backup_'))
         .map((file) => {
-          // Parse wallet name from backup content if available
           const timestampMatch = file.name.match(/_(\d+)\.json$/);
           const timestamp = timestampMatch
             ? parseInt(timestampMatch[1], 10)
             : new Date(file.createdTime).getTime();
 
+          // Parse wallet name from filename: zaparc_backup_WalletName_timestamp.json
+          let walletName: string | undefined;
+          const nameMatch = file.name.match(/^zaparc_backup_(.+?)_\d+\.json$/);
+          if (nameMatch && nameMatch[1]) {
+            // Convert underscores back to spaces for display
+            walletName = nameMatch[1].replace(/_/g, ' ');
+          }
+
           return {
             id: file.id,
             name: file.name,
             timestamp,
+            walletName,
             size: parseInt(file.size || '0', 10),
           };
         });
