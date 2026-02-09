@@ -228,6 +228,21 @@ export function WalletSelectionScreen(): React.JSX.Element {
               <Text style={[styles.addNewWalletHint, { color: secondaryTextColor }]}>
                 Forgot your PIN? Create a new wallet to start fresh.
               </Text>
+
+              {/* Restore from Cloud Backup */}
+              <TouchableOpacity
+                style={styles.cloudRestoreButton}
+                onPress={() => router.push('/wallet/settings/google-drive-backup')}
+              >
+                <IconButton
+                  icon="cloud-download"
+                  iconColor={secondaryTextColor}
+                  size={24}
+                />
+                <Text style={[styles.cloudRestoreText, { color: secondaryTextColor }]}>
+                  Restore from Cloud Backup
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         ) : (
@@ -441,5 +456,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 8,
     textAlign: 'center',
+  },
+  cloudRestoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    marginTop: 16,
+  },
+  cloudRestoreText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: -4,
   },
 });

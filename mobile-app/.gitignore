@@ -1,3 +1,8 @@
+# Build artifacts
+*.apk
+*.aab
+*.ipa
+
 # Dependencies
 node_modules/
 npm-debug.log*

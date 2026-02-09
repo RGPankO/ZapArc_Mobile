@@ -121,6 +121,20 @@ export function WalletWelcomeScreen(): React.JSX.Element {
               {t('onboarding.importExisting')}
             </Button>
 
+            {/* Restore from Cloud Backup - only show for first-time setup (no active wallet) */}
+            {!activeMasterKey && (
+              <Button
+                mode="outlined"
+                onPress={() => router.push('/wallet/settings/google-drive-backup')}
+                icon="cloud-download"
+                style={[styles.cloudRestoreButton, { borderColor: secondaryText }]}
+                contentStyle={styles.buttonContent}
+                labelStyle={[styles.importButtonLabel, { color: primaryText }]}
+              >
+                Restore from Cloud Backup
+              </Button>
+            )}
+
             {/* Add Sub-Wallet Button - only show if logged in */}
             {activeMasterKey && (
               <Button
@@ -308,6 +322,10 @@ const styles = StyleSheet.create({
     color: '#1a1a2e',
   },
   importButton: {
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  cloudRestoreButton: {
     borderRadius: 12,
     borderWidth: 1,
   },

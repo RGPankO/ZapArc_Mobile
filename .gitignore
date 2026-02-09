@@ -239,4 +239,4 @@ coverage/
 **/**/query_engine-windows.dll.node
 
 **/android/**
-**/ios/**
+**/ios/**mobile-app/dev-build.apk  

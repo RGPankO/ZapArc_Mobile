@@ -279,6 +279,23 @@ export function WalletSettingsScreen(): React.JSX.Element {
               descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
               style={styles.listItem}
             />
+
+            <Divider style={styles.divider} />
+
+            <List.Item
+              title={t('cloudBackup.title')}
+              description={t('cloudBackup.description')}
+              left={(props) => (
+                <List.Icon {...props} icon="cloud-upload" color={BRAND_COLOR} />
+              )}
+              right={(props) => (
+                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
+              )}
+              onPress={() => router.push('/wallet/settings/google-drive-backup')}
+              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
+              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
+              style={styles.listItem}
+            />
           </View>
 
 

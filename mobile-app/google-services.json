@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "493446050347-nrc5jd6motl2qkibpj60jarhim4r7j8d.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.zaparcmobile.mobileapp",
+            "certificate_hash": "fde6cf623bd5a675c71ea44a54cee431fc65c0bf"
+          }
+        },
+        {
           "client_id": "493446050347-f67dubta18b0f2mll85qs0k7keqk1jka.apps.googleusercontent.com",
           "client_type": 3
         }
