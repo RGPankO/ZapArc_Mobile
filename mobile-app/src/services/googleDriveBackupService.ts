@@ -111,7 +111,8 @@ class GoogleDriveBackupService {
           ? { iosClientId: GOOGLE_IOS_CLIENT_ID }
           : { webClientId: GOOGLE_WEB_CLIENT_ID }),
         scopes: SCOPES,
-        offlineAccess: Platform.OS !== 'ios', // Only Android needs offline access with webClientId
+        offlineAccess: Platform.OS !== 'ios',
+        profileImageSize: 0, // Don't request profile image
       });
 
       this.isConfigured = true;
@@ -428,6 +429,8 @@ class GoogleDriveBackupService {
       );
 
       if (!response.ok) {
+        const errorBody = await response.text();
+        console.error('❌ [GoogleDrive] List API error:', response.status, errorBody);
         throw new Error('Failed to list backups');
       }
 
