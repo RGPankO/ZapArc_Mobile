@@ -33,6 +33,7 @@ const BULGARIA_BOUNDS = {
 
 class LocationService {
   private cachedLocation: LocationInfo | null = null;
+  private cachedCountryByIP: string | null = null;
   private lastLocationCheck: number = 0;
   private readonly CACHE_DURATION = 1000 * 60 * 60; // 1 hour
 
@@ -114,6 +115,48 @@ class LocationService {
       return locationInfo;
     } catch (error) {
       console.error('❌ [LocationService] IP geolocation failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Detect country code via IP geolocation (no permissions required).
+   * Uses ipapi.co with a 3-second timeout. Result is cached.
+   * Intended for language auto-detection.
+   */
+  async getCountryByIP(): Promise<string | null> {
+    // Return cached value if available
+    if (this.cachedCountryByIP !== null) {
+      console.log('📍 [LocationService] Using cached IP country:', this.cachedCountryByIP);
+      return this.cachedCountryByIP;
+    }
+
+    try {
+      console.log('📍 [LocationService] Detecting country via IP...');
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+      const response = await fetch('https://ipapi.co/json/', {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`IP country lookup failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const countryCode: string | null = data.country_code ?? null;
+
+      this.cachedCountryByIP = countryCode;
+      console.log('✅ [LocationService] IP country detected:', countryCode);
+      return countryCode;
+    } catch (error) {
+      console.error('❌ [LocationService] IP country detection failed:', error);
       return null;
     }
   }

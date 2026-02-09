@@ -70,15 +70,10 @@ export function LanguageProvider({ children }: LanguageProviderProps): React.JSX
         setCurrentLanguage(i18n.getLanguage());
         setIsManuallySet(i18n.isManuallySet());
 
-        // Check location permission
-        const hasPermission = await locationService.hasPermission();
-        setLocationPermissionGranted(hasPermission);
-
-        // Get cached location info
-        const cachedLocation = locationService.getCachedLocation();
-        if (cachedLocation) {
-          setIsInBulgaria(cachedLocation.isInBulgaria);
-        }
+        // Detect country via IP (no permission needed)
+        const countryCode = await locationService.getCountryByIP();
+        setIsInBulgaria(countryCode === 'BG');
+        setLocationPermissionGranted(true); // No permission needed for IP lookup
 
         console.log('✅ [LanguageProvider] Initialized:', {
           language: i18n.getLanguage(),
@@ -157,44 +152,36 @@ export function LanguageProvider({ children }: LanguageProviderProps): React.JSX
 
   const detectFromLocation = useCallback(async (): Promise<void> => {
     try {
-      const location = await locationService.getCurrentLocation();
+      const countryCode = await locationService.getCountryByIP();
+      const detectedInBulgaria = countryCode === 'BG';
+      setIsInBulgaria(detectedInBulgaria);
 
-      if (location) {
-        setIsInBulgaria(location.isInBulgaria);
+      // If not manually set, update language based on IP country
+      if (!isManuallySet) {
+        const newLanguage: SupportedLanguage = detectedInBulgaria ? 'bg' : 'en';
+        await i18n.setLanguage(newLanguage);
+        setCurrentLanguage(newLanguage);
+        setIsManuallySet(false); // Keep it as auto-detected
 
-        // If not manually set, update language based on location
-        if (!isManuallySet) {
-          const newLanguage = location.isInBulgaria ? 'bg' : 'en';
-          await i18n.setLanguage(newLanguage);
-          setCurrentLanguage(newLanguage);
-          setIsManuallySet(false); // Keep it as auto-detected
-
-          console.log('✅ [LanguageProvider] Language detected from location:', newLanguage);
-        }
+        console.log('✅ [LanguageProvider] Language detected from IP:', newLanguage);
       }
     } catch (err) {
-      console.error('❌ [LanguageProvider] Location detection failed:', err);
+      console.error('❌ [LanguageProvider] IP detection failed:', err);
     }
   }, [isManuallySet]);
 
   const requestLocationPermission = useCallback(async (): Promise<boolean> => {
+    // No permission needed for IP-based detection
     try {
       setIsLoading(true);
       setError(null);
-
-      const result = await locationService.requestPermission();
-      setLocationPermissionGranted(result.granted);
-
-      if (result.granted) {
-        // Detect language from location
-        await detectFromLocation();
-      }
-
-      return result.granted;
+      setLocationPermissionGranted(true);
+      await detectFromLocation();
+      return true;
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to request permission';
+      const message = err instanceof Error ? err.message : 'Failed to detect location';
       setError(message);
-      console.error('❌ [LanguageProvider] Permission request failed:', err);
+      console.error('❌ [LanguageProvider] IP detection failed:', err);
       return false;
     } finally {
       setIsLoading(false);

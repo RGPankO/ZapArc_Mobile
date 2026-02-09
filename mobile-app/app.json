@@ -75,12 +75,6 @@
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan QR codes."
         }
       ],
-      [
-        "expo-location",
-        {
-          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to access your location to suggest local currency and region settings."
-        }
-      ],
       "expo-secure-store",
       [
         "@react-native-google-signin/google-signin",
