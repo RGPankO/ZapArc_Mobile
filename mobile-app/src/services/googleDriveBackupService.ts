@@ -174,7 +174,8 @@ class GoogleDriveBackupService {
       console.log('🔐 [GoogleDrive] Starting native Google Sign-In...');
 
       // Check if client ID is configured
-      if (!GOOGLE_WEB_CLIENT_ID || !this.isConfigured) {
+      const hasClientId = Platform.OS === 'ios' ? !!GOOGLE_IOS_CLIENT_ID : !!GOOGLE_WEB_CLIENT_ID;
+      if (!hasClientId || !this.isConfigured) {
         console.error('❌ [GoogleDrive] Google Client ID not configured');
         return {
           success: false,
