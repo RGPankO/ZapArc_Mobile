@@ -418,9 +418,16 @@ class GoogleDriveBackupService {
       const accessToken = await this.getValidAccessToken();
       const folderId = await this.getOrCreateBackupFolder();
 
-      const query = `'${folderId}' in parents and name contains 'zaparc_backup_' and trashed=false`;
+      const query = `'${folderId}' in parents and trashed=false`;
+      console.log('🔍 [GoogleDrive] List query:', query);
+      const params = new URLSearchParams({
+        q: query,
+        orderBy: 'createdTime desc',
+        fields: 'files(id,name,createdTime,size)',
+        spaces: 'drive',
+      });
       const response = await fetch(
-        `${DRIVE_API.FILES}?q=${encodeURIComponent(query)}&orderBy=createdTime desc&fields=files(id,name,createdTime,size)&spaces=drive`,
+        `${DRIVE_API.FILES}?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
