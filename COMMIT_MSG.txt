@@ -1,0 +1,3 @@
+chore: disable IP geolocation for language detection
+
+Default to English, user can change language in settings.

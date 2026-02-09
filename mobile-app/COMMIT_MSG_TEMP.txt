@@ -1,0 +1,1 @@
+feat: replace GPS-based language detection with IP geolocation

@@ -17,7 +17,14 @@
       "bundleIdentifier": "com.zaparcmobile.mobileapp",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.493446050347-f67dubta18b0f2mll85qs0k7keqk1jka"
+            ]
+          }
+        ]
       }
     },
     "android": {
