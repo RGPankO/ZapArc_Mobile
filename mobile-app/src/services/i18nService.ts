@@ -748,16 +748,9 @@ class I18nService {
         this.isManualOverride = true;
         console.log('🌐 [i18n] Using saved language:', this.currentLanguage);
       } else {
-        // Try to detect country from IP (no permission required)
-        const countryCode = await locationService.getCountryByIP();
-        
-        if (countryCode === 'BG') {
-          this.currentLanguage = 'bg';
-          console.log('🌐 [i18n] Detected Bulgaria via IP, using Bulgarian');
-        } else {
-          this.currentLanguage = 'en';
-          console.log('🌐 [i18n] Using default English');
-        }
+        // Default to English — user can change in settings
+        this.currentLanguage = 'en';
+        console.log('🌐 [i18n] Using default English');
       }
 
       this.isInitialized = true;
@@ -803,9 +796,8 @@ class I18nService {
     this.isManualOverride = false;
     await settingsService.updateUserSettings({ language: 'auto' });
 
-    // Re-detect from IP
-    const countryCode = await locationService.getCountryByIP();
-    this.currentLanguage = countryCode === 'BG' ? 'bg' : 'en';
+    // Default to English
+    this.currentLanguage = 'en';
 
     console.log('🌐 [i18n] Reset to auto, detected:', this.currentLanguage);
   }
