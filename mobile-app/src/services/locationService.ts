@@ -121,7 +121,7 @@ class LocationService {
 
   /**
    * Detect country code via IP geolocation (no permissions required).
-   * Uses ipapi.co with a 3-second timeout. Result is cached.
+   * Tries multiple free providers with a 3-second timeout. Result is cached.
    * Intended for language auto-detection.
    */
   async getCountryByIP(): Promise<string | null> {
@@ -131,34 +131,51 @@ class LocationService {
       return this.cachedCountryByIP;
     }
 
-    try {
-      console.log('📍 [LocationService] Detecting country via IP...');
+    const providers = [
+      {
+        url: 'http://ip-api.com/json/?fields=countryCode',
+        extract: (data: Record<string, string>) => data.countryCode,
+      },
+      {
+        url: 'https://ipapi.co/json/',
+        extract: (data: Record<string, string>) => data.country_code,
+      },
+    ];
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
+    for (const provider of providers) {
+      try {
+        console.log('📍 [LocationService] Trying IP lookup:', provider.url);
 
-      const response = await fetch('https://ipapi.co/json/', {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-        signal: controller.signal,
-      });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-      clearTimeout(timeoutId);
+        const response = await fetch(provider.url, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          signal: controller.signal,
+        });
 
-      if (!response.ok) {
-        throw new Error(`IP country lookup failed: ${response.status}`);
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          console.warn(`⚠️ [LocationService] Provider returned ${response.status}, trying next...`);
+          continue;
+        }
+
+        const data = await response.json();
+        const countryCode: string | null = provider.extract(data) ?? null;
+
+        this.cachedCountryByIP = countryCode;
+        console.log('✅ [LocationService] IP country detected:', countryCode);
+        return countryCode;
+      } catch (error) {
+        console.warn('⚠️ [LocationService] Provider failed:', error);
+        continue;
       }
-
-      const data = await response.json();
-      const countryCode: string | null = data.country_code ?? null;
-
-      this.cachedCountryByIP = countryCode;
-      console.log('✅ [LocationService] IP country detected:', countryCode);
-      return countryCode;
-    } catch (error) {
-      console.error('❌ [LocationService] IP country detection failed:', error);
-      return null;
     }
+
+    console.error('❌ [LocationService] All IP country providers failed');
+    return null;
   }
 
   /**
