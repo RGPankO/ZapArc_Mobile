@@ -8,6 +8,7 @@ import {
   type User,
 } from '@react-native-google-signin/google-signin';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import {
   encryptMnemonic,
   decryptMnemonic,
@@ -96,16 +97,21 @@ class GoogleDriveBackupService {
    */
   async initialize(): Promise<void> {
     try {
-      if (!GOOGLE_WEB_CLIENT_ID) {
-        console.warn('⚠️ [GoogleDrive] No Web Client ID configured');
+      const hasRequiredClientId = Platform.OS === 'ios' ? !!GOOGLE_IOS_CLIENT_ID : !!GOOGLE_WEB_CLIENT_ID;
+      if (!hasRequiredClientId) {
+        console.warn(`⚠️ [GoogleDrive] No ${Platform.OS === 'ios' ? 'iOS' : 'Web'} Client ID configured`);
         return;
       }
 
       GoogleSignin.configure({
-        webClientId: GOOGLE_WEB_CLIENT_ID,
-        iosClientId: GOOGLE_IOS_CLIENT_ID || undefined,
+        // On iOS, use iosClientId only — webClientId causes "access blocked" error
+        // because Google rejects custom URL scheme redirects for Web client types.
+        // On Android, webClientId is needed for server auth code.
+        ...(Platform.OS === 'ios'
+          ? { iosClientId: GOOGLE_IOS_CLIENT_ID }
+          : { webClientId: GOOGLE_WEB_CLIENT_ID }),
         scopes: SCOPES,
-        offlineAccess: true, // Get refresh token for server-side access
+        offlineAccess: Platform.OS !== 'ios', // Only Android needs offline access with webClientId
       });
 
       this.isConfigured = true;
