@@ -52,6 +52,7 @@ interface DriveListResponse {
 
 // Google OAuth configuration - loaded from environment variables
 const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
+const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '';
 
 // Secure store keys (only for cached user info)
 const STORAGE_KEYS = {
@@ -102,6 +103,7 @@ class GoogleDriveBackupService {
 
       GoogleSignin.configure({
         webClientId: GOOGLE_WEB_CLIENT_ID,
+        iosClientId: GOOGLE_IOS_CLIENT_ID || undefined,
         scopes: SCOPES,
         offlineAccess: true, // Get refresh token for server-side access
       });
