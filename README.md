@@ -57,6 +57,13 @@ Cross-platform mobile app skeleton with React Native (Expo) frontend and NestJS 
 - Docker (for PostgreSQL database)
 - Expo Go app (for mobile testing)
 
+### Native Development (iOS Simulator / Android Emulator)
+
+For local native builds without EAS cloud services, see **[docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md)** which covers:
+- iOS: Xcode, CocoaPods, Simulator setup
+- Android: Android Studio, SDK, Emulator setup  
+- Appium: Automated UI testing / AI agent integration
+
 ### Setup
 
 ```bash
