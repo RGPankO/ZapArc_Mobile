@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:transparent;">
+<canvas id="c" width="512" height="512" style="display:block;"></canvas>
+<script>
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+const W = 512;
+ctx.beginPath();
+ctx.roundRect(0, 0, W, W, 90);
+ctx.clip();
+const bg = ctx.createRadialGradient(256, 200, 50, 256, 300, 400);
+bg.addColorStop(0, '#1a1a4a');
+bg.addColorStop(0.6, '#0d0d2b');
+bg.addColorStop(1, '#050510');
+ctx.fillStyle = bg;
+ctx.fillRect(0, 0, W, W);
+for (let i = 0; i < 4; i++) {
+  const r = 90 + i * 45;
+  const alpha = 0.25 - i * 0.05;
+  ctx.strokeStyle = `rgba(88, 86, 214, ${alpha})`;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(256, 256, r, -Math.PI * 0.7 - i * 0.1, Math.PI * 0.2 + i * 0.1);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(256, 256, r, Math.PI * 0.3 - i * 0.1, Math.PI * 1.2 + i * 0.1);
+  ctx.stroke();
+}
+const glow = ctx.createRadialGradient(256, 230, 20, 256, 260, 200);
+glow.addColorStop(0, 'rgba(0, 140, 255, 0.4)');
+glow.addColorStop(0.4, 'rgba(60, 60, 220, 0.15)');
+glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+ctx.fillStyle = glow;
+ctx.fillRect(0, 0, W, W);
+ctx.beginPath();
+ctx.moveTo(290, 65);
+ctx.lineTo(195, 235);
+ctx.lineTo(265, 225);
+ctx.lineTo(218, 445);
+ctx.lineTo(320, 265);
+ctx.lineTo(248, 278);
+ctx.closePath();
+const boltGrad = ctx.createLinearGradient(220, 65, 280, 445);
+boltGrad.addColorStop(0, '#00CCFF');
+boltGrad.addColorStop(0.3, '#007AFF');
+boltGrad.addColorStop(0.7, '#5856D6');
+boltGrad.addColorStop(1, '#7B61FF');
+ctx.fillStyle = boltGrad;
+ctx.shadowColor = '#007AFF';
+ctx.shadowBlur = 40;
+ctx.fill();
+ctx.shadowBlur = 20;
+ctx.fill();
+ctx.shadowBlur = 0;
+ctx.beginPath();
+ctx.moveTo(290, 65);
+ctx.lineTo(195, 235);
+ctx.lineTo(265, 225);
+ctx.lineTo(240, 310);
+ctx.lineTo(248, 278);
+ctx.closePath();
+const highlight = ctx.createLinearGradient(200, 65, 280, 300);
+highlight.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
+highlight.addColorStop(0.6, 'rgba(255, 255, 255, 0.05)');
+highlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
+ctx.fillStyle = highlight;
+ctx.fill();
+const topGlow = ctx.createRadialGradient(280, 90, 2, 280, 90, 40);
+topGlow.addColorStop(0, 'rgba(200, 240, 255, 0.6)');
+topGlow.addColorStop(1, 'rgba(200, 240, 255, 0)');
+ctx.fillStyle = topGlow;
+ctx.fillRect(240, 50, 80, 80);
+</script>
+</body>
+</html>
