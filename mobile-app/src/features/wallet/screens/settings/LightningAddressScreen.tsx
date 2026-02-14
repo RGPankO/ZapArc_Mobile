@@ -119,14 +119,34 @@ export function LightningAddressScreen(): React.JSX.Element {
   }, [username, checkAvailability, validateUsername]);
 
   const handleRegister = useCallback(async () => {
-    if (availabilityStatus !== 'available') {
-      Alert.alert(t('common.error'), t('lightningAddressScreen.checkAvailability'));
+    // Validate format first
+    const validation = validateUsername(username);
+    if (!validation.isValid) {
+      setValidationError(validation.error || 'Invalid username');
+      setAvailabilityStatus('error');
       return;
     }
 
     setIsRegistering(true);
+    setValidationError(null);
 
     try {
+      // Auto-check availability if not already checked
+      if (availabilityStatus !== 'available') {
+        const result = await checkAvailability(username);
+        if (result.error) {
+          setValidationError(result.error);
+          setAvailabilityStatus('error');
+          return;
+        }
+        if (!result.available) {
+          setAvailabilityStatus('unavailable');
+          setValidationError('This username is already taken');
+          return;
+        }
+        setAvailabilityStatus('available');
+      }
+
       const result = await register(username, description || undefined);
 
       if (result.success) {
@@ -140,7 +160,7 @@ export function LightningAddressScreen(): React.JSX.Element {
     } finally {
       setIsRegistering(false);
     }
-  }, [username, description, availabilityStatus, register]);
+  }, [username, description, availabilityStatus, register, checkAvailability, validateUsername]);
 
   const handleUnregister = useCallback(async () => {
     Alert.alert(
@@ -367,10 +387,7 @@ export function LightningAddressScreen(): React.JSX.Element {
                       mode="contained"
                       onPress={handleRegister}
                       loading={isRegistering}
-                      disabled={
-                        isRegistering ||
-                        availabilityStatus !== 'available'
-                      }
+                      disabled={isRegistering || !username || username.length < 3}
                       style={styles.registerButton}
                       labelStyle={styles.registerButtonLabel}
                     >
