@@ -243,10 +243,10 @@ export function WalletImportScreen(): React.JSX.Element {
 
         <StyledTextInput
           mode="outlined"
-          label="Enter PIN"
+          label="Enter 6-digit PIN"
           value={pin}
           onChangeText={(text) => {
-            setPin(text);
+            setPin(text.replace(/[^0-9]/g, ''));
             if (text.length === 6) {
               Keyboard.dismiss();
             }
@@ -256,13 +256,16 @@ export function WalletImportScreen(): React.JSX.Element {
           maxLength={6}
           style={styles.pinInput}
         />
+        {pin.length > 0 && pin.length < 6 && (
+          <Text style={styles.pinHint}>{6 - pin.length} more digit{6 - pin.length !== 1 ? 's' : ''} needed</Text>
+        )}
 
         <StyledTextInput
           mode="outlined"
-          label="Confirm PIN"
+          label="Confirm 6-digit PIN"
           value={confirmPin}
           onChangeText={(text) => {
-            setConfirmPin(text);
+            setConfirmPin(text.replace(/[^0-9]/g, ''));
             if (text.length === 6) {
               Keyboard.dismiss();
             }
@@ -274,6 +277,9 @@ export function WalletImportScreen(): React.JSX.Element {
         />
       </View>
 
+      {pin.length > 0 && pin.length < 6 && confirmPin.length === 0 && (
+        <Text style={styles.pinMismatch}>PIN must be exactly 6 digits</Text>
+      )}
       {pin.length >= 6 && confirmPin.length >= 6 && pin !== confirmPin && (
         <Text style={styles.pinMismatch}>PINs do not match</Text>
       )}
@@ -501,6 +507,13 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   pinInput: {
+  },
+  pinHint: {
+    color: '#FF9800',
+    fontSize: 12,
+    marginTop: -4,
+    marginBottom: 4,
+    marginLeft: 4,
   },
   pinMismatch: {
     color: '#F44336',
