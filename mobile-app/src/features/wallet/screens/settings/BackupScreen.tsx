@@ -8,6 +8,10 @@ import {
   ScrollView,
   Alert,
   TouchableOpacity,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Text, Button, IconButton, Switch } from 'react-native-paper';
@@ -40,6 +44,8 @@ export function BackupScreen(): React.JSX.Element {
   const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [backupConfirmed, setBackupConfirmed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [pinPromptVisible, setPinPromptVisible] = useState(false);
+  const [manualPin, setManualPin] = useState('');
 
   // Authenticate and reveal mnemonic
   const handleRevealMnemonic = useCallback(async () => {
@@ -70,22 +76,17 @@ export function BackupScreen(): React.JSX.Element {
       }
 
       // Get PIN from biometric storage (stored during wallet creation)
-      const pin = await storageService.getBiometricPin(activeMasterKey.id);
+      let pin = await storageService.getBiometricPin(activeMasterKey.id);
       
       if (!pin) {
-        Alert.alert('Error', 'PIN not available. Please unlock wallet with PIN first.');
+        // PIN not in biometric storage — prompt user to enter it
         setIsLoading(false);
+        setPinPromptVisible(true);
         return;
       }
 
       // Get the mnemonic with masterKeyId and pin
-      const phrase = await getMnemonic(activeMasterKey.id, pin);
-      if (phrase) {
-        setMnemonic(phrase);
-        setShowMnemonic(true);
-      } else {
-        Alert.alert('Error', 'Could not retrieve recovery phrase');
-      }
+      await revealWithPin(pin);
     } catch (err) {
       console.error('Failed to reveal mnemonic:', err);
       Alert.alert('Error', 'Failed to authenticate');
@@ -93,6 +94,41 @@ export function BackupScreen(): React.JSX.Element {
       setIsLoading(false);
     }
   }, [activeMasterKey, activeWalletInfo, getMnemonic]);
+
+  // Reveal mnemonic with a given PIN
+  const revealWithPin = useCallback(async (pin: string) => {
+    if (!activeMasterKey) return;
+    try {
+      const phrase = await getMnemonic(activeMasterKey.id, pin);
+      if (phrase) {
+        setMnemonic(phrase);
+        setShowMnemonic(true);
+        // Store PIN for future use so this wallet won't need manual entry again
+        storageService.storeBiometricPin(activeMasterKey.id, pin).catch(() => {});
+      } else {
+        Alert.alert('Error', 'Incorrect PIN or could not retrieve recovery phrase');
+      }
+    } catch (err) {
+      console.error('Failed to reveal mnemonic:', err);
+      Alert.alert('Error', 'Incorrect PIN');
+    }
+  }, [activeMasterKey, getMnemonic]);
+
+  // Handle manual PIN submission
+  const handleManualPinSubmit = useCallback(async () => {
+    if (manualPin.length !== 6) {
+      Alert.alert('Error', 'PIN must be 6 digits');
+      return;
+    }
+    setPinPromptVisible(false);
+    setIsLoading(true);
+    try {
+      await revealWithPin(manualPin);
+    } finally {
+      setManualPin('');
+      setIsLoading(false);
+    }
+  }, [manualPin, revealWithPin]);
 
   // Hide mnemonic
   const handleHideMnemonic = useCallback(() => {
@@ -313,6 +349,42 @@ export function BackupScreen(): React.JSX.Element {
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      {/* PIN Entry Modal */}
+      <Modal visible={pinPromptVisible} transparent animationType="fade">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Enter Your PIN</Text>
+            <Text style={styles.modalDescription}>Enter your 6-digit PIN to view the recovery phrase.</Text>
+            <TextInput
+              style={styles.modalPinInput}
+              value={manualPin}
+              onChangeText={(text) => setManualPin(text.replace(/[^0-9]/g, ''))}
+              keyboardType="numeric"
+              secureTextEntry
+              maxLength={6}
+              placeholder="Enter 6-digit PIN"
+              placeholderTextColor="#999"
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => { setPinPromptVisible(false); setManualPin(''); }}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalConfirmButton, manualPin.length !== 6 && { opacity: 0.5 }]}
+                onPress={handleManualPinSubmit}
+                disabled={manualPin.length !== 6}
+              >
+                <Text style={styles.modalConfirmText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -525,5 +597,73 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#FFFFFF',
     fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#1a1a2e',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 340,
+    borderWidth: 1,
+    borderColor: 'rgba(247, 147, 26, 0.3)',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  modalDescription: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginBottom: 20,
+  },
+  modalPinInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 20,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    letterSpacing: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(247, 147, 26, 0.3)',
+    marginBottom: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancelButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalConfirmButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#F7931A',
+    alignItems: 'center',
+  },
+  modalConfirmText: {
+    color: '#1a1a2e',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
