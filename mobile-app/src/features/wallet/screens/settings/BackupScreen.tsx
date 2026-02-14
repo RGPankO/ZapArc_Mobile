@@ -63,6 +63,7 @@ export function BackupScreen(): React.JSX.Element {
     try {
       // Only use biometric if the user has it enabled in app settings
       const biometricEnabledInSettings = settings?.biometricEnabled ?? false;
+      console.log('🔐 [BackupScreen] biometricEnabled from settings:', biometricEnabledInSettings, 'raw settings:', settings?.biometricEnabled);
       const biometricAvailable = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
 
@@ -96,7 +97,7 @@ export function BackupScreen(): React.JSX.Element {
     } finally {
       setIsLoading(false);
     }
-  }, [activeMasterKey, activeWalletInfo, getMnemonic]);
+  }, [activeMasterKey, activeWalletInfo, getMnemonic, settings]);
 
   // Reveal mnemonic with a given PIN
   const revealWithPin = useCallback(async (pin: string) => {
