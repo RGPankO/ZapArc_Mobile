@@ -21,7 +21,9 @@ import {
   getWordCount,
   generateMasterKeyNickname,
 } from '../../../utils/mnemonic';
+import * as Notifications from 'expo-notifications';
 import { useWallet } from '../../../hooks/useWallet';
+import { useSettings } from '../../../hooks/useSettings';
 import { useAppTheme } from '../../../contexts/ThemeContext';
 import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_COLOR } from '../../../utils/theme-helpers';
 
@@ -37,6 +39,7 @@ type ImportStep = 'input' | 'pin' | 'complete';
 
 export function WalletImportScreen(): React.JSX.Element {
   const { importMasterKey, masterKeys } = useWallet();
+  const { updateSettings } = useSettings();
   const { themeMode } = useAppTheme();
 
   // Theme colors
@@ -131,9 +134,22 @@ export function WalletImportScreen(): React.JSX.Element {
   // Step 3: Complete
   // ========================================
 
-  const handleComplete = useCallback(() => {
+  const handleComplete = useCallback(async () => {
+    // Ask for notification permission on wallet setup
+    try {
+      const { status: existing } = await Notifications.getPermissionsAsync();
+      if (existing !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        if (status === 'granted') {
+          await updateSettings({ notificationsEnabled: true, notifyPaymentReceived: true });
+          console.log('✅ [WalletImport] Notification permission granted');
+        }
+      }
+    } catch (err) {
+      console.warn('⚠️ [WalletImport] Failed to request notification permission:', err);
+    }
     router.replace('/wallet/home');
-  }, []);
+  }, [updateSettings]);
 
   // ========================================
   // Render Steps

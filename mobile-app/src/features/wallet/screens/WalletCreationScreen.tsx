@@ -18,8 +18,10 @@ import { StyledTextInput } from '../../../components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Notifications from 'expo-notifications';
 import { generateMnemonic, generateMasterKeyNickname } from '../../../utils/mnemonic';
 import { useWallet } from '../../../hooks/useWallet';
+import { useSettings } from '../../../hooks/useSettings';
 import { useAppTheme } from '../../../contexts/ThemeContext';
 import { getGradientColors, BRAND_COLOR } from '../../../utils/theme-helpers';
 
@@ -40,6 +42,7 @@ interface MnemonicWord {
 
 export function WalletCreationScreen(): React.JSX.Element {
   const { createMasterKey, masterKeys } = useWallet();
+  const { updateSettings } = useSettings();
   const { themeMode } = useAppTheme();
 
   // Theme colors
@@ -264,9 +267,22 @@ export function WalletCreationScreen(): React.JSX.Element {
   // Step 5: Complete
   // ========================================
 
-  const handleComplete = useCallback(() => {
+  const handleComplete = useCallback(async () => {
+    // Ask for notification permission on first wallet creation
+    try {
+      const { status: existing } = await Notifications.getPermissionsAsync();
+      if (existing !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        if (status === 'granted') {
+          await updateSettings({ notificationsEnabled: true, notifyPaymentReceived: true });
+          console.log('✅ [WalletCreation] Notification permission granted');
+        }
+      }
+    } catch (err) {
+      console.warn('⚠️ [WalletCreation] Failed to request notification permission:', err);
+    }
     router.replace('/wallet/home');
-  }, []);
+  }, [updateSettings]);
 
   // Copy mnemonic to clipboard
   const handleCopyMnemonic = useCallback(async () => {

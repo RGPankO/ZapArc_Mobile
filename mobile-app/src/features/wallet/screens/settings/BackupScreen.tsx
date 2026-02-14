@@ -20,6 +20,7 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useWallet } from '../../../../hooks/useWallet';
+import { useSettings } from '../../../../hooks/useSettings';
 import { storageService } from '../../../../services';
 import { useAppTheme } from '../../../../contexts/ThemeContext';
 import { useLanguage } from '../../../../hooks/useLanguage';
@@ -31,6 +32,7 @@ import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_CO
 
 export function BackupScreen(): React.JSX.Element {
   const { getMnemonic, activeMasterKey, activeWalletInfo } = useWallet();
+  const { settings } = useSettings();
   const { themeMode } = useAppTheme();
   const { t } = useLanguage();
 
@@ -59,11 +61,12 @@ export function BackupScreen(): React.JSX.Element {
     setIsLoading(true);
 
     try {
-      // First try biometric authentication
+      // Only use biometric if the user has it enabled in app settings
+      const biometricEnabledInSettings = settings?.biometricEnabled ?? false;
       const biometricAvailable = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
 
-      if (biometricAvailable && isEnrolled) {
+      if (biometricEnabledInSettings && biometricAvailable && isEnrolled) {
         const result = await LocalAuthentication.authenticateAsync({
           promptMessage: 'Authenticate to view recovery phrase',
           fallbackLabel: 'Use PIN',
