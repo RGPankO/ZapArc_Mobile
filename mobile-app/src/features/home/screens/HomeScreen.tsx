@@ -53,7 +53,7 @@ export function HomeScreen(): React.JSX.Element {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text variant="headlineMedium" style={styles.title}>
-          Mobile App Skeleton
+          ZapArc
         </Text>
         <Text variant="bodyMedium" style={styles.subtitle}>
           Welcome back!
