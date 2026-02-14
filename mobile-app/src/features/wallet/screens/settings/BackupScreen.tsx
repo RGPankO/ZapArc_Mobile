@@ -21,6 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useWallet } from '../../../../hooks/useWallet';
 import { useSettings } from '../../../../hooks/useSettings';
+import { settingsService } from '../../../../services/settingsService';
 import { storageService } from '../../../../services';
 import { useAppTheme } from '../../../../contexts/ThemeContext';
 import { useLanguage } from '../../../../hooks/useLanguage';
@@ -62,8 +63,10 @@ export function BackupScreen(): React.JSX.Element {
 
     try {
       // Only use biometric if the user has it enabled in app settings
-      const biometricEnabledInSettings = settings?.biometricEnabled ?? false;
-      console.log('🔐 [BackupScreen] biometricEnabled from settings:', biometricEnabledInSettings, 'raw settings:', settings?.biometricEnabled);
+      // Read directly from storage to avoid stale hook state
+      const freshSettings = await settingsService.getUserSettings();
+      const biometricEnabledInSettings = freshSettings.biometricEnabled ?? false;
+      console.log('🔐 [BackupScreen] biometricEnabled:', biometricEnabledInSettings);
       const biometricAvailable = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
 
