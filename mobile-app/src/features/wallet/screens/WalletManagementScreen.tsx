@@ -404,11 +404,13 @@ export function WalletManagementScreen(): React.JSX.Element {
         setPinInput('');
         setModalType('revealPhrase');
       } else {
-        Alert.alert('Error', 'Incorrect PIN or could not retrieve recovery phrase');
+        Alert.alert('Incorrect PIN', 'The PIN you entered is incorrect. Please try again.');
+        setPinInput('');
       }
     } catch (err) {
-      console.error('Failed to reveal mnemonic with PIN:', err);
-      Alert.alert('Error', 'Failed to authenticate');
+      console.warn('Failed to reveal mnemonic with PIN:', err);
+      Alert.alert('Incorrect PIN', 'The PIN you entered is incorrect. Please try again.');
+      setPinInput('');
     } finally {
       setIsRevealing(false);
     }
