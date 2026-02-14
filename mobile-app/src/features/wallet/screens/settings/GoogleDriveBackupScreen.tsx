@@ -24,7 +24,7 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useWallet } from '../../../../hooks/useWallet';
-import { storageService } from '../../../../services';
+import { storageService, settingsService } from '../../../../services';
 import { useAppTheme } from '../../../../contexts/ThemeContext';
 import { generateMasterKeyNickname } from '../../../../utils/mnemonic';
 import { useLanguage } from '../../../../hooks/useLanguage';
@@ -192,6 +192,12 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
 
   const authenticateUser = async (): Promise<boolean> => {
     try {
+      // Check app-level biometric setting first
+      const settings = settingsService.getUserSettings();
+      if (!settings.biometricEnabled) {
+        return true; // Biometric disabled in app settings, skip
+      }
+
       const biometricAvailable = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
 
@@ -203,7 +209,8 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
         return result.success;
       }
       return true; // No biometric available, allow proceed
-    } catch {
+    } catch (error) {
+      console.warn('[GoogleDriveBackup] Auth error:', error);
       return false;
     }
   };
