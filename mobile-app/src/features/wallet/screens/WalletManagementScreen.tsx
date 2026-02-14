@@ -1099,6 +1099,7 @@ export function WalletManagementScreen(): React.JSX.Element {
                     keyboardType="numeric"
                     maxLength={6}
                     mode="outlined"
+                    autoFocus
                   />
                 </Dialog.Content>
                 <Dialog.Actions>
