@@ -19,6 +19,7 @@ export interface EncryptedBackup {
   mac: string; // base64 - HMAC for authentication
   timestamp: number;
   walletName?: string;
+  seedFingerprint?: string;
 }
 
 export interface PasswordStrength {

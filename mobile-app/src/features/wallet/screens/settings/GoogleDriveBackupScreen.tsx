@@ -64,6 +64,7 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
   const [userInfo, setUserInfo] = useState<GoogleUser | null>(null);
   const [backups, setBackups] = useState<BackupMetadata[]>([]);
   const [lastBackupTimestamp, setLastBackupTimestamp] = useState<number | null>(null);
+  const [localFingerprints, setLocalFingerprints] = useState<Record<string, string>>({});
 
   // Modal state
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -130,8 +131,24 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
       if (backupList.length > 0) {
         setLastBackupTimestamp(backupList[0].timestamp);
       }
+
+      const keys = masterKeys || [];
+      const fingerprintPairs = await Promise.all(
+        keys.map(async (key) => {
+          const fingerprint = await googleDriveBackupService.getLocalFingerprint(key.id);
+          return [key.id, fingerprint] as const;
+        })
+      );
+
+      const nextLocalFingerprints: Record<string, string> = {};
+      for (const [walletId, fingerprint] of fingerprintPairs) {
+        if (fingerprint) {
+          nextLocalFingerprints[walletId] = fingerprint;
+        }
+      }
+      setLocalFingerprints(nextLocalFingerprints);
     } catch (error) {
-      console.error('Failed to refresh backups:', error);
+      console.warn('⚠️ [GoogleDriveBackupScreen] Failed to refresh backups:', error);
     }
   };
 
@@ -193,7 +210,7 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
   const authenticateUser = async (): Promise<boolean> => {
     try {
       // Check app-level biometric setting first
-      const settings = settingsService.getUserSettings();
+      const settings = await settingsService.getUserSettings();
       if (!settings.biometricEnabled) {
         return true; // Biometric disabled in app settings, skip
       }
@@ -228,6 +245,12 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
     }
     return activeMasterKey;
   };
+
+  const getWalletBackupById = useCallback((walletId: string): BackupMetadata | undefined => {
+    const fingerprint = localFingerprints[walletId];
+    if (!fingerprint) return undefined;
+    return backups.find((backup) => backup.seedFingerprint === fingerprint);
+  }, [backups, localFingerprints]);
 
   const handleCreateBackup = async (masterKeyId?: string): Promise<void> => {
     const keys = masterKeys || [];
@@ -315,11 +338,16 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
         setShowPasswordModal(false);
         setPassword('');
         setConfirmPassword('');
+
+        const mnemonicFingerprint = await googleDriveBackupService.getSeedFingerprint(mnemonic);
+        await googleDriveBackupService.saveLocalFingerprint(targetKey.id, mnemonicFingerprint);
+
         await refreshBackups();
       } else {
         Alert.alert(t('common.error'), result.error || 'Failed to create backup');
       }
     } catch (error) {
+      console.warn('⚠️ [GoogleDriveBackupScreen] Failed to create backup:', error);
       Alert.alert(t('common.error'), 'Failed to create backup');
     } finally {
       setIsProcessing(false);
@@ -461,6 +489,13 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
   // ==========================================================================
   // Render
   // ==========================================================================
+
+  const activeWalletBackup = activeMasterKey ? getWalletBackupById(activeMasterKey.id) : undefined;
+
+  const getWalletLabel = (walletId: string): string => {
+    const wallet = (masterKeys || []).find((key) => key.id === walletId);
+    return wallet?.nickname || wallet?.id.substring(0, 8) || walletId.substring(0, 8);
+  };
 
   const renderPasswordModal = (): React.JSX.Element => (
     <Modal
@@ -742,13 +777,41 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
 
                   <Button
                     mode="contained"
-                    onPress={handleCreateBackup}
+                    onPress={() => {
+                      void handleCreateBackup();
+                    }}
                     icon="cloud-upload"
                     style={[styles.actionButton, { backgroundColor: BRAND_COLOR }]}
                     labelStyle={{ color: '#1a1a2e' }}
                   >
-                    {t('cloudBackup.createBackup')}
+                    {activeWalletBackup ? 'Update Backup' : t('cloudBackup.createBackup')}
                   </Button>
+
+                  {(masterKeys || []).map((key) => {
+                    const matchedBackup = getWalletBackupById(key.id);
+                    return (
+                      <View key={key.id} style={styles.walletStatusRow}>
+                        <View style={styles.walletStatusInfo}>
+                          <Text style={[styles.backupWalletName, { color: primaryText }]}>
+                            {key.nickname || key.id.substring(0, 8)}
+                          </Text>
+                          <Text style={[styles.walletStatusText, { color: matchedBackup ? '#4CAF50' : '#ffb74d' }]}>
+                            {matchedBackup
+                              ? `✅ Backed up · ${formatDate(matchedBackup.timestamp)}`
+                              : '⚠️ Not backed up'}
+                          </Text>
+                        </View>
+                        <Button
+                          mode="text"
+                          onPress={() => handleCreateBackup(key.id)}
+                          compact
+                          textColor={BRAND_COLOR}
+                        >
+                          {matchedBackup ? 'Update Backup' : 'Create Backup'}
+                        </Button>
+                      </View>
+                    );
+                  })}
                 </View>
 
                 {/* Existing Backups */}
@@ -770,6 +833,16 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
                           </Text>
                           <Text style={[styles.backupDate, { color: secondaryText }]}>
                             {formatDate(backup.timestamp)}
+                          </Text>
+                          <Text style={[styles.backupWallet, { color: secondaryText }]}>
+                            {backup.seedFingerprint
+                              ? (() => {
+                                const matchedWallet = (masterKeys || []).find((key) => localFingerprints[key.id] === backup.seedFingerprint);
+                                return matchedWallet
+                                  ? `Wallet: ${getWalletLabel(matchedWallet.id)}`
+                                  : 'Wallet: Not linked to local wallet';
+                              })()
+                              : 'Wallet: Unknown (legacy backup)'}
                           </Text>
                         </View>
                         <View style={styles.backupActions}>
@@ -932,6 +1005,23 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     marginTop: 8,
+    marginBottom: 8,
+  },
+  walletStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  walletStatusInfo: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  walletStatusText: {
+    fontSize: 12,
+    marginTop: 2,
   },
   noBackups: {
     fontSize: 14,

@@ -7,6 +7,7 @@ import {
   statusCodes,
   type User,
 } from '@react-native-google-signin/google-signin';
+import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import {
@@ -33,6 +34,7 @@ export interface BackupMetadata {
   timestamp: number;
   walletName?: string;
   size: number;
+  seedFingerprint?: string;
 }
 
 interface DriveFile {
@@ -40,6 +42,9 @@ interface DriveFile {
   name: string;
   createdTime: string;
   size?: string;
+  appProperties?: {
+    seedFingerprint?: string;
+  };
 }
 
 interface DriveListResponse {
@@ -58,6 +63,7 @@ const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '';
 // Secure store keys (only for cached user info)
 const STORAGE_KEYS = {
   USER_INFO: 'google_drive_user_info',
+  BACKUP_FINGERPRINT_PREFIX: 'backup_fingerprint_',
 };
 
 // Google Drive API endpoints
@@ -349,12 +355,20 @@ class GoogleDriveBackupService {
     try {
       console.log('📤 [GoogleDrive] Creating backup...');
 
+      const seedFingerprint = await this.getSeedFingerprint(mnemonic);
+
       // Encrypt the mnemonic
       const encryptedBackup = await encryptMnemonic(mnemonic, password, walletName);
+      encryptedBackup.seedFingerprint = seedFingerprint;
 
       // Get valid access token and backup folder
       const accessToken = await this.getValidAccessToken();
       const folderId = await this.getOrCreateBackupFolder();
+
+      const existingBackups = await this.listBackups();
+      const existingBackup = existingBackups.find(
+        (backup) => backup.seedFingerprint === seedFingerprint
+      );
 
       // Create file name — include wallet name for easy identification
       const safeName = (walletName || 'Wallet').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 30);
@@ -366,6 +380,9 @@ class GoogleDriveBackupService {
         parents: [folderId],
         mimeType: 'application/json',
         description: `ZapArc wallet backup: ${walletName || 'Unknown wallet'}`,
+        appProperties: {
+          seedFingerprint,
+        },
       };
 
       const boundary = 'backup_boundary_' + Date.now();
@@ -380,18 +397,20 @@ class GoogleDriveBackupService {
         '\r\n' +
         `--${boundary}--`;
 
+      const uploadUrl = existingBackup
+        ? `${DRIVE_API.UPLOAD}/${existingBackup.id}?uploadType=multipart`
+        : `${DRIVE_API.UPLOAD}?uploadType=multipart`;
+      const method = existingBackup ? 'PATCH' : 'POST';
+
       // Upload to Google Drive
-      const response = await fetch(
-        `${DRIVE_API.UPLOAD}?uploadType=multipart`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': `multipart/related; boundary=${boundary}`,
-          },
-          body: body,
-        }
-      );
+      const response = await fetch(uploadUrl, {
+        method,
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': `multipart/related; boundary=${boundary}`,
+        },
+        body: body,
+      });
 
       if (!response.ok) {
         const error = await response.text();
@@ -399,7 +418,11 @@ class GoogleDriveBackupService {
         return { success: false, error: 'Failed to upload backup' };
       }
 
-      console.log('✅ [GoogleDrive] Backup created successfully');
+      await this.saveLocalFingerprint(walletId, seedFingerprint);
+
+      console.log(existingBackup
+        ? '✅ [GoogleDrive] Backup updated successfully'
+        : '✅ [GoogleDrive] Backup created successfully');
       return { success: true };
     } catch (error) {
       console.error('❌ [GoogleDrive] Create backup failed:', error);
@@ -425,7 +448,7 @@ class GoogleDriveBackupService {
       const params = new URLSearchParams({
         q: query,
         orderBy: 'createdTime desc',
-        fields: 'files(id,name,createdTime,size)',
+        fields: 'files(id,name,createdTime,size,appProperties)',
         spaces: 'drive',
       });
       const response = await fetch(
@@ -468,6 +491,7 @@ class GoogleDriveBackupService {
             timestamp,
             walletName,
             size: parseInt(file.size || '0', 10),
+            seedFingerprint: file.appProperties?.seedFingerprint,
           };
         });
 
@@ -568,7 +592,25 @@ class GoogleDriveBackupService {
       return null;
     }
   }
+
+  async getSeedFingerprint(mnemonic: string): Promise<string> {
+    const hash = await Crypto.digestStringAsync(
+      Crypto.CryptoDigestAlgorithm.SHA256,
+      mnemonic.trim().toLowerCase()
+    );
+    return hash.substring(0, 16);
+  }
+
+  async saveLocalFingerprint(walletId: string, fingerprint: string): Promise<void> {
+    await SecureStore.setItemAsync(`${STORAGE_KEYS.BACKUP_FINGERPRINT_PREFIX}${walletId}`, fingerprint);
+  }
+
+  async getLocalFingerprint(walletId: string): Promise<string | null> {
+    return await SecureStore.getItemAsync(`${STORAGE_KEYS.BACKUP_FINGERPRINT_PREFIX}${walletId}`);
+  }
+
 }
+
 
 // =============================================================================
 // Export Singleton
