@@ -31,6 +31,7 @@ import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconC
 import { useWallet } from '../../../hooks/useWallet';
 import { useWalletAuth } from '../../../hooks/useWalletAuth';
 import { storageService } from '../../../services';
+import { settingsService } from '../../../services/settingsService';
 import type { MasterKeyEntry, SubWalletEntry } from '../types';
 
 // =============================================================================
@@ -311,11 +312,13 @@ export function WalletManagementScreen(): React.JSX.Element {
     setError(null);
 
     try {
-      // First try biometric authentication
+      // Only use biometric if user has it enabled in app settings
+      const freshSettings = await settingsService.getUserSettings();
+      const biometricEnabled = freshSettings.biometricEnabled ?? false;
       const biometricAvailable = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
 
-      if (biometricAvailable && isEnrolled) {
+      if (biometricEnabled && biometricAvailable && isEnrolled) {
         const result = await LocalAuthentication.authenticateAsync({
           promptMessage: 'Authenticate to view recovery phrase',
           fallbackLabel: 'Use PIN',
