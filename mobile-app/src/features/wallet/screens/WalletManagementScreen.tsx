@@ -38,7 +38,7 @@ import type { MasterKeyEntry, SubWalletEntry } from '../types';
 // Types
 // =============================================================================
 
-type ModalType = 'rename' | 'addSubWallet' | 'confirmDelete' | 'revealPhrase' | null;
+type ModalType = 'rename' | 'addSubWallet' | 'confirmDelete' | 'revealPhrase' | 'revealPinPrompt' | null;
 
 // =============================================================================
 // Component
@@ -330,14 +330,21 @@ export function WalletManagementScreen(): React.JSX.Element {
         }
       }
 
-      // Get PIN from biometric storage
+      // If biometric was not used, require manual PIN entry
+      if (!biometricEnabled || !biometricAvailable || !isEnrolled) {
+        setIsRevealing(false);
+        setPinInput('');
+        setModalType('revealPinPrompt');
+        return;
+      }
+
+      // Get PIN from biometric storage (only after successful biometric auth)
       const pin = await storageService.getBiometricPin(selectedMasterKeyId);
       
       if (!pin) {
-        Alert.alert('Error', 'PIN not available. Please unlock wallet with PIN first.');
         setIsRevealing(false);
-        setModalType(null);
-        setSelectedMasterKeyId(null);
+        setPinInput('');
+        setModalType('revealPinPrompt');
         return;
       }
 
@@ -384,6 +391,28 @@ export function WalletManagementScreen(): React.JSX.Element {
     setSelectedMasterKeyId(null);
     setRevealMnemonic(null);
   }, []);
+
+  // Reveal with manually entered PIN
+  const handleRevealWithPin = useCallback(async () => {
+    if (!selectedMasterKeyId || !pinInput) return;
+
+    setIsRevealing(true);
+    try {
+      const phrase = await getMnemonic(selectedMasterKeyId, pinInput);
+      if (phrase) {
+        setRevealMnemonic(phrase);
+        setPinInput('');
+        setModalType('revealPhrase');
+      } else {
+        Alert.alert('Error', 'Incorrect PIN or could not retrieve recovery phrase');
+      }
+    } catch (err) {
+      console.error('Failed to reveal mnemonic with PIN:', err);
+      Alert.alert('Error', 'Failed to authenticate');
+    } finally {
+      setIsRevealing(false);
+    }
+  }, [selectedMasterKeyId, pinInput, getMnemonic]);
 
   // ========================================
   // Switch Wallet
@@ -738,6 +767,7 @@ export function WalletManagementScreen(): React.JSX.Element {
 
   const renderDeleteModal = (): React.JSX.Element | null => {
     if (modalType !== 'confirmDelete' || !deleteTarget) return null;
+    // Note: revealPinPrompt modal is rendered separately
 
     const targetWallet = masterKeys.find((mk) => mk.id === deleteTarget);
 
@@ -1036,6 +1066,64 @@ export function WalletManagementScreen(): React.JSX.Element {
           {renderAddSubWalletModal()}
           {renderRenameModal()}
           {renderRevealPhraseModal()}
+
+          {/* PIN prompt for reveal when biometric is disabled */}
+          {modalType === 'revealPinPrompt' && (
+            <Portal>
+              <Dialog
+                visible
+                onDismiss={() => {
+                  setModalType(null);
+                  setSelectedMasterKeyId(null);
+                  setPinInput('');
+                }}
+                style={[styles.dialog, { backgroundColor: dialogBackgroundColor }]}
+              >
+                <Dialog.Title style={[styles.dialogTitle, { color: primaryTextColor }]}>Enter PIN</Dialog.Title>
+                <Dialog.Content>
+                  <Text style={[styles.dialogText, { color: secondaryTextColor }]}>
+                    Enter your PIN to view the recovery phrase.
+                  </Text>
+                  <StyledTextInput
+                    style={styles.pinInputField}
+                    value={pinInput}
+                    onChangeText={(text) => {
+                      setPinInput(text);
+                      if (text.length === 6) {
+                        Keyboard.dismiss();
+                      }
+                    }}
+                    label="PIN"
+                    placeholder="Enter your PIN"
+                    secureTextEntry
+                    keyboardType="numeric"
+                    maxLength={6}
+                    mode="outlined"
+                  />
+                </Dialog.Content>
+                <Dialog.Actions>
+                  <Button
+                    onPress={() => {
+                      setModalType(null);
+                      setSelectedMasterKeyId(null);
+                      setPinInput('');
+                    }}
+                    labelStyle={[styles.cancelButtonLabel, { color: secondaryTextColor }]}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onPress={handleRevealWithPin}
+                    disabled={pinInput.length < 6 || isRevealing}
+                    loading={isRevealing}
+                    labelStyle={styles.confirmButtonLabel}
+                  >
+                    Confirm
+                  </Button>
+                </Dialog.Actions>
+              </Dialog>
+            </Portal>
+          )}
         </SafeAreaView>
       </TouchableWithoutFeedback>
     </LinearGradient>
