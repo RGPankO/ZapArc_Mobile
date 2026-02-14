@@ -184,10 +184,6 @@ export function HomeScreen(): React.JSX.Element {
     router.push('/wallet/scan');
   };
 
-  const handleCreateTip = (): void => {
-    router.push('/wallet/tip/create');
-  };
-
   const handleViewHistory = (): void => {
     router.push('/wallet/history');
   };
@@ -355,12 +351,6 @@ export function HomeScreen(): React.JSX.Element {
               label={t('payments.scanQR')}
               onPress={handleScan}
               color="#2196F3"
-            />
-            <QuickAction
-              icon="💡"
-              label={t('payments.tip')}
-              onPress={handleCreateTip}
-              color={BRAND_COLOR}
             />
           </View>
 

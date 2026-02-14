@@ -81,7 +81,8 @@
     "jest": "~29.7.0",
     "jest-expo": "~52.0.6",
     "prettier": "^3.6.2",
-    "typescript": "~5.3.3"
+    "typescript": "~5.3.3",
+    "webdriverio": "^9.24.0"
   },
   "private": true
 }
