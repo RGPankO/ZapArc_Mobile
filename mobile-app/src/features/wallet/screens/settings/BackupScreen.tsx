@@ -52,6 +52,7 @@ export function BackupScreen(): React.JSX.Element {
 
   // Authenticate and reveal mnemonic
   const handleRevealMnemonic = useCallback(async () => {
+    console.log('🔐🔐🔐 [BackupScreen] handleRevealMnemonic CALLED');
     console.log('🔐 [BackupScreen] Reveal requested. activeMasterKey:', activeMasterKey?.id);
     
     if (!activeMasterKey) {
