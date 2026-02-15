@@ -9,9 +9,10 @@
  * Encrypted data structure for storing sensitive information
  */
 export interface EncryptedData {
-  data: number[]; // AES-GCM encrypted data
-  iv: number[]; // Initialization vector (12 bytes)
-  timestamp: number; // Encryption timestamp for integrity check
+  data: number[]; // Encrypted bytes
+  iv: number[]; // IV (12 bytes for GCM)
+  timestamp: number; // Encryption timestamp
+  version?: number; // 1 = old XOR, 2 = AES-GCM (undefined = 1 for backward compat)
 }
 
 // =============================================================================

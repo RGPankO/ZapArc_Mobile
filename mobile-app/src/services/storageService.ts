@@ -445,6 +445,15 @@ class StorageService {
       // Decrypt mnemonic
       const mnemonic = await decryptData(masterKey.encryptedMnemonic, pin);
 
+      // Silent migration: legacy v1 (or undefined) -> v2 AES-GCM
+      if (!masterKey.encryptedMnemonic.version || masterKey.encryptedMnemonic.version === 1) {
+        console.log('🔄 [StorageService] Migrating encryption from V1 to V2');
+        const newEncrypted = await encryptData(mnemonic, pin);
+        masterKey.encryptedMnemonic = newEncrypted;
+        await this.saveMultiWalletStorage(storage);
+        console.log('✅ [StorageService] Encryption migration complete');
+      }
+
       console.log('✅ [StorageService] GET_MASTER_KEY_MNEMONIC SUCCESS');
       return mnemonic;
     } catch (error) {

@@ -1,7 +1,25 @@
 // Crypto utilities for wallet encryption/decryption
-// Adapted from zap-arc browser extension for React Native using expo-crypto
+// Supports legacy XOR (v1) decryption and AES-256-GCM (v2) encryption/decryption
 
 import * as Crypto from 'expo-crypto';
+import { Buffer } from 'buffer';
+
+// react-native-quick-crypto requires native modules at runtime.
+// In Jest/Node environments, fall back to Node's crypto implementation.
+let cryptoImpl: {
+  pbkdf2Sync: typeof import('crypto').pbkdf2Sync;
+  randomBytes: typeof import('crypto').randomBytes;
+  createCipheriv: typeof import('crypto').createCipheriv;
+  createDecipheriv: typeof import('crypto').createDecipheriv;
+};
+
+try {
+  cryptoImpl = require('react-native-quick-crypto');
+} catch {
+  cryptoImpl = require('crypto');
+}
+
+const { pbkdf2Sync, randomBytes, createCipheriv, createDecipheriv } = cryptoImpl;
 
 import type { EncryptedData } from '../features/wallet/types';
 
@@ -13,6 +31,7 @@ const SALT = 'lightning-tipping-salt';
 const ITERATIONS = 100000;
 const KEY_LENGTH = 32; // 256 bits for AES-256
 const IV_LENGTH = 12; // 96 bits for AES-GCM
+const ENCRYPTION_VERSION = 2;
 
 // =============================================================================
 // Helper Functions
@@ -29,8 +48,8 @@ export function generateUUID(): string {
  * Generate cryptographically secure random bytes
  */
 export async function generateRandomBytes(length: number): Promise<Uint8Array> {
-  const randomBytesArray = await Crypto.getRandomBytesAsync(length);
-  return new Uint8Array(randomBytesArray);
+  const bytes = randomBytes(length);
+  return new Uint8Array(bytes);
 }
 
 /**
@@ -72,14 +91,22 @@ function hexToBytes(hex: string): Uint8Array {
 // =============================================================================
 
 /**
- * Derive an encryption key from a PIN using PBKDF2
- * Uses SHA-256 with 100,000 iterations for security
- *
- * Note: expo-crypto doesn't have built-in PBKDF2, so we use a
- * simplified approach using multiple SHA-256 rounds.
- * For production, consider using a native PBKDF2 implementation.
+ * New (v2) key derivation using native PBKDF2 (quick-crypto)
+ * Kept async for API compatibility.
  */
 export async function deriveKeyFromPin(pin: string): Promise<Uint8Array> {
+  return new Uint8Array(deriveKeyFromPinV2(pin));
+}
+
+function deriveKeyFromPinV2(pin: string): Buffer {
+  return pbkdf2Sync(pin, SALT, ITERATIONS, KEY_LENGTH, 'sha256');
+}
+
+/**
+ * Legacy (v1) key derivation using expo-crypto SHA-256 rounds.
+ * Must remain exactly compatible for backward decryption.
+ */
+async function deriveKeyFromPinV1(pin: string): Promise<Uint8Array> {
   // Combine PIN with salt
   const saltedPin = `${pin}${SALT}`;
 
@@ -109,16 +136,11 @@ export async function deriveKeyFromPin(pin: string): Promise<Uint8Array> {
 }
 
 // =============================================================================
-// AES-GCM Encryption/Decryption
+// Legacy XOR Helpers (v1 compatibility)
 // =============================================================================
 
 /**
- * Simple XOR-based encryption for React Native
- * Note: This is a simplified implementation. For production use,
- * consider using react-native-aes-gcm-crypto or similar native module.
- *
- * This implementation uses XOR cipher with the derived key, which is
- * suitable for our use case with Expo SecureStore as an additional layer.
+ * Simple XOR-based encryption/decryption helper
  */
 async function xorEncrypt(data: Uint8Array, key: Uint8Array): Promise<Uint8Array> {
   const result = new Uint8Array(data.length);
@@ -135,49 +157,37 @@ async function xorDecrypt(data: Uint8Array, key: Uint8Array): Promise<Uint8Array
   return xorEncrypt(data, key);
 }
 
+// =============================================================================
+// AES-GCM Encryption/Decryption
+// =============================================================================
+
 /**
- * Encrypt data with PIN-derived key
- * Returns encrypted data with IV and timestamp
+ * Encrypt data with PIN-derived key (v2 AES-256-GCM)
+ * Returns encrypted data with IV, timestamp, and version
  */
 export async function encryptData(
   plaintext: string,
   pin: string
 ): Promise<EncryptedData> {
   try {
-    const key = await deriveKeyFromPin(pin);
-    const iv = await generateRandomBytes(IV_LENGTH);
-    const plaintextBytes = stringToBytes(plaintext);
+    const key = deriveKeyFromPinV2(pin);
+    const iv = randomBytes(IV_LENGTH);
+    const cipher = createCipheriv('aes-256-gcm', key, iv);
 
-    // Create a combined key from key + IV for additional entropy
-    const combinedKeyHex = await Crypto.digestStringAsync(
-      Crypto.CryptoDigestAlgorithm.SHA256,
-      bytesToHex(key) + bytesToHex(iv),
-      { encoding: Crypto.CryptoEncoding.HEX }
-    );
-    const combinedKey = hexToBytes(combinedKeyHex);
+    const encrypted = Buffer.concat([
+      cipher.update(plaintext, 'utf8'),
+      cipher.final(),
+    ]);
+    const authTag = cipher.getAuthTag();
 
-    // Encrypt the data
-    const encryptedBytes = await xorEncrypt(plaintextBytes, combinedKey);
-
-    // Add a simple integrity check (HMAC-like)
-    const integrityHash = await Crypto.digestStringAsync(
-      Crypto.CryptoDigestAlgorithm.SHA256,
-      bytesToHex(encryptedBytes) + bytesToHex(key),
-      { encoding: Crypto.CryptoEncoding.HEX }
-    );
-
-    // Append integrity hash (first 8 bytes) to encrypted data
-    const integrityBytes = hexToBytes(integrityHash.substring(0, 16));
-    const dataWithIntegrity = new Uint8Array(
-      encryptedBytes.length + integrityBytes.length
-    );
-    dataWithIntegrity.set(encryptedBytes);
-    dataWithIntegrity.set(integrityBytes, encryptedBytes.length);
+    // Append auth tag (16 bytes) to encrypted payload
+    const combined = Buffer.concat([encrypted, authTag]);
 
     return {
-      data: Array.from(dataWithIntegrity),
+      data: Array.from(combined),
       iv: Array.from(iv),
       timestamp: Date.now(),
+      version: ENCRYPTION_VERSION,
     };
   } catch (error) {
     console.error('❌ [Crypto] Encryption failed:', error);
@@ -186,15 +196,15 @@ export async function encryptData(
 }
 
 /**
- * Decrypt data with PIN-derived key
- * Validates integrity and returns original plaintext
+ * Legacy v1 decrypt path (XOR + integrity check).
+ * Must remain compatible with historical stored payloads.
  */
-export async function decryptData(
+async function decryptDataV1(
   encryptedData: EncryptedData,
   pin: string
 ): Promise<string> {
   try {
-    const key = await deriveKeyFromPin(pin);
+    const key = await deriveKeyFromPinV1(pin);
     const iv = new Uint8Array(encryptedData.iv);
     const fullData = new Uint8Array(encryptedData.data);
 
@@ -240,6 +250,43 @@ export async function decryptData(
     const decryptedBytes = await xorDecrypt(encryptedBytes, combinedKey);
 
     return bytesToString(decryptedBytes);
+  } catch (error) {
+    console.warn('⚠️ [Crypto] Decryption failed:', error);
+    throw new Error('Failed to decrypt data - invalid PIN or corrupted data');
+  }
+}
+
+/**
+ * Decrypt data with PIN-derived key
+ * Auto-detects payload version and routes to v1/v2 decrypt path
+ */
+export async function decryptData(
+  encryptedData: EncryptedData,
+  pin: string
+): Promise<string> {
+  const version = encryptedData.version || 1;
+
+  if (version === 1) {
+    return decryptDataV1(encryptedData, pin);
+  }
+
+  try {
+    const key = deriveKeyFromPinV2(pin);
+    const fullData = Buffer.from(encryptedData.data);
+    const iv = Buffer.from(encryptedData.iv);
+
+    if (fullData.length < 16) {
+      throw new Error('Invalid encrypted payload');
+    }
+
+    const authTag = fullData.slice(fullData.length - 16);
+    const encrypted = fullData.slice(0, fullData.length - 16);
+
+    const decipher = createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(authTag);
+
+    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+    return decrypted.toString('utf8');
   } catch (error) {
     console.warn('⚠️ [Crypto] Decryption failed:', error);
     throw new Error('Failed to decrypt data - invalid PIN or corrupted data');
