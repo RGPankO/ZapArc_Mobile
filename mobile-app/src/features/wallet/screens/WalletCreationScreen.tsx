@@ -248,20 +248,25 @@ export function WalletCreationScreen(): React.JSX.Element {
       return;
     }
 
+    if (!mnemonic) {
+      setError('Recovery phrase not generated. Please go back and generate it again.');
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError(null);
 
       // Use custom name or default to "Main Wallet"
       const nickname = walletName.trim() || undefined;
-      await createMasterKey(pin, nickname);
+      await createMasterKey(pin, nickname, mnemonic);
       setCurrentStep('complete');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create wallet');
     } finally {
       setIsLoading(false);
     }
-  }, [pinValid, pin, walletName, createMasterKey]);
+  }, [pinValid, pin, walletName, mnemonic, createMasterKey]);
 
   // ========================================
   // Step 5: Complete

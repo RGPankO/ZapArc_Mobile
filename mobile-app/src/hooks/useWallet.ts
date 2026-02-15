@@ -45,7 +45,7 @@ export interface WalletState {
 
 export interface WalletActions {
   // Wallet creation/import
-  createMasterKey: (pin: string, nickname?: string) => Promise<string>;
+  createMasterKey: (pin: string, nickname?: string, providedMnemonic?: string) => Promise<string>;
   importMasterKey: (mnemonic: string, pin: string, nickname?: string) => Promise<string>;
 
   // Sub-wallet operations
@@ -178,12 +178,16 @@ export function useWallet(): WalletState & WalletActions {
   // ========================================
 
   const createMasterKey = useCallback(
-    async (pin: string, nickname?: string): Promise<string> => {
+    async (pin: string, nickname?: string, providedMnemonic?: string): Promise<string> => {
       try {
         setIsLoading(true);
         setError(null);
 
-        const mnemonic = generateMnemonic();
+        const mnemonic = providedMnemonic?.trim().toLowerCase() || generateMnemonic();
+        if (!validateMnemonic(mnemonic)) {
+          throw new Error('Invalid mnemonic phrase');
+        }
+
         const keyNumber = masterKeys.length + 1;
         const name = nickname ?? generateMasterKeyNickname(keyNumber);
 
