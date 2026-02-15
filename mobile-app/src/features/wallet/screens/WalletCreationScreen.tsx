@@ -19,7 +19,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
-import { generateMnemonic, generateMasterKeyNickname } from '../../../utils/mnemonic';
+import {
+  generateAndValidateMnemonic,
+  generateMasterKeyNickname,
+  validateMnemonic,
+} from '../../../utils/mnemonic';
 import { useWallet } from '../../../hooks/useWallet';
 import { useSettings } from '../../../hooks/useSettings';
 import { useAppTheme } from '../../../contexts/ThemeContext';
@@ -131,21 +135,55 @@ export function WalletCreationScreen(): React.JSX.Element {
   // ========================================
 
   const handleGenerateMnemonic = useCallback(() => {
-    const newMnemonic = generateMnemonic();
-    setMnemonic(newMnemonic);
-    
-    const words = newMnemonic.split(' ').map((word, index) => ({
-      index: index + 1,
-      word,
-    }));
-    setMnemonicWords(words);
-    
-    // Shuffle words for verification step
-    const wordList = words.map(w => w.word);
-    const shuffled = [...wordList].sort(() => Math.random() - 0.5);
-    setShuffledWords(shuffled);
-    
-    setCurrentStep('backup');
+    const MAX_DISPLAY_VALIDATION_RETRIES = 3;
+
+    for (let attempt = 1; attempt <= MAX_DISPLAY_VALIDATION_RETRIES; attempt++) {
+      const newMnemonic = generateAndValidateMnemonic();
+      const splitWords = newMnemonic.split(' ');
+      const joinedMnemonic = splitWords.join(' ');
+      const has12Words = splitWords.length === 12;
+      const joinedValid = validateMnemonic(joinedMnemonic);
+
+      if (has12Words && joinedValid) {
+        if (__DEV__) {
+          console.log('✅ [WalletCreation] Display mnemonic validation passed', {
+            attempt,
+          });
+        }
+
+        setMnemonic(newMnemonic);
+
+        const words = splitWords.map((word, index) => ({
+          index: index + 1,
+          word,
+        }));
+        setMnemonicWords(words);
+
+        // Shuffle words for verification step
+        const wordList = words.map((w) => w.word);
+        const shuffled = [...wordList].sort(() => Math.random() - 0.5);
+        setShuffledWords(shuffled);
+
+        setCurrentStep('backup');
+        return;
+      }
+
+      console.error('❌ [WalletCreation] Display mnemonic validation failed, regenerating', {
+        attempt,
+        has12Words,
+        joinedValid,
+      });
+
+      Alert.alert(
+        'Recovery Phrase Error',
+        'There was a problem preparing your recovery phrase. We will regenerate it now.'
+      );
+    }
+
+    Alert.alert(
+      'Recovery Phrase Error',
+      'Failed to generate a valid recovery phrase. Please try again.'
+    );
   }, []);
 
   // ========================================

@@ -25,6 +25,61 @@ export function generateMnemonic(): string {
 }
 
 /**
+ * Generate a 12-word mnemonic and run strict sanity checks.
+ * Retries generation up to 3 times before throwing.
+ *
+ * Checks performed:
+ * - BIP39 checksum validity
+ * - Exactly 12 words
+ * - All words exist in BIP39 English wordlist
+ * - No duplicate consecutive words
+ *
+ * @returns A validated 12-word mnemonic phrase
+ * @throws Error if a valid mnemonic cannot be generated after retries
+ */
+export function generateAndValidateMnemonic(): string {
+  const MAX_RETRIES = 3;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    const mnemonic = bip39.generateMnemonic();
+    const normalized = normalizeMnemonic(mnemonic);
+    const words = normalized.split(' ');
+
+    const isBip39Valid = bip39.validateMnemonic(normalized);
+    const is12Words = words.length === 12;
+    const allWordsInEnglishWordlist = words.every((word) => WORDLIST.includes(word));
+    const hasConsecutiveDuplicates = words.some(
+      (word, index) => index > 0 && word === words[index - 1]
+    );
+
+    const isValid =
+      isBip39Valid &&
+      is12Words &&
+      allWordsInEnglishWordlist &&
+      !hasConsecutiveDuplicates;
+
+    if (isValid) {
+      if (__DEV__) {
+        console.log('✅ [Mnemonic] generateAndValidateMnemonic() passed sanity checks', {
+          attempt,
+        });
+      }
+      return normalized;
+    }
+
+    console.error('❌ [Mnemonic] Generated mnemonic failed sanity checks, retrying', {
+      attempt,
+      isBip39Valid,
+      is12Words,
+      allWordsInEnglishWordlist,
+      hasConsecutiveDuplicates,
+    });
+  }
+
+  throw new Error('Failed to generate a valid 12-word mnemonic after 3 attempts');
+}
+
+/**
  * Validate a mnemonic phrase using BIP39
  * @param mnemonic - The mnemonic phrase to validate
  * @returns true if the mnemonic is valid

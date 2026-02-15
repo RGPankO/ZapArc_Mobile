@@ -2,6 +2,7 @@
 // Uses Expo SecureStore for encrypted storage on mobile devices
 
 import * as SecureStore from 'expo-secure-store';
+import * as bip39 from 'bip39';
 
 import type {
   MasterKeyEntry,
@@ -282,8 +283,32 @@ class StorageService {
     console.log('🔵 [StorageService] CREATE_MASTER_KEY', { nickname });
 
     try {
+      const normalizedMnemonic = mnemonic
+        .trim()
+        .toLowerCase()
+        .replace(/[\s\r\n]+/g, ' ');
+      const mnemonicWords = normalizedMnemonic.split(' ');
+
+      const isValidMnemonic = bip39.validateMnemonic(normalizedMnemonic);
+      const is12Words = mnemonicWords.length === 12;
+
+      if (!isValidMnemonic || !is12Words) {
+        console.error('❌ [StorageService] Invalid mnemonic rejected before storage', {
+          isValidMnemonic,
+          is12Words,
+          wordCount: mnemonicWords.length,
+        });
+        throw new Error(
+          `Invalid mnemonic: expected valid 12-word BIP39 phrase, got ${mnemonicWords.length} words`
+        );
+      }
+
+      if (__DEV__) {
+        console.log('✅ [StorageService] Pre-storage mnemonic validation passed');
+      }
+
       // Encrypt the mnemonic
-      const encryptedMnemonic = await encryptData(mnemonic, pin);
+      const encryptedMnemonic = await encryptData(normalizedMnemonic, pin);
 
       // Create master key entry
       const masterKeyId = generateUUID();
@@ -329,6 +354,63 @@ class StorageService {
 
       // Save updated storage
       await this.saveMultiWalletStorage(storage);
+
+      // Post-storage round-trip verification
+      const persistedStorage = await this.loadMultiWalletStorage();
+      const persistedMasterKey = persistedStorage?.masterKeys.find(
+        (mk) => mk.id === masterKeyId
+      );
+
+      if (!persistedMasterKey) {
+        console.error('❌ [StorageService] Round-trip verification failed: key not found after save', {
+          masterKeyId,
+        });
+        throw new Error('Failed to verify stored mnemonic: master key not found after save');
+      }
+
+      const decryptedMnemonic = await decryptData(persistedMasterKey.encryptedMnemonic, pin);
+      const normalizedDecryptedMnemonic = decryptedMnemonic
+        .trim()
+        .toLowerCase()
+        .replace(/[\s\r\n]+/g, ' ');
+      const normalizedOriginalMnemonic = normalizedMnemonic
+        .trim()
+        .toLowerCase()
+        .replace(/[\s\r\n]+/g, ' ');
+
+      if (normalizedDecryptedMnemonic !== normalizedOriginalMnemonic) {
+        console.error('❌ [StorageService] Round-trip mnemonic mismatch, deleting corrupted entry', {
+          masterKeyId,
+        });
+
+        const rollbackStorage = await this.loadMultiWalletStorage();
+        if (rollbackStorage) {
+          rollbackStorage.masterKeys = rollbackStorage.masterKeys.filter(
+            (mk) => mk.id !== masterKeyId
+          );
+
+          if (rollbackStorage.masterKeys.length === 0) {
+            await this.deleteAllWallets();
+          } else {
+            const stillHasActive = rollbackStorage.masterKeys.some(
+              (mk) => mk.id === rollbackStorage.activeMasterKeyId
+            );
+
+            if (!stillHasActive) {
+              rollbackStorage.activeMasterKeyId = rollbackStorage.masterKeys[0].id;
+              rollbackStorage.activeSubWalletIndex = 0;
+            }
+
+            await this.saveMultiWalletStorage(rollbackStorage);
+          }
+        }
+
+        throw new Error('Stored mnemonic verification failed. Please try again.');
+      }
+
+      if (__DEV__) {
+        console.log('✅ [StorageService] Post-storage mnemonic round-trip validation passed');
+      }
 
       console.log('✅ [StorageService] CREATE_MASTER_KEY SUCCESS', { masterKeyId });
       return masterKeyId;
