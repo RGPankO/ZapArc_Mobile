@@ -100,6 +100,7 @@ export function useWallet(): WalletState & WalletActions {
   const refreshBalancePromiseRef = useRef<{ walletKey: string; promise: Promise<void> } | null>(null);
   const refreshTransactionsPromiseRef = useRef<{ walletKey: string; promise: Promise<void> } | null>(null);
   const activeWalletKeyRef = useRef<string | null>(null);
+  const isSwitchingRef = useRef(false); // Guards against effect overrides during wallet switch
   const subWalletActivityCacheRef = useRef<Map<string, boolean>>(new Map());
 
   useEffect(() => {
@@ -405,18 +406,10 @@ export function useWallet(): WalletState & WalletActions {
   const switchWallet = useCallback(
     async (masterKeyId: string, subWalletIndex: number, pin?: string): Promise<void> => {
       try {
-        setIsLoading(true);
+        isSwitchingRef.current = true;
         setError(null);
 
-        // 1. Update active wallet in storage FIRST
-        // This ensures any background refreshes (e.g. from SDK sync) fetch data for the NEW wallet
-        // and prevents race conditions where old wallet data might be refetched
-        await storageService.setActiveWallet(masterKeyId, subWalletIndex);
-
-        // 2. Immediately load cached data for the TARGET wallet
-        // This prevents "flash of zero content" or showing stale data from previous wallet
-        setIsConnected(false); // Disconnected until SDK re-initializes
-        
+        // 1. Load cached data for the TARGET wallet FIRST — instant UI update
         const [cachedBalance, cachedTxs] = await Promise.all([
           WalletCache.getCachedBalance(masterKeyId, subWalletIndex),
           WalletCache.getCachedTransactions(masterKeyId, subWalletIndex)
@@ -426,18 +419,25 @@ export function useWallet(): WalletState & WalletActions {
           console.log('✅ [useWallet] switchWallet: Loaded cached balance:', cachedBalance.balance);
           setBalance(cachedBalance.balance);
         } else {
-           setBalance(0);
+          setBalance(0);
         }
 
         if (cachedTxs) {
           console.log('✅ [useWallet] switchWallet: Loaded cached transactions:', cachedTxs.transactions.length);
           setTransactions(cachedTxs.transactions);
         } else {
-           setTransactions([]);
+          setTransactions([]);
         }
 
-        // 3. Update full wallet state BEFORE reconnecting SDK
-        // This ensures refreshBalance uses correct wallet info when polling effect triggers
+        setIsConnected(false); // Disconnected until SDK re-initializes
+
+        // 2. Update active wallet in storage
+        await storageService.setActiveWallet(masterKeyId, subWalletIndex);
+
+        // 3. Reload wallet data (updates storage/masterKeys state)
+        // Mark the target wallet key so the activeWalletInfo effect skips redundant cache reload
+        const targetWalletKey = `${masterKeyId}:${subWalletIndex}`;
+        lastCacheLoadKeyRef.current = targetWalletKey;
         await loadWalletData();
 
         // 4. Reconnect Breez SDK with the new wallet's mnemonic
@@ -449,10 +449,14 @@ export function useWallet(): WalletState & WalletActions {
               const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, subWalletIndex);
               const walletInfo = await storageService.getActiveWalletInfo();
               await BreezSparkService.initializeSDK(derivedMnemonic, undefined, walletInfo?.subWalletNickname);
+              setIsConnected(true);
               console.log('✅ [useWallet] Breez SDK reconnected for switched wallet');
+
+              // 5. Now that SDK is connected, refresh with live data
+              refreshBalance();
+              refreshTransactions();
             }
           } catch (sdkError) {
-            // Log SDK error but don't fail switch - SDK may not be available in Expo Go
             console.warn('⚠️ [useWallet] SDK reconnection failed:', sdkError);
           }
         }
@@ -466,10 +470,11 @@ export function useWallet(): WalletState & WalletActions {
         setError(message);
         throw err;
       } finally {
+        isSwitchingRef.current = false;
         setIsLoading(false);
       }
     },
-    [loadWalletData]
+    [loadWalletData, refreshBalance, refreshTransactions]
   );
 
   // ========================================
@@ -770,10 +775,15 @@ export function useWallet(): WalletState & WalletActions {
 
     const walletKey = getWalletKey(activeWalletInfo);
     if (walletKey === lastCacheLoadKeyRef.current) {
-      // Same wallet — no need to reload cache
+      // Same wallet — already handled (by switchWallet or previous run)
       return;
     }
     lastCacheLoadKeyRef.current = walletKey;
+
+    // If switchWallet is in progress, it handles cache loading — skip to avoid override
+    if (isSwitchingRef.current) {
+      return;
+    }
 
     // Prevent stale in-flight requests from a previous wallet from writing into state.
     refreshBalancePromiseRef.current = null;
@@ -789,7 +799,7 @@ export function useWallet(): WalletState & WalletActions {
           WalletCache.getCachedTransactions(activeWalletInfo.masterKeyId, activeWalletInfo.subWalletIndex),
         ]);
 
-        if (isCancelled) return;
+        if (isCancelled || isSwitchingRef.current) return;
 
         if (cachedBalance) {
           setBalance(cachedBalance.balance);
@@ -810,13 +820,13 @@ export function useWallet(): WalletState & WalletActions {
         }
       } catch (cacheError) {
         console.warn('⚠️ [useWallet] Failed to load cached wallet data:', cacheError);
-        if (!isCancelled) {
+        if (!isCancelled && !isSwitchingRef.current) {
           setBalance(0);
           setTransactions([]);
           setIsLoading(true);
         }
       } finally {
-        if (!isCancelled) {
+        if (!isCancelled && !isSwitchingRef.current) {
           refreshBalance();
           refreshTransactions();
         }
