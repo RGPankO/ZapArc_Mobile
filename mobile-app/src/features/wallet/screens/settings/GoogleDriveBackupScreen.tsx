@@ -124,7 +124,7 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
     }
   };
 
-  const refreshBackups = async (): Promise<void> => {
+  const refreshBackups = useCallback(async (): Promise<void> => {
     try {
       const backupList = await googleDriveBackupService.listBackups();
       setBackups(backupList);
@@ -132,7 +132,9 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
         setLastBackupTimestamp(backupList[0].timestamp);
       }
 
-      const keys = masterKeys || [];
+      // Load wallet data fresh from storage to avoid stale masterKeys closure
+      const storage = await storageService.loadMultiWalletStorage();
+      const keys = storage?.masterKeys ?? [];
       const fingerprintPairs = await Promise.all(
         keys.map(async (key) => {
           const fingerprint = await googleDriveBackupService.getLocalFingerprint(key.id);
@@ -150,7 +152,7 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
     } catch (error) {
       console.warn('⚠️ [GoogleDriveBackupScreen] Failed to refresh backups:', error);
     }
-  };
+  }, []);
 
   // ==========================================================================
   // Authentication
