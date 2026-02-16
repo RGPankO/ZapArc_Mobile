@@ -267,6 +267,9 @@ export function PinEntryScreen(): React.JSX.Element {
 
           {/* Error Message */}
           {error && <Text style={styles.errorText}>{error}</Text>}
+          {!error && pin.length > 0 && pin.length < PIN_LENGTH && (
+            <Text style={styles.pinHintText}>{t('auth.pinLengthRequirement')}</Text>
+          )}
 
           {/* Attempts Warning */}
           {attempts >= 3 && (
@@ -408,6 +411,11 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#F44336',
     fontSize: 14,
+    marginTop: 8,
+  },
+  pinHintText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 13,
     marginTop: 8,
   },
   warningText: {

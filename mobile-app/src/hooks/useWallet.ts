@@ -97,8 +97,9 @@ export function useWallet(): WalletState & WalletActions {
 
   // Refs for debouncing refresh calls to prevent redundant API calls
   // Store the promise so callers can wait for the in-progress call
-  const refreshBalancePromiseRef = useRef<Promise<void> | null>(null);
-  const refreshTransactionsPromiseRef = useRef<Promise<void> | null>(null);
+  const refreshBalancePromiseRef = useRef<{ walletKey: string; promise: Promise<void> } | null>(null);
+  const refreshTransactionsPromiseRef = useRef<{ walletKey: string; promise: Promise<void> } | null>(null);
+  const activeWalletKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     balanceRef.current = balance;
@@ -134,6 +135,15 @@ export function useWallet(): WalletState & WalletActions {
       subWalletNickname: activeSubWallet.nickname,
     };
   }, [activeMasterKey, activeSubWallet]);
+
+  const getWalletKey = useCallback((walletInfo: ActiveWalletInfo | null): string | null => {
+    if (!walletInfo) return null;
+    return `${walletInfo.masterKeyId}:${walletInfo.subWalletIndex}`;
+  }, []);
+
+  useEffect(() => {
+    activeWalletKeyRef.current = getWalletKey(activeWalletInfo);
+  }, [activeWalletInfo, getWalletKey]);
 
   // ========================================
   // Load wallet data
@@ -562,26 +572,31 @@ export function useWallet(): WalletState & WalletActions {
   // ========================================
 
   const refreshBalance = useCallback(async (): Promise<void> => {
-    // If already in progress, wait for the existing call to complete
-    if (refreshBalancePromiseRef.current) {
-      return refreshBalancePromiseRef.current;
+    const walletInfo = await storageService.getActiveWalletInfo();
+    const walletKey = getWalletKey(walletInfo);
+
+    if (!walletInfo || !walletKey) {
+      setBalance(0);
+      setIsLoading(false);
+      return;
+    }
+
+    // If refresh for this wallet is already in progress, reuse it.
+    if (refreshBalancePromiseRef.current?.walletKey === walletKey) {
+      return refreshBalancePromiseRef.current.promise;
     }
 
     const doRefresh = async (): Promise<void> => {
       try {
-        const walletInfo = await storageService.getActiveWalletInfo();
-
-        if (!walletInfo) {
-          setBalance(0);
-          setIsLoading(false);
-          return;
-        }
-
         // Load from cache first for instant display
         const cached = await WalletCache.getCachedBalance(
           walletInfo.masterKeyId,
           walletInfo.subWalletIndex
         );
+
+        if (activeWalletKeyRef.current !== walletKey) {
+          return;
+        }
 
         if (cached) {
           setBalance(cached.balance);
@@ -593,15 +608,22 @@ export function useWallet(): WalletState & WalletActions {
 
         // Fetch fresh data from SDK
         if (!BreezSparkService.isSDKInitialized()) {
-          if (!cached) {
+          if (!cached && activeWalletKeyRef.current === walletKey) {
             setBalance(0);
             setIsLoading(false);
           }
-          setIsRefreshing(false);
+          if (activeWalletKeyRef.current === walletKey) {
+            setIsRefreshing(false);
+          }
           return;
         }
 
         const walletBalance = await BreezSparkService.getBalance();
+
+        if (activeWalletKeyRef.current !== walletKey) {
+          return;
+        }
+
         setBalance(walletBalance.balanceSat);
         setIsLoading(false);
         setIsRefreshing(false);
@@ -614,46 +636,55 @@ export function useWallet(): WalletState & WalletActions {
         );
 
         // Update activity flag
-        if (walletInfo) {
-          const hasActivity = walletBalance.balanceSat > 0 || transactionsRef.current.length > 0;
-          storageService.updateSubWalletActivity(
-            walletInfo.masterKeyId,
-            walletInfo.subWalletIndex,
-            hasActivity
-          ).catch(err => console.warn('⚠️ [useWallet] Failed to update activity:', err));
-        }
+        const hasActivity = walletBalance.balanceSat > 0 || transactionsRef.current.length > 0;
+        storageService.updateSubWalletActivity(
+          walletInfo.masterKeyId,
+          walletInfo.subWalletIndex,
+          hasActivity
+        ).catch(err => console.warn('⚠️ [useWallet] Failed to update activity:', err));
       } catch (err) {
         console.error('❌ [useWallet] Failed to refresh balance:', err);
-        setIsLoading(false);
-        setIsRefreshing(false);
+        if (activeWalletKeyRef.current === walletKey) {
+          setIsLoading(false);
+          setIsRefreshing(false);
+        }
       } finally {
-        refreshBalancePromiseRef.current = null;
+        if (refreshBalancePromiseRef.current?.walletKey === walletKey) {
+          refreshBalancePromiseRef.current = null;
+        }
       }
     };
 
-    refreshBalancePromiseRef.current = doRefresh();
-    return refreshBalancePromiseRef.current;
-  }, []);
+    const promise = doRefresh();
+    refreshBalancePromiseRef.current = { walletKey, promise };
+    return promise;
+  }, [getWalletKey]);
 
   const refreshTransactions = useCallback(async (): Promise<void> => {
-    // If already in progress, wait for the existing call to complete
-    if (refreshTransactionsPromiseRef.current) {
-      return refreshTransactionsPromiseRef.current;
+    const walletInfo = await storageService.getActiveWalletInfo();
+    const walletKey = getWalletKey(walletInfo);
+
+    if (!walletInfo || !walletKey) {
+      setTransactions([]);
+      return;
+    }
+
+    // If refresh for this wallet is already in progress, reuse it.
+    if (refreshTransactionsPromiseRef.current?.walletKey === walletKey) {
+      return refreshTransactionsPromiseRef.current.promise;
     }
 
     const doRefresh = async (): Promise<void> => {
       try {
-        const walletInfo = await storageService.getActiveWalletInfo();
-        if (!walletInfo) {
-          setTransactions([]);
-          return;
-        }
-
         // Load from cache first for instant display
         const cached = await WalletCache.getCachedTransactions(
           walletInfo.masterKeyId,
           walletInfo.subWalletIndex
         );
+
+        if (activeWalletKeyRef.current !== walletKey) {
+          return;
+        }
 
         if (cached) {
           setTransactions(cached.transactions);
@@ -664,10 +695,12 @@ export function useWallet(): WalletState & WalletActions {
         const sdkInitialized = BreezSparkService.isSDKInitialized();
 
         if (!sdkInitialized) {
-          if (!cached) {
+          if (!cached && activeWalletKeyRef.current === walletKey) {
             setTransactions([]);
           }
-          setIsRefreshing(false);
+          if (activeWalletKeyRef.current === walletKey) {
+            setIsRefreshing(false);
+          }
           return;
         }
 
@@ -684,6 +717,10 @@ export function useWallet(): WalletState & WalletActions {
           description: p.description,
         }));
 
+        if (activeWalletKeyRef.current !== walletKey) {
+          return;
+        }
+
         setTransactions(txs);
         setIsRefreshing(false);
 
@@ -695,34 +732,47 @@ export function useWallet(): WalletState & WalletActions {
         );
 
         // Update activity flag
-        if (walletInfo) {
-          const hasActivity = txs.length > 0 || balanceRef.current > 0;
-          storageService.updateSubWalletActivity(
-            walletInfo.masterKeyId,
-            walletInfo.subWalletIndex,
-            hasActivity
-          ).catch(err => console.warn('⚠️ [useWallet] Failed to update activity:', err));
-        }
+        const hasActivity = txs.length > 0 || balanceRef.current > 0;
+        storageService.updateSubWalletActivity(
+          walletInfo.masterKeyId,
+          walletInfo.subWalletIndex,
+          hasActivity
+        ).catch(err => console.warn('⚠️ [useWallet] Failed to update activity:', err));
       } catch (err) {
         console.error('❌ [useWallet] Failed to refresh transactions:', err);
-        setIsRefreshing(false);
+        if (activeWalletKeyRef.current === walletKey) {
+          setIsRefreshing(false);
+        }
       } finally {
-        refreshTransactionsPromiseRef.current = null;
+        if (refreshTransactionsPromiseRef.current?.walletKey === walletKey) {
+          refreshTransactionsPromiseRef.current = null;
+        }
       }
     };
 
-    refreshTransactionsPromiseRef.current = doRefresh();
-    return refreshTransactionsPromiseRef.current;
-  }, []);
+    const promise = doRefresh();
+    refreshTransactionsPromiseRef.current = { walletKey, promise };
+    return promise;
+  }, [getWalletKey]);
 
   // ========================================
   // Cache Loading Trigger
   // ========================================
 
-  // Immediately load cached data (refreshBalance/Transactions checks cache first)
+  // Immediately reset wallet-specific state and then load wallet-specific cache/fresh data
   // whenever the active wallet changes in storage.
   useEffect(() => {
     if (activeWalletInfo) {
+      // Prevent stale in-flight requests from a previous wallet from writing into state.
+      refreshBalancePromiseRef.current = null;
+      refreshTransactionsPromiseRef.current = null;
+
+      // Clear wallet-specific state immediately and show loading state.
+      setIsLoading(true);
+      setIsRefreshing(false);
+      setBalance(0);
+      setTransactions([]);
+
       refreshBalance();
       refreshTransactions();
     }
