@@ -438,7 +438,7 @@ class StorageService {
     // Return cached mnemonic if available (avoids slow PBKDF2)
     const cached = this._mnemonicCache.get(masterKeyId);
     if (cached) {
-      if (__DEV__) console.log('⚡ [StorageService] GET_MASTER_KEY_MNEMONIC from cache');
+      if (__DEV__) console.log('⚡ [StorageService] GET_MASTER_KEY_MNEMONIC from cache, words:', cached.trim().split(/\s+/).length);
       return cached;
     }
 
@@ -462,6 +462,8 @@ class StorageService {
 
       // Decrypt mnemonic
       const mnemonic = await decryptData(masterKey.encryptedMnemonic, pin);
+      const wordCount = mnemonic.trim().split(/\s+/).length;
+      console.log('🔐 [StorageService] Decrypted mnemonic wordCount:', wordCount, 'version:', masterKey.encryptedMnemonic.version);
 
       // Cache for subsequent calls during this session
       this._mnemonicCache.set(masterKeyId, mnemonic);
