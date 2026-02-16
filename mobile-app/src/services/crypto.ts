@@ -4,10 +4,10 @@
 // Preserves legacy XOR (v1) decryption for backward compatibility
 
 import * as Crypto from 'expo-crypto';
-import { gcm } from '@noble/ciphers/aes';
-import { pbkdf2 } from '@noble/hashes/pbkdf2';
-import { sha256 } from '@noble/hashes/sha256';
-import { randomBytes } from '@noble/ciphers/webcrypto';
+import { gcm } from '@noble/ciphers/aes.js';
+import { pbkdf2 } from '@noble/hashes/pbkdf2.js';
+import { sha256 } from '@noble/hashes/sha256.js';
+import { randomBytes } from '@noble/ciphers/webcrypto.js';
 
 import type { EncryptedData } from '../features/wallet/types';
 
