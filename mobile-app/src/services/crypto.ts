@@ -239,12 +239,16 @@ export async function decryptData(
 
   for (const iters of iterationCounts) {
     try {
+      console.log('🔐 [Crypto] Trying', iters, 'iterations, saltLen:', salt.length, 'dataLen:', fullData.length, 'ivLen:', iv.length);
       const key = await deriveKeyWithIterations(pin, salt, iters);
+      console.log('🔐 [Crypto] Key derived, first4:', bytesToHex(key.slice(0, 4)));
       const aes = gcm(key, iv);
       const decrypted = aes.decrypt(fullData);
-      return bytesToString(decrypted);
-    } catch {
-      // Auth tag mismatch = wrong key = try next iteration count
+      const result = bytesToString(decrypted);
+      console.log('🔐 [Crypto] Decrypt SUCCESS, wordCount:', result.trim().split(/\s+/).length);
+      return result;
+    } catch (e) {
+      console.warn('🔐 [Crypto] Decrypt failed with', iters, 'iters:', e);
       continue;
     }
   }
