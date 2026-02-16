@@ -96,7 +96,7 @@ async function deriveKeyFromPinV1(pin: string): Promise<Uint8Array> {
   );
   hash = hash.toLowerCase();
 
-  const mobileIterations = Math.floor(ITERATIONS / 100); // 1000 iterations
+  const mobileIterations = 1000; // Fixed: V1 always used 1000 SHA-256 rounds
 
   for (let i = 0; i < mobileIterations; i++) {
     hash = await Crypto.digestStringAsync(
