@@ -633,16 +633,22 @@ export function useWallet(): WalletState & WalletActions {
           return;
         }
 
-        setBalance(walletBalance.balanceSat);
+        // Don't overwrite a known balance with 0 from SDK — likely transitional state
+        // A true 0 balance will be set once confirmed (transactions also empty)
+        if (walletBalance.balanceSat > 0 || balanceRef.current === 0) {
+          setBalance(walletBalance.balanceSat);
+        }
         setIsLoading(false);
         setIsRefreshing(false);
 
-        // Update cache with fresh data
-        await WalletCache.cacheBalance(
-          walletInfo.masterKeyId,
-          walletInfo.subWalletIndex,
-          walletBalance.balanceSat
-        );
+        // Update cache with fresh data (only if non-zero or wallet truly empty)
+        if (walletBalance.balanceSat > 0 || balanceRef.current === 0) {
+          await WalletCache.cacheBalance(
+            walletInfo.masterKeyId,
+            walletInfo.subWalletIndex,
+            walletBalance.balanceSat
+          );
+        }
 
         // Update activity flag
         const hasActivity = walletBalance.balanceSat > 0 || transactionsRef.current.length > 0;
@@ -803,28 +809,18 @@ export function useWallet(): WalletState & WalletActions {
 
         if (cachedBalance) {
           setBalance(cachedBalance.balance);
-        } else {
-          setBalance(0);
         }
+        // Don't set balance to 0 — keep preloaded/current value until SDK provides real data
 
         if (cachedTxs) {
           setTransactions(cachedTxs.transactions);
-        } else {
-          setTransactions([]);
         }
+        // Don't clear transactions — keep current until SDK provides real data
 
-        const hasCachedData = Boolean(cachedBalance || cachedTxs);
-        setIsLoading(!hasCachedData);
-        if (hasCachedData) {
-          setIsRefreshing(true);
-        }
+        setIsLoading(false);
+        setIsRefreshing(true);
       } catch (cacheError) {
         console.warn('⚠️ [useWallet] Failed to load cached wallet data:', cacheError);
-        if (!isCancelled && !isSwitchingRef.current) {
-          setBalance(0);
-          setTransactions([]);
-          setIsLoading(true);
-        }
       } finally {
         if (!isCancelled && !isSwitchingRef.current) {
           refreshBalance();
