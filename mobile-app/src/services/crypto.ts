@@ -7,6 +7,15 @@ import * as Crypto from 'expo-crypto';
 import type { EncryptedData } from '../features/wallet/types';
 
 // =============================================================================
+// Runtime capability check
+// =============================================================================
+
+const _hasSubtle = typeof crypto !== 'undefined' && typeof crypto?.subtle?.importKey === 'function';
+console.log('🔐 [Crypto] crypto available:', typeof crypto !== 'undefined');
+console.log('🔐 [Crypto] crypto.subtle available:', _hasSubtle);
+console.log('🔐 [Crypto] crypto.getRandomValues available:', typeof crypto?.getRandomValues === 'function');
+
+// =============================================================================
 // Constants
 // =============================================================================
 
@@ -281,8 +290,15 @@ export async function decryptData(
 ): Promise<string> {
   const version = encryptedData.version || 1;
 
+  console.log('🔐 [Crypto] decryptData called, version:', version, 'hasSalt:', !!encryptedData.salt, 'dataLen:', encryptedData.data?.length);
+
   if (version === 1) {
     return decryptDataV1(encryptedData, pin);
+  }
+
+  if (!_hasSubtle) {
+    console.error('🔐 [Crypto] crypto.subtle NOT available — cannot decrypt V' + version + ' data');
+    throw new Error('crypto.subtle not available in this runtime — cannot decrypt AES-GCM data');
   }
 
   // v2/v3: AES-256-GCM via Web Crypto
