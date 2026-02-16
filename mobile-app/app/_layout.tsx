@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '../src/lib/queryClient';
 import { initializeDeepLinking } from '../src/utils/deepLinking';
+import { storageService } from '../src/services';
 import { ThemeProvider } from '../src/contexts/ThemeContext';
 import { LanguageProvider } from '../src/contexts/LanguageContext';
 import { FeedbackProvider } from '../src/features/wallet/components/FeedbackComponents';
@@ -12,6 +13,17 @@ export default function RootLayout(): React.JSX.Element {
   useEffect(() => {
     // Initialize deep linking when the app starts
     initializeDeepLinking();
+
+    // ONE-TIME: Wipe corrupted wallets from broken encryption migration
+    // TODO: Remove this after Bob's device is clean
+    (async () => {
+      try {
+        await storageService.deleteAllWallets();
+        console.log('🧹 [CLEANUP] All corrupted wallet data wiped');
+      } catch (e) {
+        console.warn('🧹 [CLEANUP] Wipe failed:', e);
+      }
+    })();
   }, []);
 
   return (
