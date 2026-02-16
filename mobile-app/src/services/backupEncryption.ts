@@ -1,14 +1,11 @@
 // Backup Encryption Service
-// v3: AES-256-GCM + PBKDF2-SHA256 via Web Crypto API (crypto.subtle)
+// v3: AES-256-GCM + PBKDF2-SHA256 via react-native-quick-crypto
 // Backward compatibility: v2 AES-256-CTR + HMAC decrypt path preserved
 
 import * as Crypto from 'expo-crypto';
 import * as aesjs from 'aes-js';
 import { Buffer } from 'buffer';
-import { gcm } from '@noble/ciphers/aes.js';
-import { pbkdf2Async } from '@noble/hashes/pbkdf2.js';
-import { sha256 } from '@noble/hashes/sha2.js';
-import { randomBytes } from '@noble/ciphers/webcrypto.js';
+import QuickCrypto from 'react-native-quick-crypto';
 
 // =============================================================================
 // Types
@@ -191,22 +188,26 @@ export async function encryptMnemonic(
       throw new Error('Password does not meet security requirements');
     }
 
-    const salt = randomBytes(SALT_LENGTH);
-    const iv = randomBytes(IV_LENGTH_GCM);
-    const key = await pbkdf2Async(sha256, password, salt, { c: PBKDF2_ITERATIONS_V3, dkLen: KEY_LENGTH, asyncTick: 10 });
+    const salt = new Uint8Array(QuickCrypto.randomBytes(SALT_LENGTH));
+    const iv = new Uint8Array(QuickCrypto.randomBytes(IV_LENGTH_GCM));
+    const key = QuickCrypto.pbkdf2Sync(
+      password,
+      Buffer.from(salt),
+      PBKDF2_ITERATIONS_V3,
+      KEY_LENGTH,
+      'sha256'
+    );
 
-    const aes = gcm(key, iv);
-    const encrypted = aes.encrypt(new TextEncoder().encode(mnemonic));
-    // @noble/ciphers returns ciphertext + 16-byte authTag
-    const ciphertext = encrypted.slice(0, encrypted.length - 16);
-    const authTag = encrypted.slice(encrypted.length - 16);
+    const cipher = QuickCrypto.createCipheriv('aes-256-gcm', Buffer.from(key), Buffer.from(iv));
+    const encrypted = Buffer.concat([cipher.update(mnemonic, 'utf8'), cipher.final()]);
+    const authTag = cipher.getAuthTag();
 
     return {
       version: BACKUP_VERSION,
       format: 'aes-256-gcm',
       salt: Buffer.from(salt).toString('base64'),
       iv: Buffer.from(iv).toString('base64'),
-      ciphertext: Buffer.from(ciphertext).toString('base64'),
+      ciphertext: Buffer.from(encrypted).toString('base64'),
       authTag: Buffer.from(authTag).toString('base64'),
       timestamp: Date.now(),
       walletName,
@@ -232,20 +233,25 @@ export async function decryptMnemonic(
 
     const salt = new Uint8Array(Buffer.from(backup.salt, 'base64'));
     const iv = new Uint8Array(Buffer.from(backup.iv, 'base64'));
-    const ciphertext = new Uint8Array(Buffer.from(backup.ciphertext, 'base64'));
-    const authTag = new Uint8Array(Buffer.from(backup.authTag, 'base64'));
+    const ciphertext = Buffer.from(backup.ciphertext, 'base64');
+    const authTag = Buffer.from(backup.authTag, 'base64');
 
-    const key = await pbkdf2Async(sha256, password, salt, { c: PBKDF2_ITERATIONS_V3, dkLen: KEY_LENGTH, asyncTick: 10 });
+    const key = QuickCrypto.pbkdf2Sync(
+      password,
+      Buffer.from(salt),
+      PBKDF2_ITERATIONS_V3,
+      KEY_LENGTH,
+      'sha256'
+    );
 
-    // @noble/ciphers expects ciphertext + authTag concatenated
-    const combined = new Uint8Array(ciphertext.length + authTag.length);
-    combined.set(ciphertext);
-    combined.set(authTag, ciphertext.length);
+    const decipher = QuickCrypto.createDecipheriv('aes-256-gcm', Buffer.from(key), Buffer.from(iv));
+    decipher.setAuthTag(authTag);
+    const decrypted = Buffer.concat([
+      decipher.update(ciphertext),
+      decipher.final(),
+    ]);
 
-    const aes = gcm(key, iv);
-    const decrypted = aes.decrypt(combined);
-
-    return new TextDecoder().decode(decrypted);
+    return decrypted.toString('utf8');
   } catch (error) {
     console.error('❌ [BackupEncryption] Decryption failed:', error);
     throw new Error('Failed to decrypt backup. Please check your password.');
