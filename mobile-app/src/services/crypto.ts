@@ -4,22 +4,7 @@
 import * as Crypto from 'expo-crypto';
 import { Buffer } from 'buffer';
 
-// react-native-quick-crypto requires native modules at runtime.
-// In Jest/Node environments, fall back to Node's crypto implementation.
-let cryptoImpl: {
-  pbkdf2Sync: typeof import('crypto').pbkdf2Sync;
-  randomBytes: typeof import('crypto').randomBytes;
-  createCipheriv: typeof import('crypto').createCipheriv;
-  createDecipheriv: typeof import('crypto').createDecipheriv;
-};
-
-try {
-  cryptoImpl = require('react-native-quick-crypto');
-} catch {
-  cryptoImpl = require('crypto');
-}
-
-const { pbkdf2Sync, randomBytes, createCipheriv, createDecipheriv } = cryptoImpl;
+import { pbkdf2Sync, randomBytes, createCipheriv, createDecipheriv } from 'react-native-quick-crypto';
 
 import type { EncryptedData } from '../features/wallet/types';
 
