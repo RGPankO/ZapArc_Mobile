@@ -1,11 +1,12 @@
 // Wallet Settings Screen
 // Main settings hub for wallet configuration
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, List, Divider, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../../hooks/useSettings';
 import { useLanguage } from '../../../hooks/useLanguage';
@@ -17,9 +18,16 @@ import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_CO
 // =============================================================================
 
 export function WalletSettingsScreen(): React.JSX.Element {
-  const { settings, isLoading: settingsLoading } = useSettings();
+  const { settings, isLoading: settingsLoading, loadSettings } = useSettings();
   const { currentLanguage, t } = useLanguage();
   const { themeMode } = useAppTheme();
+
+  // Reload settings when screen comes into focus (catches changes from sub-screens)
+  useFocusEffect(
+    useCallback(() => {
+      loadSettings();
+    }, [loadSettings])
+  );
 
   const gradientColors = getGradientColors(themeMode);
   const primaryTextColor = getPrimaryTextColor(themeMode);
