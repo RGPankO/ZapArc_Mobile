@@ -253,27 +253,10 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
   }, [backups, localFingerprints]);
 
   const handleCreateBackup = async (masterKeyId?: string): Promise<void> => {
-    const keys = masterKeys || [];
     const targetId = masterKeyId || activeMasterKey?.id;
 
     if (!targetId) {
       Alert.alert(t('common.error'), 'No wallet found');
-      return;
-    }
-
-    // If multiple wallets and no specific one chosen, let user pick
-    if (!masterKeyId && keys.length > 1) {
-      Alert.alert(
-        'Select Wallet to Back Up',
-        'Which wallet do you want to back up?',
-        [
-          ...keys.map((key) => ({
-            text: key.nickname || key.id.substring(0, 8),
-            onPress: () => handleCreateBackup(key.id),
-          })),
-          { text: t('common.cancel'), style: 'cancel' as const },
-        ]
-      );
       return;
     }
 
@@ -489,8 +472,6 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
   // ==========================================================================
   // Render
   // ==========================================================================
-
-  const activeWalletBackup = activeMasterKey ? getWalletBackupById(activeMasterKey.id) : undefined;
 
   const getWalletLabel = (walletId: string): string => {
     const wallet = (masterKeys || []).find((key) => key.id === walletId);
@@ -761,116 +742,120 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
               )}
             </View>
 
-            {/* Backup Actions */}
+            {/* Your Wallets */}
             {isConnected && (
               <>
                 <View style={styles.section}>
                   <Text style={[styles.sectionTitle, { color: primaryText }]}>
-                    {t('cloudBackup.backupActions')}
+                    Your Wallets
                   </Text>
 
-                  {lastBackupTimestamp && (
-                    <Text style={[styles.lastBackup, { color: secondaryText }]}>
-                      {t('cloudBackup.lastBackup')}: {formatDate(lastBackupTimestamp)}
-                    </Text>
-                  )}
-
-                  <Button
-                    mode="contained"
-                    onPress={() => {
-                      void handleCreateBackup();
-                    }}
-                    icon="cloud-upload"
-                    style={[styles.actionButton, { backgroundColor: BRAND_COLOR }]}
-                    labelStyle={{ color: '#1a1a2e' }}
-                  >
-                    {activeWalletBackup ? 'Update Backup' : t('cloudBackup.createBackup')}
-                  </Button>
-
-                  {(masterKeys || []).map((key) => {
-                    const matchedBackup = getWalletBackupById(key.id);
-                    return (
-                      <View key={key.id} style={styles.walletStatusRow}>
-                        <View style={styles.walletStatusInfo}>
-                          <Text style={[styles.backupWalletName, { color: primaryText }]}>
-                            {key.nickname || key.id.substring(0, 8)}
-                          </Text>
-                          <Text style={[styles.walletStatusText, { color: matchedBackup ? '#4CAF50' : '#ffb74d' }]}>
-                            {matchedBackup
-                              ? `✅ Backed up · ${formatDate(matchedBackup.timestamp)}`
-                              : '⚠️ Not backed up'}
-                          </Text>
-                        </View>
-                        <Button
-                          mode="text"
-                          onPress={() => handleCreateBackup(key.id)}
-                          compact
-                          textColor={BRAND_COLOR}
-                        >
-                          {matchedBackup ? 'Update Backup' : 'Create Backup'}
-                        </Button>
-                      </View>
-                    );
-                  })}
-                </View>
-
-                {/* Existing Backups */}
-                <View style={styles.section}>
-                  <Text style={[styles.sectionTitle, { color: primaryText }]}>
-                    {t('cloudBackup.existingBackups')}
-                  </Text>
-
-                  {backups.length === 0 ? (
+                  {(masterKeys || []).length === 0 ? (
                     <Text style={[styles.noBackups, { color: secondaryText }]}>
-                      {t('cloudBackup.noBackups')}
+                      No wallets found
                     </Text>
                   ) : (
-                    backups.map((backup) => (
-                      <View key={backup.id} style={styles.backupItem}>
-                        <View style={styles.backupInfo}>
-                          <Text style={[styles.backupWalletName, { color: primaryText }]}>
-                            {backup.walletName || 'Unknown Wallet'}
-                          </Text>
-                          <Text style={[styles.backupDate, { color: secondaryText }]}>
-                            {formatDate(backup.timestamp)}
-                          </Text>
-                          <Text style={[styles.backupWallet, { color: secondaryText }]}>
-                            {backup.seedFingerprint
-                              ? (() => {
-                                const matchedWallet = (masterKeys || []).find((key) => localFingerprints[key.id] === backup.seedFingerprint);
-                                return matchedWallet
-                                  ? `Wallet: ${getWalletLabel(matchedWallet.id)}`
-                                  : 'Wallet: Not linked to local wallet';
-                              })()
-                              : 'Wallet: Unknown (legacy backup)'}
-                          </Text>
-                        </View>
-                        <View style={styles.backupActions}>
-                          <TouchableOpacity
-                            onPress={() => handleRestoreBackup(backup)}
-                            style={styles.backupActionButton}
+                    (masterKeys || []).map((key) => {
+                      const matchedBackup = getWalletBackupById(key.id);
+                      const isActive = activeMasterKey?.id === key.id;
+                      return (
+                        <View key={key.id} style={[styles.walletCard, { borderColor: isActive ? BRAND_COLOR : 'rgba(255, 255, 255, 0.1)' }]}>
+                          <View style={styles.walletCardHeader}>
+                            <View style={styles.walletCardNameRow}>
+                              <Text style={[styles.backupWalletName, { color: primaryText }]}>
+                                {key.nickname || key.id.substring(0, 8)}
+                              </Text>
+                              {isActive && (
+                                <View style={[styles.activeBadge, { backgroundColor: BRAND_COLOR }]}>
+                                  <Text style={styles.activeBadgeText}>Active</Text>
+                                </View>
+                              )}
+                            </View>
+                            {matchedBackup ? (
+                              <View style={styles.backupStatusRow}>
+                                <Text style={[styles.walletStatusText, { color: '#4CAF50' }]}>
+                                  ✅ Backed up
+                                </Text>
+                                <Text style={[styles.backupDate, { color: secondaryText }]}>
+                                  {formatDate(matchedBackup.timestamp)}
+                                </Text>
+                              </View>
+                            ) : (
+                              <Text style={[styles.walletStatusText, { color: '#ffb74d' }]}>
+                                ⚠️ Not backed up
+                              </Text>
+                            )}
+                          </View>
+                          <Button
+                            mode={matchedBackup ? 'outlined' : 'contained'}
+                            onPress={() => handleCreateBackup(key.id)}
+                            icon={matchedBackup ? 'cloud-sync' : 'cloud-upload'}
+                            compact
+                            style={matchedBackup ? [styles.walletActionBtn, { borderColor: BRAND_COLOR }] : [styles.walletActionBtn, { backgroundColor: BRAND_COLOR }]}
+                            textColor={matchedBackup ? BRAND_COLOR : '#1a1a2e'}
+                            labelStyle={matchedBackup ? undefined : { color: '#1a1a2e' }}
                           >
-                            <IconButton
-                              icon="download"
-                              iconColor={BRAND_COLOR}
-                              size={20}
-                            />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            onPress={() => handleDeleteBackup(backup)}
-                            style={styles.backupActionButton}
-                          >
-                            <IconButton
-                              icon="delete"
-                              iconColor="#ff5252"
-                              size={20}
-                            />
-                          </TouchableOpacity>
+                            {matchedBackup ? 'Update Backup' : 'Back Up Now'}
+                          </Button>
                         </View>
-                      </View>
-                    ))
+                      );
+                    })
                   )}
                 </View>
+
+                {/* Cloud Backups (orphaned — not linked to any local wallet) */}
+                {(() => {
+                  const linkedFingerprints = new Set(Object.values(localFingerprints));
+                  const orphanedBackups = backups.filter(
+                    (b) => !b.seedFingerprint || !linkedFingerprints.has(b.seedFingerprint)
+                  );
+                  if (orphanedBackups.length === 0) return null;
+                  return (
+                    <View style={styles.section}>
+                      <Text style={[styles.sectionTitle, { color: primaryText }]}>
+                        Cloud Backups
+                      </Text>
+                      <Text style={[styles.sectionSubtitle, { color: secondaryText }]}>
+                        These backups aren't linked to any wallet on this device
+                      </Text>
+
+                      {orphanedBackups.map((backup) => (
+                        <View key={backup.id} style={styles.backupItem}>
+                          <View style={styles.backupInfo}>
+                            <Text style={[styles.backupWalletName, { color: primaryText }]}>
+                              {backup.walletName || 'Unknown Wallet'}
+                            </Text>
+                            <Text style={[styles.backupDate, { color: secondaryText }]}>
+                              {formatDate(backup.timestamp)}
+                            </Text>
+                          </View>
+                          <View style={styles.backupActions}>
+                            <TouchableOpacity
+                              onPress={() => handleRestoreBackup(backup)}
+                              style={styles.backupActionButton}
+                            >
+                              <IconButton
+                                icon="download"
+                                iconColor={BRAND_COLOR}
+                                size={20}
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => handleDeleteBackup(backup)}
+                              style={styles.backupActionButton}
+                            >
+                              <IconButton
+                                icon="delete"
+                                iconColor="#ff5252"
+                                size={20}
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  );
+                })()}
               </>
             )}
 
@@ -1007,21 +992,47 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 8,
   },
-  walletStatusRow: {
+  walletCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+  },
+  walletCardHeader: {
+    marginBottom: 10,
+  },
+  walletCardNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    gap: 8,
+    marginBottom: 4,
   },
-  walletStatusInfo: {
-    flex: 1,
-    paddingRight: 8,
+  activeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  activeBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1a1a2e',
+  },
+  backupStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  walletActionBtn: {
+    borderRadius: 8,
   },
   walletStatusText: {
     fontSize: 12,
     marginTop: 2,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    marginBottom: 12,
+    marginTop: -4,
   },
   noBackups: {
     fontSize: 14,
