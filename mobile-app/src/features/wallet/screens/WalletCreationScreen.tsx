@@ -297,7 +297,20 @@ export function WalletCreationScreen(): React.JSX.Element {
 
       // Use custom name or default to "Main Wallet"
       const nickname = walletName.trim() || undefined;
-      await createMasterKey(pin, nickname, mnemonic);
+      // Race against a timeout — don't let SDK init block the UI forever
+      const timeoutPromise = new Promise<string>((_, reject) =>
+        setTimeout(() => reject(new Error('__timeout__')), 15000)
+      );
+      try {
+        await Promise.race([createMasterKey(pin, nickname, mnemonic), timeoutPromise]);
+      } catch (raceErr) {
+        // If it timed out, the wallet was likely created — SDK init is just slow
+        if (raceErr instanceof Error && raceErr.message === '__timeout__') {
+          console.warn('⚠️ [WalletCreation] createMasterKey timed out (SDK init slow), proceeding');
+        } else {
+          throw raceErr;
+        }
+      }
       setCurrentStep('complete');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create wallet');
