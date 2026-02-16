@@ -420,11 +420,29 @@ class StorageService {
     }
   }
 
+  // In-memory mnemonic cache — avoids repeated PBKDF2 derivation during a session
+  private _mnemonicCache = new Map<string, string>();
+
+  /**
+   * Clear cached mnemonics (call on lock/logout)
+   */
+  clearMnemonicCache(): void {
+    this._mnemonicCache.clear();
+    if (__DEV__) console.log('🔐 [StorageService] Mnemonic cache cleared');
+  }
+
   /**
    * Decrypt and get the mnemonic for a master key
    */
   async getMasterKeyMnemonic(masterKeyId: string, pin: string): Promise<string | null> {
-    if (__DEV__) console.log('🔵 [StorageService] GET_MASTER_KEY_MNEMONIC', { masterKeyId });
+    // Return cached mnemonic if available (avoids slow PBKDF2)
+    const cached = this._mnemonicCache.get(masterKeyId);
+    if (cached) {
+      if (__DEV__) console.log('⚡ [StorageService] GET_MASTER_KEY_MNEMONIC from cache');
+      return cached;
+    }
+
+    if (__DEV__) console.log('🔵 [StorageService] GET_MASTER_KEY_MNEMONIC (decrypting)', { masterKeyId });
 
     try {
       const storage = await this.loadMultiWalletStorage();
@@ -444,6 +462,9 @@ class StorageService {
 
       // Decrypt mnemonic
       const mnemonic = await decryptData(masterKey.encryptedMnemonic, pin);
+
+      // Cache for subsequent calls during this session
+      this._mnemonicCache.set(masterKeyId, mnemonic);
 
       // Silent migration: legacy v1/v2 payloads -> v3 AES-GCM (per-wallet salt)
       // Silent migration: legacy v1/v2 payloads -> v3 AES-GCM (per-wallet salt)

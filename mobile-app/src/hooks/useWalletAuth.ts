@@ -336,6 +336,7 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
   const lock = useCallback(async (): Promise<void> => {
     try {
       await storageService.lockWallet();
+      storageService.clearMnemonicCache(); // Clear cached mnemonics for security
       sessionPinRef.current = null; // Clear cached PIN for security
       setIsUnlocked(false);
       console.log('✅ [useWalletAuth] Wallet locked');
