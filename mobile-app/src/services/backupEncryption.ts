@@ -6,7 +6,7 @@ import * as Crypto from 'expo-crypto';
 import * as aesjs from 'aes-js';
 import { Buffer } from 'buffer';
 import { gcm } from '@noble/ciphers/aes.js';
-import { pbkdf2 } from '@noble/hashes/pbkdf2.js';
+import { pbkdf2Async } from '@noble/hashes/pbkdf2.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { randomBytes } from '@noble/ciphers/webcrypto.js';
 
@@ -193,7 +193,7 @@ export async function encryptMnemonic(
 
     const salt = randomBytes(SALT_LENGTH);
     const iv = randomBytes(IV_LENGTH_GCM);
-    const key = pbkdf2(sha256, password, salt, { c: PBKDF2_ITERATIONS_V3, dkLen: KEY_LENGTH });
+    const key = await pbkdf2Async(sha256, password, salt, { c: PBKDF2_ITERATIONS_V3, dkLen: KEY_LENGTH, asyncTick: 10 });
 
     const aes = gcm(key, iv);
     const encrypted = aes.encrypt(new TextEncoder().encode(mnemonic));
@@ -235,7 +235,7 @@ export async function decryptMnemonic(
     const ciphertext = new Uint8Array(Buffer.from(backup.ciphertext, 'base64'));
     const authTag = new Uint8Array(Buffer.from(backup.authTag, 'base64'));
 
-    const key = pbkdf2(sha256, password, salt, { c: PBKDF2_ITERATIONS_V3, dkLen: KEY_LENGTH });
+    const key = await pbkdf2Async(sha256, password, salt, { c: PBKDF2_ITERATIONS_V3, dkLen: KEY_LENGTH, asyncTick: 10 });
 
     // @noble/ciphers expects ciphertext + authTag concatenated
     const combined = new Uint8Array(ciphertext.length + authTag.length);

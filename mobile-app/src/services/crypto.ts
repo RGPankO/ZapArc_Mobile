@@ -5,7 +5,7 @@
 
 import * as Crypto from 'expo-crypto';
 import { gcm } from '@noble/ciphers/aes.js';
-import { pbkdf2 } from '@noble/hashes/pbkdf2.js';
+import { pbkdf2Async } from '@noble/hashes/pbkdf2.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { randomBytes } from '@noble/ciphers/webcrypto.js';
 
@@ -64,9 +64,9 @@ function bytesToString(bytes: Uint8Array): string {
  * Derive key using PBKDF2-HMAC-SHA256 (v2/v3)
  * Uses @noble/hashes — pure JS, audited
  */
-function deriveKeyV2(pin: string, salt: Uint8Array | string): Uint8Array {
+async function deriveKeyV2(pin: string, salt: Uint8Array | string): Promise<Uint8Array> {
   const saltBytes = typeof salt === 'string' ? stringToBytes(salt) : salt;
-  return pbkdf2(sha256, pin, saltBytes, { c: ITERATIONS, dkLen: KEY_LENGTH });
+  return pbkdf2Async(sha256, pin, saltBytes, { c: ITERATIONS, dkLen: KEY_LENGTH, asyncTick: 10 });
 }
 
 /**
@@ -133,7 +133,7 @@ export async function encryptData(
 ): Promise<EncryptedData> {
   try {
     const salt = randomBytes(SALT_LENGTH);
-    const key = deriveKeyV2(pin, salt);
+    const key = await deriveKeyV2(pin, salt);
     const iv = randomBytes(IV_LENGTH);
 
     const aes = gcm(key, iv);
@@ -229,7 +229,7 @@ export async function decryptData(
       ? new Uint8Array(encryptedData.salt)
       : stringToBytes(LEGACY_SALT);
 
-    const key = deriveKeyV2(pin, salt);
+    const key = await deriveKeyV2(pin, salt);
     const fullData = new Uint8Array(encryptedData.data);
     const iv = new Uint8Array(encryptedData.iv);
 
