@@ -1,11 +1,10 @@
 // Backup Encryption Service
-// v3: AES-256-GCM + PBKDF2-SHA256 via react-native-quick-crypto
+// v3: AES-256-GCM + PBKDF2-SHA256 via Web Crypto API (crypto.subtle)
 // Backward compatibility: v2 AES-256-CTR + HMAC decrypt path preserved
 
 import * as Crypto from 'expo-crypto';
 import * as aesjs from 'aes-js';
 import { Buffer } from 'buffer';
-import QuickCrypto from 'react-native-quick-crypto';
 
 // =============================================================================
 // Types
@@ -188,24 +187,40 @@ export async function encryptMnemonic(
       throw new Error('Password does not meet security requirements');
     }
 
-    const salt = QuickCrypto.randomBytes(SALT_LENGTH);
-    const iv = QuickCrypto.randomBytes(IV_LENGTH_GCM);
-    const key = QuickCrypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS_V3, KEY_LENGTH, 'sha256');
+    const salt = new Uint8Array(SALT_LENGTH);
+    crypto.getRandomValues(salt);
+    const iv = new Uint8Array(IV_LENGTH_GCM);
+    crypto.getRandomValues(iv);
 
-    const cipher = QuickCrypto.createCipheriv('aes-256-gcm', key, iv);
-    const ciphertext = Buffer.concat([
-      cipher.update(mnemonic, 'utf8'),
-      cipher.final(),
-    ]);
-    const authTag = cipher.getAuthTag();
+    // PBKDF2 via Web Crypto
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']
+    );
+    const keyBits = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS_V3, hash: 'SHA-256' },
+      keyMaterial, KEY_LENGTH * 8
+    );
+    const key = new Uint8Array(keyBits);
+
+    // AES-256-GCM encrypt via Web Crypto
+    const cryptoKey = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['encrypt']);
+    const encResult = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      cryptoKey,
+      new TextEncoder().encode(mnemonic)
+    );
+    // Web Crypto returns ciphertext + 16-byte authTag
+    const encBytes = new Uint8Array(encResult);
+    const ciphertext = encBytes.slice(0, encBytes.length - 16);
+    const authTag = encBytes.slice(encBytes.length - 16);
 
     return {
       version: BACKUP_VERSION,
       format: 'aes-256-gcm',
-      salt: salt.toString('base64'),
-      iv: iv.toString('base64'),
-      ciphertext: ciphertext.toString('base64'),
-      authTag: authTag.toString('base64'),
+      salt: Buffer.from(salt).toString('base64'),
+      iv: Buffer.from(iv).toString('base64'),
+      ciphertext: Buffer.from(ciphertext).toString('base64'),
+      authTag: Buffer.from(authTag).toString('base64'),
       timestamp: Date.now(),
       walletName,
     };
@@ -228,21 +243,34 @@ export async function decryptMnemonic(
       throw new Error('Unsupported backup format/version');
     }
 
-    const salt = Buffer.from(backup.salt, 'base64');
-    const iv = Buffer.from(backup.iv, 'base64');
-    const ciphertext = Buffer.from(backup.ciphertext, 'base64');
-    const authTag = Buffer.from(backup.authTag, 'base64');
+    const salt = new Uint8Array(Buffer.from(backup.salt, 'base64'));
+    const iv = new Uint8Array(Buffer.from(backup.iv, 'base64'));
+    const ciphertext = new Uint8Array(Buffer.from(backup.ciphertext, 'base64'));
+    const authTag = new Uint8Array(Buffer.from(backup.authTag, 'base64'));
 
-    const key = QuickCrypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS_V3, KEY_LENGTH, 'sha256');
-    const decipher = QuickCrypto.createDecipheriv('aes-256-gcm', key, iv);
-    decipher.setAuthTag(authTag);
+    // PBKDF2 via Web Crypto
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']
+    );
+    const keyBits = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS_V3, hash: 'SHA-256' },
+      keyMaterial, KEY_LENGTH * 8
+    );
+    const key = new Uint8Array(keyBits);
 
-    const plaintext = Buffer.concat([
-      decipher.update(ciphertext),
-      decipher.final(),
-    ]);
+    // AES-256-GCM decrypt via Web Crypto (expects ciphertext + authTag concatenated)
+    const combined = new Uint8Array(ciphertext.length + authTag.length);
+    combined.set(ciphertext);
+    combined.set(authTag, ciphertext.length);
 
-    return plaintext.toString('utf8');
+    const cryptoKey = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['decrypt']);
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      cryptoKey,
+      combined
+    );
+
+    return new TextDecoder().decode(decrypted);
   } catch (error) {
     console.error('❌ [BackupEncryption] Decryption failed:', error);
     throw new Error('Failed to decrypt backup. Please check your password.');
