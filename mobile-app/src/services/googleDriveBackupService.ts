@@ -375,15 +375,18 @@ class GoogleDriveBackupService {
       const fileName = `zaparc_backup_${safeName}_${Date.now()}.json`;
 
       // Prepare multipart upload
-      const metadata = {
+      // Note: 'parents' is only allowed on create (POST), not update (PATCH)
+      const metadata: Record<string, unknown> = {
         name: fileName,
-        parents: [folderId],
         mimeType: 'application/json',
         description: `ZapArc wallet backup: ${walletName || 'Unknown wallet'}`,
         appProperties: {
           seedFingerprint,
         },
       };
+      if (!existingBackup) {
+        metadata.parents = [folderId];
+      }
 
       const boundary = 'backup_boundary_' + Date.now();
       const body =
