@@ -470,12 +470,24 @@ class StorageService {
 
       // Silent migration: legacy v1/v2 payloads -> v3 AES-GCM (per-wallet salt)
       // Silent migration: legacy v1/v2 payloads -> v3 AES-GCM (per-wallet salt)
+      // Only migrate if decrypted mnemonic is valid (prevents corrupted re-encryption)
       if (!masterKey.encryptedMnemonic.version || masterKey.encryptedMnemonic.version < 3) {
-        if (__DEV__) console.log('🔄 [StorageService] Migrating encryption to V3');
-        const newEncrypted = await encryptData(mnemonic, pin);
-        masterKey.encryptedMnemonic = newEncrypted;
-        await this.saveMultiWalletStorage(storage);
-        if (__DEV__) console.log('✅ [StorageService] Encryption migration complete');
+        const words = mnemonic.trim().split(/\s+/);
+        if (words.length === 12 || words.length === 15 || words.length === 18 || words.length === 21 || words.length === 24) {
+          console.log('🔄 [StorageService] Migrating encryption to V3');
+          const newEncrypted = await encryptData(mnemonic, pin);
+          // Verify round-trip: decrypt the new data and check it matches
+          const verifyMnemonic = await decryptData(newEncrypted, pin);
+          if (verifyMnemonic === mnemonic) {
+            masterKey.encryptedMnemonic = newEncrypted;
+            await this.saveMultiWalletStorage(storage);
+            console.log('✅ [StorageService] Encryption migration complete (verified)');
+          } else {
+            console.error('❌ [StorageService] Migration round-trip FAILED — keeping original encryption');
+          }
+        } else {
+          console.error('❌ [StorageService] Skipping migration — invalid mnemonic word count:', words.length);
+        }
       }
 
       if (__DEV__) console.log('✅ [StorageService] GET_MASTER_KEY_MNEMONIC SUCCESS');
