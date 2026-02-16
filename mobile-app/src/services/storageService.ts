@@ -530,17 +530,15 @@ class StorageService {
     if (__DEV__) console.log('🔵 [StorageService] VERIFY_MASTER_KEY_PIN', { masterKeyId });
 
     try {
-      const storage = await this.loadMultiWalletStorage();
-      if (!storage) {
-        return false;
+      // If we have a cached mnemonic for this key, PIN was already verified
+      if (this._mnemonicCache.has(masterKeyId)) {
+        if (__DEV__) console.log('⚡ [StorageService] VERIFY_MASTER_KEY_PIN from cache');
+        return true;
       }
 
-      const masterKey = storage.masterKeys.find((mk) => mk.id === masterKeyId);
-      if (!masterKey) {
-        return false;
-      }
-
-      const isValid = await verifyPin(masterKey.encryptedMnemonic, pin);
+      // Try to decrypt — if it works, PIN is valid (also populates cache)
+      const mnemonic = await this.getMasterKeyMnemonic(masterKeyId, pin);
+      const isValid = mnemonic !== null;
       if (__DEV__) console.log('✅ [StorageService] VERIFY_MASTER_KEY_PIN', { isValid });
       return isValid;
     } catch (error) {
