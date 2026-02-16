@@ -100,6 +100,7 @@ export function useWallet(): WalletState & WalletActions {
   const refreshBalancePromiseRef = useRef<{ walletKey: string; promise: Promise<void> } | null>(null);
   const refreshTransactionsPromiseRef = useRef<{ walletKey: string; promise: Promise<void> } | null>(null);
   const activeWalletKeyRef = useRef<string | null>(null);
+  const subWalletActivityCacheRef = useRef<Map<string, boolean>>(new Map());
 
   useEffect(() => {
     balanceRef.current = balance;
@@ -139,6 +140,10 @@ export function useWallet(): WalletState & WalletActions {
   const getWalletKey = useCallback((walletInfo: ActiveWalletInfo | null): string | null => {
     if (!walletInfo) return null;
     return `${walletInfo.masterKeyId}:${walletInfo.subWalletIndex}`;
+  }, []);
+
+  const getSubWalletKey = useCallback((masterKeyId: string, subWalletIndex: number): string => {
+    return `${masterKeyId}:${subWalletIndex}`;
   }, []);
 
   useEffect(() => {
@@ -759,23 +764,63 @@ export function useWallet(): WalletState & WalletActions {
   // Cache Loading Trigger
   // ========================================
 
-  // Immediately reset wallet-specific state and then load wallet-specific cache/fresh data
-  // whenever the active wallet changes in storage.
+  // Load wallet-specific cache and refresh whenever the active wallet changes in storage.
   useEffect(() => {
-    if (activeWalletInfo) {
-      // Prevent stale in-flight requests from a previous wallet from writing into state.
-      refreshBalancePromiseRef.current = null;
-      refreshTransactionsPromiseRef.current = null;
+    if (!activeWalletInfo) return;
 
-      // Clear wallet-specific state immediately and show loading state.
-      setIsLoading(true);
-      setIsRefreshing(false);
-      setBalance(0);
-      setTransactions([]);
+    // Prevent stale in-flight requests from a previous wallet from writing into state.
+    refreshBalancePromiseRef.current = null;
+    refreshTransactionsPromiseRef.current = null;
+    setIsRefreshing(false);
 
-      refreshBalance();
-      refreshTransactions();
-    }
+    let isCancelled = false;
+
+    const loadCachedAndRefresh = async (): Promise<void> => {
+      try {
+        const [cachedBalance, cachedTxs] = await Promise.all([
+          WalletCache.getCachedBalance(activeWalletInfo.masterKeyId, activeWalletInfo.subWalletIndex),
+          WalletCache.getCachedTransactions(activeWalletInfo.masterKeyId, activeWalletInfo.subWalletIndex),
+        ]);
+
+        if (isCancelled) return;
+
+        if (cachedBalance) {
+          setBalance(cachedBalance.balance);
+        } else {
+          setBalance(0);
+        }
+
+        if (cachedTxs) {
+          setTransactions(cachedTxs.transactions);
+        } else {
+          setTransactions([]);
+        }
+
+        const hasCachedData = Boolean(cachedBalance || cachedTxs);
+        setIsLoading(!hasCachedData);
+        if (hasCachedData) {
+          setIsRefreshing(true);
+        }
+      } catch (cacheError) {
+        console.warn('⚠️ [useWallet] Failed to load cached wallet data:', cacheError);
+        if (!isCancelled) {
+          setBalance(0);
+          setTransactions([]);
+          setIsLoading(true);
+        }
+      } finally {
+        if (!isCancelled) {
+          refreshBalance();
+          refreshTransactions();
+        }
+      }
+    };
+
+    loadCachedAndRefresh();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [activeWalletInfo, refreshBalance, refreshTransactions]);
 
   // ========================================
@@ -996,6 +1041,21 @@ export function useWallet(): WalletState & WalletActions {
       pin: string,
       restorePin?: string | null
     ): Promise<boolean> => {
+      const cacheKey = getSubWalletKey(masterKeyId, subWalletIndex);
+      const cachedResult = subWalletActivityCacheRef.current.get(cacheKey);
+
+      if (cachedResult !== undefined) {
+        return cachedResult;
+      }
+
+      const knownMasterKey = masterKeys.find((mk) => mk.id === masterKeyId);
+      const knownSubWallet = knownMasterKey?.subWallets.find((sw) => sw.index === subWalletIndex);
+
+      if (knownSubWallet?.hasActivity !== undefined) {
+        subWalletActivityCacheRef.current.set(cacheKey, knownSubWallet.hasActivity);
+        return knownSubWallet.hasActivity;
+      }
+
       console.log('🔄 [useWallet] Syncing sub-wallet activity:', {
         masterKeyId,
         subWalletIndex,
@@ -1022,11 +1082,10 @@ export function useWallet(): WalletState & WalletActions {
         const payments = await BreezSparkService.listPayments();
         const hasActivity = payments.length > 0;
 
-        // 5. Update storage
-        if (hasActivity) {
-          await storageService.updateSubWalletActivity(masterKeyId, subWalletIndex, true);
-          await loadWalletData(); // Refresh local state
-        }
+        // 5. Update cache + storage
+        subWalletActivityCacheRef.current.set(cacheKey, hasActivity);
+        await storageService.updateSubWalletActivity(masterKeyId, subWalletIndex, hasActivity);
+        await loadWalletData(); // Refresh local state
 
         // 6. Restore original connection
         if (originalWallet && (restorePin || pin)) {
@@ -1051,7 +1110,7 @@ export function useWallet(): WalletState & WalletActions {
         return false;
       }
     },
-    [loadWalletData]
+    [getSubWalletKey, loadWalletData, masterKeys]
   );
 
   const canAddSubWallet = useCallback(

@@ -134,8 +134,8 @@ export function WalletManagementScreen(): React.JSX.Element {
         
         const lastSubWallet = subWallets[subWallets.length - 1];
         
-        // If we already know it has activity, skip
-        if (lastSubWallet.hasActivity === true) continue;
+        // If we already know whether it has activity, skip
+        if (lastSubWallet.hasActivity !== undefined) continue;
 
         // Try to get PIN for this master key
         let pin: string | null = null;
