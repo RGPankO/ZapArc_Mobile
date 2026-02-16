@@ -1,15 +1,37 @@
 // Crypto utilities for wallet encryption/decryption
-// Uses @noble/ciphers (AES-256-GCM) + @noble/hashes (PBKDF2)
-// Pure JS, audited, zero native dependencies
+// Tries react-native-quick-crypto (native) first, falls back to @noble (pure JS)
 // Preserves legacy XOR (v1) decryption for backward compatibility
 
 import * as Crypto from 'expo-crypto';
+import { Buffer } from 'buffer';
 import { gcm } from '@noble/ciphers/aes.js';
 import { pbkdf2Async } from '@noble/hashes/pbkdf2.js';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { randomBytes } from '@noble/ciphers/webcrypto.js';
+import { randomBytes as nobleRandomBytes } from '@noble/ciphers/webcrypto.js';
 
 import type { EncryptedData } from '../features/wallet/types';
+
+// =============================================================================
+// Quick Crypto — try native first, fall back to noble
+// =============================================================================
+
+let QC: any = null;
+let _nativeAvailable = false;
+
+try {
+  QC = require('react-native-quick-crypto').default || require('react-native-quick-crypto');
+  if (QC && typeof QC.pbkdf2Sync === 'function') {
+    // Smoke test
+    const testResult = QC.pbkdf2Sync('test', 'salt', 1, 32, 'sha256');
+    if (testResult && testResult.length === 32) {
+      _nativeAvailable = true;
+      console.log('✅ [Crypto] Native quick-crypto available');
+    }
+  }
+} catch (e) {
+  console.log('ℹ️ [Crypto] Native quick-crypto not available, using @noble (pure JS)');
+}
+
 
 // =============================================================================
 // Constants
@@ -70,6 +92,9 @@ async function deriveKeyV2(pin: string, salt: Uint8Array | string): Promise<Uint
 
 async function deriveKeyWithIterations(pin: string, salt: Uint8Array | string, iterations: number): Promise<Uint8Array> {
   const saltBytes = typeof salt === 'string' ? stringToBytes(salt) : salt;
+  if (_nativeAvailable) {
+    return new Uint8Array(QC.pbkdf2Sync(pin, Buffer.from(saltBytes), iterations, KEY_LENGTH, 'sha256'));
+  }
   return pbkdf2Async(sha256, pin, saltBytes, { c: iterations, dkLen: KEY_LENGTH, asyncTick: 10 });
 }
 
@@ -136,13 +161,21 @@ export async function encryptData(
   pin: string
 ): Promise<EncryptedData> {
   try {
-    const salt = randomBytes(SALT_LENGTH);
+    const salt = _nativeAvailable ? new Uint8Array(QC.randomBytes(SALT_LENGTH)) : nobleRandomBytes(SALT_LENGTH);
     const key = await deriveKeyV2(pin, salt);
-    const iv = randomBytes(IV_LENGTH);
+    const iv = _nativeAvailable ? new Uint8Array(QC.randomBytes(IV_LENGTH)) : nobleRandomBytes(IV_LENGTH);
 
-    const aes = gcm(key, iv);
-    const ciphertext = aes.encrypt(stringToBytes(plaintext));
-    // @noble/ciphers gcm.encrypt returns ciphertext + 16-byte authTag appended
+    let ciphertext: Uint8Array;
+    if (_nativeAvailable) {
+      const cipher = QC.createCipheriv('aes-256-gcm', Buffer.from(key), Buffer.from(iv));
+      const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+      const authTag = cipher.getAuthTag();
+      ciphertext = new Uint8Array(Buffer.concat([encrypted, authTag]));
+    } else {
+      const aes = gcm(key, iv);
+      ciphertext = aes.encrypt(stringToBytes(plaintext));
+    }
+    // ciphertext + 16-byte authTag appended
 
     return {
       data: Array.from(ciphertext),
@@ -239,13 +272,29 @@ export async function decryptData(
 
   for (const iters of iterationCounts) {
     try {
-      console.log('🔐 [Crypto] Trying', iters, 'iterations, saltLen:', salt.length, 'dataLen:', fullData.length, 'ivLen:', iv.length);
       const key = await deriveKeyWithIterations(pin, salt, iters);
-      console.log('🔐 [Crypto] Key derived, first4:', bytesToHex(key.slice(0, 4)));
+
+      // Try native decrypt first (matches how data was encrypted)
+      if (_nativeAvailable) {
+        try {
+          const authTag = fullData.slice(fullData.length - 16);
+          const encrypted = fullData.slice(0, fullData.length - 16);
+          const decipher = QC.createDecipheriv('aes-256-gcm', Buffer.from(key), Buffer.from(iv));
+          decipher.setAuthTag(Buffer.from(authTag));
+          const decrypted = Buffer.concat([decipher.update(Buffer.from(encrypted)), decipher.final()]);
+          const result = decrypted.toString('utf8');
+          console.log('✅ [Crypto] Native decrypt SUCCESS');
+          return result;
+        } catch (nativeErr) {
+          console.warn('⚠️ [Crypto] Native decrypt failed, trying noble:', nativeErr);
+        }
+      }
+
+      // Noble fallback
       const aes = gcm(key, iv);
       const decrypted = aes.decrypt(fullData);
       const result = bytesToString(decrypted);
-      console.log('🔐 [Crypto] Decrypt SUCCESS, wordCount:', result.trim().split(/\s+/).length);
+      console.log('✅ [Crypto] Noble decrypt SUCCESS');
       return result;
     } catch (e) {
       console.warn('🔐 [Crypto] Decrypt failed with', iters, 'iters:', e);
