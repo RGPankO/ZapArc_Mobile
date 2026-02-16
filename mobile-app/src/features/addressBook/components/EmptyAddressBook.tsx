@@ -7,6 +7,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text, Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useLanguage } from '../../../hooks/useLanguage';
 import { BRAND_COLOR } from '../../../utils/theme-helpers';
 
 interface EmptyAddressBookProps {
@@ -22,6 +23,8 @@ export function EmptyAddressBook({
   secondaryTextColor,
   isSearchResult = false,
 }: EmptyAddressBookProps): React.JSX.Element {
+  const { t } = useLanguage();
+
   return (
     <View style={styles.container}>
       <MaterialCommunityIcons
@@ -30,12 +33,12 @@ export function EmptyAddressBook({
         color={secondaryTextColor}
       />
       <Text style={[styles.title, { color: primaryTextColor }]}>
-        {isSearchResult ? 'No contacts found' : 'No contacts yet'}
+        {isSearchResult ? t('addressBook.noContactsFound') : t('addressBook.noContacts')}
       </Text>
       <Text style={[styles.description, { color: secondaryTextColor }]}>
         {isSearchResult
-          ? 'Try a different search term'
-          : 'Add your first contact to quickly send payments'}
+          ? t('addressBook.tryDifferentSearchTerm')
+          : t('addressBook.noContactsDescription')}
       </Text>
       {!isSearchResult && (
         <Button
@@ -46,7 +49,7 @@ export function EmptyAddressBook({
           textColor="#000000"
           icon="plus"
         >
-          Add Contact
+          {t('addressBook.addContact')}
         </Button>
       )}
     </View>

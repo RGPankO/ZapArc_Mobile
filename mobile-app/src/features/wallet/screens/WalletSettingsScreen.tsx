@@ -35,13 +35,13 @@ export function WalletSettingsScreen(): React.JSX.Element {
 
   // Format currency display
   const getCurrencyDisplay = (): string => {
-    if (!settings) return 'sats';
+    if (!settings) return t('wallet.sats');
     const currency = settings.currency || 'sats';
     const map: Record<string, string> = {
-      btc: 'BTC',
-      sats: 'Satoshis',
-      usd: 'USD',
-      eur: 'EUR',
+      btc: t('settings.bitcoin'),
+      sats: t('settings.satoshis'),
+      usd: t('settings.usDollar'),
+      eur: t('settings.euro'),
     };
     return map[currency] || currency;
   };
@@ -185,8 +185,8 @@ export function WalletSettingsScreen(): React.JSX.Element {
             */}
 
             <List.Item
-              title="Lightning Address"
-              description="Receive payments with a simple address"
+              title={t('settings.lightningAddress')}
+              description={t('settings.receivePaymentsSimpleAddress')}
               left={(props) => (
                 <List.Icon {...props} icon="at" color={BRAND_COLOR} />
               )}
@@ -202,8 +202,8 @@ export function WalletSettingsScreen(): React.JSX.Element {
             <Divider style={styles.divider} />
 
             <List.Item
-              title="Address Book"
-              description="Manage saved Lightning Addresses"
+              title={t('addressBook.title')}
+              description={t('settings.manageSavedLightningAddresses')}
               left={(props) => (
                 <List.Icon {...props} icon="contacts" color={BRAND_COLOR} />
               )}

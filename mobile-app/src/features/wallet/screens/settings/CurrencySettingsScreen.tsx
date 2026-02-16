@@ -19,23 +19,23 @@ import type { PrimaryDenomination, FiatCurrency } from '../../../settings/types'
 
 interface DenominationOption {
   code: PrimaryDenomination;
-  name: string;
+  nameKey: string;
   symbol: string;
-  description: string;
+  descriptionKey: string;
 }
 
 const DENOMINATION_OPTIONS: DenominationOption[] = [
-  { 
-    code: 'sats', 
-    name: 'Satoshis', 
-    symbol: 'sats', 
-    description: 'Smallest Bitcoin unit (1 BTC = 100,000,000 sats)' 
+  {
+    code: 'sats',
+    nameKey: 'settings.satoshis',
+    symbol: 'sats',
+    descriptionKey: 'settings.smallestBitcoinUnit'
   },
-  { 
-    code: 'btc', 
-    name: 'Bitcoin', 
-    symbol: 'BTC', 
-    description: 'Full Bitcoin denomination (₿)' 
+  {
+    code: 'btc',
+    nameKey: 'settings.bitcoin',
+    symbol: 'BTC',
+    descriptionKey: 'settings.fullBitcoinDenomination'
   },
 ];
 
@@ -45,23 +45,23 @@ const DENOMINATION_OPTIONS: DenominationOption[] = [
 
 interface FiatOption {
   code: FiatCurrency;
-  name: string;
+  nameKey: string;
   symbol: string;
-  description: string;
+  descriptionKey: string;
 }
 
 const FIAT_OPTIONS: FiatOption[] = [
-  { 
-    code: 'usd', 
-    name: 'US Dollar', 
-    symbol: '$', 
-    description: 'United States Dollar' 
+  {
+    code: 'usd',
+    nameKey: 'settings.usDollar',
+    symbol: '$',
+    descriptionKey: 'settings.unitedStatesDollar'
   },
-  { 
-    code: 'eur', 
-    name: 'Euro', 
-    symbol: '€', 
-    description: 'European Union currency' 
+  {
+    code: 'eur',
+    nameKey: 'settings.euro',
+    symbol: '€',
+    descriptionKey: 'settings.europeanUnionCurrency'
   },
 ];
 
@@ -106,9 +106,9 @@ export function CurrencySettingsScreen(): React.JSX.Element {
   const handlePrimaryDenominationChange = async (value: string): Promise<void> => {
     const newValue = value as PrimaryDenomination;
     setPrimaryDenomination(newValue);
-    
+
     try {
-      await updateSettings({ 
+      await updateSettings({
         primaryDenomination: newValue,
         // Also update legacy field for backwards compatibility
         currency: newValue,
@@ -122,9 +122,9 @@ export function CurrencySettingsScreen(): React.JSX.Element {
   const handleFiatCurrencyChange = async (value: string): Promise<void> => {
     const newValue = value as FiatCurrency;
     setSecondaryFiatCurrency(newValue);
-    
+
     try {
-      await updateSettings({ 
+      await updateSettings({
         secondaryFiatCurrency: newValue,
       });
     } catch (error) {
@@ -157,10 +157,10 @@ export function CurrencySettingsScreen(): React.JSX.Element {
             {/* Primary Denomination Section */}
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: primaryText }]}>
-                Bitcoin Denomination
+                {t('settings.bitcoinDenomination')}
               </Text>
               <Text style={[styles.sectionDescription, { color: secondaryText }]}>
-                Choose how Bitcoin amounts are displayed
+                {t('settings.chooseBitcoinDisplay')}
               </Text>
 
               <RadioButton.Group
@@ -177,14 +177,14 @@ export function CurrencySettingsScreen(): React.JSX.Element {
                     <View style={styles.radioContent}>
                       <View style={styles.radioTitleRow}>
                         <Text style={[styles.radioTitle, { color: primaryText }]}>
-                          {option.name}
+                          {t(option.nameKey)}
                         </Text>
                         <Text style={[styles.currencySymbol, { color: secondaryText }]}>
                           {option.symbol}
                         </Text>
                       </View>
                       <Text style={[styles.radioDescription, { color: secondaryText }]}>
-                        {option.description}
+                        {t(option.descriptionKey)}
                       </Text>
                     </View>
                   </View>
@@ -195,10 +195,10 @@ export function CurrencySettingsScreen(): React.JSX.Element {
             {/* Secondary Fiat Currency Section */}
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: primaryText }]}>
-                Fiat Conversion
+                {t('settings.fiatConversion')}
               </Text>
               <Text style={[styles.sectionDescription, { color: secondaryText }]}>
-                Choose which fiat currency to show as secondary
+                {t('settings.chooseFiatSecondary')}
               </Text>
 
               <RadioButton.Group
@@ -215,14 +215,14 @@ export function CurrencySettingsScreen(): React.JSX.Element {
                     <View style={styles.radioContent}>
                       <View style={styles.radioTitleRow}>
                         <Text style={[styles.radioTitle, { color: primaryText }]}>
-                          {option.name}
+                          {t(option.nameKey)}
                         </Text>
                         <Text style={[styles.currencySymbol, { color: secondaryText }]}>
                           {option.symbol}
                         </Text>
                       </View>
                       <Text style={[styles.radioDescription, { color: secondaryText }]}>
-                        {option.description}
+                        {t(option.descriptionKey)}
                       </Text>
                     </View>
                   </View>
@@ -232,32 +232,28 @@ export function CurrencySettingsScreen(): React.JSX.Element {
 
             {/* Preview Box */}
             <View style={styles.previewBox}>
-              <Text style={styles.previewTitle}>Preview</Text>
+              <Text style={styles.previewTitle}>{t('settings.preview')}</Text>
               <Text style={[styles.previewText, { color: secondaryText }]}>
-                Your balance will display as:
+                {t('settings.balanceDisplayPreview')}
               </Text>
               <View style={styles.previewExample}>
                 <Text style={[styles.previewPrimary, { color: primaryText }]}>
-                  {primaryDenomination === 'btc' ? '₿ 0.00035529' : '35,529 sats'}
+                  {primaryDenomination === 'btc' ? '₿ 0.00035529' : `35,529 ${t('wallet.sats')}`}
                 </Text>
                 <Text style={[styles.previewSecondary, { color: secondaryText }]}>
-                  about {secondaryFiatCurrency === 'eur' ? '€14' : '$16'}
+                  {t('settings.approximate')} {secondaryFiatCurrency === 'eur' ? '€14' : '$16'}
                 </Text>
               </View>
             </View>
 
             {/* Info Box */}
             <View style={styles.infoBox}>
-              <Text style={styles.infoTitle}>About Display Currency</Text>
-              <Text style={[styles.infoText, { color: secondaryText }]}>
-                The primary denomination controls how Bitcoin amounts are shown 
-                throughout the app. The fiat conversion shows an approximate value 
-                below the main amount.
+              <Text style={styles.infoTitle}>{t('settings.aboutDisplayCurrency')}</Text>
+              <Text style={[styles.infoText, { color: secondaryText }]}> 
+                {t('settings.displayCurrencyInfoPrimary')}
               </Text>
-              <Text style={[styles.infoText, { color: secondaryText, marginTop: 8 }]}>
-                All Lightning payments are always processed in satoshis regardless
-                of your display preference. Fiat conversions are approximate and 
-                based on current exchange rates.
+              <Text style={[styles.infoText, { color: secondaryText, marginTop: 8 }]}> 
+                {t('settings.displayCurrencyInfoSecondary')}
               </Text>
             </View>
           </View>
@@ -318,7 +314,7 @@ const styles = StyleSheet.create({
   },
   radioItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingVertical: 12,
   },
   radioContent: {

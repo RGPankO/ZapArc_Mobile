@@ -68,7 +68,7 @@ export function LanguageSettingsScreen(): React.JSX.Element {
       console.error('❌ [LanguageSettings] Error details:', JSON.stringify(error));
       
       // Only show Alert on error
-      Alert.alert('Error', `Failed to save settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      Alert.alert(t('common.error'), `${t('settings.failedToSaveSettings')}: ${error instanceof Error ? error.message : t('errors.unknownError')}`);
     } finally {
       setIsSaving(false);
     }
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
   },
   radioItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingVertical: 12,
   },
   radioContent: {

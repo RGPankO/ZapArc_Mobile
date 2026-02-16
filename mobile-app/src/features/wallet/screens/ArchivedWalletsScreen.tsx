@@ -20,10 +20,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '../../../contexts/ThemeContext';
 import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_COLOR } from '../../../utils/theme-helpers';
 import { useWallet } from '../../../hooks/useWallet';
+import { useLanguage } from '../../../hooks/useLanguage';
 import type { SubWalletEntry } from '../types';
 
 export function ArchivedWalletsScreen(): React.JSX.Element {
   const { themeMode } = useAppTheme();
+  const { t } = useLanguage();
   const { masterKeys, restoreSubWallet, isLoading } = useWallet();
   const [processing, setProcessing] = useState(false);
 
@@ -41,15 +43,15 @@ export function ArchivedWalletsScreen(): React.JSX.Element {
       try {
         setProcessing(true);
         await restoreSubWallet(masterKeyId, subWalletIndex);
-        Alert.alert('Success', 'Sub-wallet restored successfully');
+        Alert.alert(t('common.success'), t('wallet.subWalletRestoredSuccessfully'));
       } catch (err) {
         console.error('❌ [ArchivedWallets] Restore error:', err);
-        Alert.alert('Error', 'Failed to restore sub-wallet');
+        Alert.alert(t('common.error'), t('wallet.failedToRestoreSubWallet'));
       } finally {
         setProcessing(false);
       }
     },
-    [restoreSubWallet]
+    [restoreSubWallet, t]
   );
 
   // ========================================
@@ -71,7 +73,7 @@ export function ArchivedWalletsScreen(): React.JSX.Element {
             {subWallet.nickname}
           </Text>
           <Text style={[styles.subWalletSubtitle, { color: secondaryTextColor }]}>
-            From: {masterKeyNickname} • Index: {subWallet.index}
+            {t('wallet.from')}: {masterKeyNickname} • {t('wallet.index')}: {subWallet.index}
           </Text>
         </View>
       </View>
@@ -84,7 +86,7 @@ export function ArchivedWalletsScreen(): React.JSX.Element {
         loading={processing}
         disabled={processing}
       >
-        Restore
+        {t('wallet.restoreWallet')}
       </Button>
     </View>
   );
@@ -104,7 +106,7 @@ export function ArchivedWalletsScreen(): React.JSX.Element {
             size={24}
             onPress={() => router.back()}
           />
-          <Text style={[styles.headerTitle, { color: primaryTextColor }]}>Archived Wallets</Text>
+          <Text style={[styles.headerTitle, { color: primaryTextColor }]}>{t('wallet.archivedWallets')}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -117,16 +119,16 @@ export function ArchivedWalletsScreen(): React.JSX.Element {
             <View style={styles.centerContent}>
               <Text style={styles.emptyIcon}>📂</Text>
               <Text style={[styles.emptyTitle, { color: primaryTextColor }]}>
-                No Archived Wallets
+                {t('wallet.noArchivedWallets')}
               </Text>
               <Text style={[styles.emptyText, { color: secondaryTextColor }]}>
-                Sub-wallets you archive from the management page will appear here.
+                {t('wallet.archivedWalletsEmptyDescription')}
               </Text>
             </View>
           ) : (
             <View style={styles.listContainer}>
               <Text style={[styles.sectionDescription, { color: secondaryTextColor }]}>
-                These wallets are currently hidden from your main dashboard. You can restore them at any time.
+                {t('wallet.archivedWalletsInfo')}
               </Text>
               
               {archivedWallets.map(({ masterKey, subWallet }) => 

@@ -71,12 +71,12 @@ export function AmountsSettingsScreen(): React.JSX.Element {
     const value = parseInt(editValue, 10);
 
     if (isNaN(value) || value <= 0) {
-      setError('Please enter a valid positive number');
+      setError(t('settings.enterPositiveNumber'));
       return;
     }
 
     if (value > MAX_AMOUNT) {
-      setError(`Maximum amount is ${MAX_AMOUNT.toLocaleString()} sats (1 BTC)`);
+      setError(t('settings.maximumAmountIs', { amount: MAX_AMOUNT.toLocaleString() }));
       return;
     }
 
@@ -86,7 +86,7 @@ export function AmountsSettingsScreen(): React.JSX.Element {
     // Check for duplicates
     const otherAmounts = amounts.filter((_, i) => i !== index);
     if (otherAmounts.includes(value)) {
-      setError('All three amounts must be unique');
+      setError(t('settings.amountsMustBeUnique'));
       return;
     }
 
@@ -121,14 +121,14 @@ export function AmountsSettingsScreen(): React.JSX.Element {
     // Validate posting amounts
     const postingValidation = validateTipAmounts(postingAmounts);
     if (!postingValidation.isValid) {
-      setError(`Posting amounts: ${postingValidation.error}`);
+      setError(t('settings.postingAmountsError', { error: postingValidation.error || '' }));
       return;
     }
 
     // Validate tipping amounts
     const tippingValidation = validateTipAmounts(tippingAmounts);
     if (!tippingValidation.isValid) {
-      setError(`Tipping amounts: ${tippingValidation.error}`);
+      setError(t('settings.tippingAmountsError', { error: tippingValidation.error || '' }));
       return;
     }
 
@@ -141,11 +141,11 @@ export function AmountsSettingsScreen(): React.JSX.Element {
         defaultTippingAmounts: tippingAmounts,
       });
 
-      Alert.alert('Saved', 'Default amounts updated', [
-        { text: 'OK', onPress: () => router.back() },
+      Alert.alert(t('settings.saved'), t('settings.defaultAmountsUpdated'), [
+        { text: t('common.ok'), onPress: () => router.back() },
       ]);
     } catch (err) {
-      setError('Failed to save settings');
+      setError(t('settings.failedToSaveSettings'));
     } finally {
       setIsSaving(false);
     }
@@ -190,7 +190,7 @@ export function AmountsSettingsScreen(): React.JSX.Element {
         ) : (
           <View style={styles.amountValue} onTouchEnd={() => startEdit(type, index)}>
             <Text style={styles.amountValueText}>
-              {amounts[index].toLocaleString()} sats
+              {amounts[index].toLocaleString()} {t('wallet.sats')}
             </Text>
             <IconButton
               icon="pencil"
@@ -227,32 +227,32 @@ export function AmountsSettingsScreen(): React.JSX.Element {
           <View style={styles.content}>
             {/* Posting Amounts */}
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: primaryText }]}>Tip Request Amounts</Text>
+              <Text style={[styles.sectionTitle, { color: primaryText }]}>{t('settings.tipRequestAmounts')}</Text>
               <Text style={[styles.sectionDescription, { color: secondaryText }]}>
-                Default amounts shown when creating tip requests
+                {t('settings.defaultAmountsWhenCreatingRequests')}
               </Text>
 
-              {renderAmountRow('posting', 0, 'Small')}
-              {renderAmountRow('posting', 1, 'Medium')}
-              {renderAmountRow('posting', 2, 'Large')}
+              {renderAmountRow('posting', 0, t('settings.small'))}
+              {renderAmountRow('posting', 1, t('settings.medium'))}
+              {renderAmountRow('posting', 2, t('settings.large'))}
             </View>
 
             {/* Tipping Amounts */}
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: primaryText }]}>Tipping Amounts</Text>
+              <Text style={[styles.sectionTitle, { color: primaryText }]}>{t('settings.tippingAmounts')}</Text>
               <Text style={[styles.sectionDescription, { color: secondaryText }]}>
-                Default amounts shown when tipping others
+                {t('settings.defaultAmountsWhenTipping')}
               </Text>
 
-              {renderAmountRow('tipping', 0, 'Small')}
-              {renderAmountRow('tipping', 1, 'Medium')}
-              {renderAmountRow('tipping', 2, 'Large')}
+              {renderAmountRow('tipping', 0, t('settings.small'))}
+              {renderAmountRow('tipping', 1, t('settings.medium'))}
+              {renderAmountRow('tipping', 2, t('settings.large'))}
             </View>
 
             {/* Presets (shown when editing) */}
             {editingField && (
               <View style={styles.presetsSection}>
-                <Text style={[styles.presetsTitle, { color: secondaryText }]}>Quick Select</Text>
+                <Text style={[styles.presetsTitle, { color: secondaryText }]}>{t('settings.quickSelect')}</Text>
                 <View style={styles.presetsContainer}>
                   {PRESET_AMOUNTS.map((preset) => (
                     <Chip
@@ -277,11 +277,9 @@ export function AmountsSettingsScreen(): React.JSX.Element {
 
             {/* Info Box */}
             <View style={styles.infoBox}>
-              <Text style={styles.infoTitle}>About Amounts</Text>
+              <Text style={styles.infoTitle}>{t('settings.aboutAmounts')}</Text>
               <Text style={[styles.infoText, { color: secondaryText }]}>
-                • All amounts must be unique{'\n'}
-                • Maximum amount is 100,000,000 sats (1 BTC){'\n'}
-                • Minimum amount is 1 sat
+                {t('settings.amountsRules')}
               </Text>
             </View>
           </View>
@@ -297,7 +295,7 @@ export function AmountsSettingsScreen(): React.JSX.Element {
             style={styles.saveButton}
             labelStyle={styles.saveButtonLabel}
           >
-            Save Changes
+            {t('settings.saveChanges')}
           </Button>
         </View>
       </SafeAreaView>

@@ -9,7 +9,7 @@ import { Text, IconButton, FAB, Divider, ActivityIndicator } from 'react-native-
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
-import { t } from '../../../services/i18nService';
+import { useLanguage } from '../../../hooks/useLanguage';
 import { useAppTheme } from '../../../contexts/ThemeContext';
 import {
   getGradientColors,
@@ -26,6 +26,7 @@ import { ContactSearchBar } from '../components/ContactSearchBar';
 import { EmptyAddressBook } from '../components/EmptyAddressBook';
 
 export function AddressBookScreen(): React.JSX.Element {
+  const { t } = useLanguage();
   const { themeMode } = useAppTheme();
   const { contacts, loading, refreshContacts } = useContacts();
   const { searchQuery, setSearchQuery, filteredContacts, isSearching } =
