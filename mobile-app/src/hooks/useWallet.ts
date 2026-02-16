@@ -764,9 +764,19 @@ export function useWallet(): WalletState & WalletActions {
   // Cache Loading Trigger
   // ========================================
 
+  // Track which wallet key we last loaded cache for — skip re-runs if unchanged
+  const lastCacheLoadKeyRef = useRef<string | null>(null);
+
   // Load wallet-specific cache and refresh whenever the active wallet changes in storage.
   useEffect(() => {
     if (!activeWalletInfo) return;
+
+    const walletKey = getWalletKey(activeWalletInfo);
+    if (walletKey === lastCacheLoadKeyRef.current) {
+      // Same wallet — no need to reload cache
+      return;
+    }
+    lastCacheLoadKeyRef.current = walletKey;
 
     // Prevent stale in-flight requests from a previous wallet from writing into state.
     refreshBalancePromiseRef.current = null;
