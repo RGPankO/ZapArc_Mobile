@@ -6,6 +6,7 @@ import { AppState, AppStateStatus } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { storageService, settingsService } from '../services';
 import * as BreezSparkService from '../services/breezSparkService';
+import * as WalletCache from '../services/walletCacheService';
 import { deriveSubWalletMnemonic } from '../utils/mnemonic';
 import type { ActiveWalletInfo } from '../features/wallet/types';
 
@@ -391,6 +392,16 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
         setActiveWalletInfo(walletInfo);
         setCurrentMasterKeyId(masterKeyId);
 
+        // Preload cached balance/transactions so useWallet has data on first render
+        const [cachedBal, cachedTxs] = await Promise.all([
+          WalletCache.getCachedBalance(masterKeyId, subWalletIndex),
+          WalletCache.getCachedTransactions(masterKeyId, subWalletIndex),
+        ]);
+        WalletCache.setPreloadedData(
+          cachedBal?.balance ?? 0,
+          cachedTxs?.transactions ?? [],
+        );
+
         // Cache PIN for future use
         sessionPinRef.current = pin;
 
@@ -453,6 +464,16 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
         const walletInfo = await storageService.getActiveWalletInfo();
         setActiveWalletInfo(walletInfo);
         updateActivity();
+
+        // Preload cached balance/transactions so useWallet has data on first render
+        const [cachedBal, cachedTxs] = await Promise.all([
+          WalletCache.getCachedBalance(currentMasterKeyId, subWalletIndex),
+          WalletCache.getCachedTransactions(currentMasterKeyId, subWalletIndex),
+        ]);
+        WalletCache.setPreloadedData(
+          cachedBal?.balance ?? 0,
+          cachedTxs?.transactions ?? [],
+        );
 
         // Reinitialize SDK with the new sub-wallet's mnemonic
         try {

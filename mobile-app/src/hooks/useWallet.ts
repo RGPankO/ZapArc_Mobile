@@ -87,8 +87,8 @@ export function useWallet(): WalletState & WalletActions {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [balance, setBalance] = useState(0);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [balance, setBalance] = useState(() => WalletCache.consumePreloadedBalance() ?? 0);
+  const [transactions, setTransactions] = useState<Transaction[]>(() => WalletCache.consumePreloadedTransactions() ?? []);
   const [storage, setStorage] = useState<MultiWalletStorage | null>(null);
 
   // Refs for stable access in callbacks without triggering identity changes

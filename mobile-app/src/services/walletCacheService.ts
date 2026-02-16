@@ -24,6 +24,32 @@ interface WalletCache {
 }
 
 // =============================================================================
+// In-Memory Preload Cache (cross-hook bridge)
+// =============================================================================
+
+// Module-level cache so selectWallet (useWalletAuth) can preload data
+// that useWallet reads on mount — eliminates the async gap that causes 0-balance flash.
+let _preloadedBalance: number | null = null;
+let _preloadedTransactions: Transaction[] | null = null;
+
+export function setPreloadedData(balance: number, transactions: Transaction[]): void {
+  _preloadedBalance = balance;
+  _preloadedTransactions = transactions;
+}
+
+export function consumePreloadedBalance(): number | null {
+  const val = _preloadedBalance;
+  _preloadedBalance = null;
+  return val;
+}
+
+export function consumePreloadedTransactions(): Transaction[] | null {
+  const val = _preloadedTransactions;
+  _preloadedTransactions = null;
+  return val;
+}
+
+// =============================================================================
 // Constants
 // =============================================================================
 
