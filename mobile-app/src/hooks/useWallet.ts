@@ -1047,7 +1047,7 @@ export function useWallet(): WalletState & WalletActions {
 
         return hasActivity;
       } catch (err) {
-        console.error('❌ [useWallet] syncSubWalletActivity failed:', err);
+        console.warn('⚠️ [useWallet] syncSubWalletActivity failed:', err);
         return false;
       }
     },

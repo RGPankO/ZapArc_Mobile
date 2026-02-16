@@ -98,18 +98,93 @@ function hexToBytes(hex: string): Uint8Array {
 }
 
 // =============================================================================
+// Web Crypto Fallback (for AES-GCM when quick-crypto unavailable)
+// =============================================================================
+
+/**
+ * PBKDF2 via Web Crypto API (crypto.subtle)
+ * Available in Hermes engine since RN 0.76
+ */
+async function deriveKeyWebCrypto(
+  pin: string,
+  salt: Uint8Array | string,
+  iterations: number,
+  keyLength: number
+): Promise<Uint8Array> {
+  const encoder = new TextEncoder();
+  const pinData = encoder.encode(pin);
+  const saltData = typeof salt === 'string' ? encoder.encode(salt) : salt;
+
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    pinData,
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: saltData,
+      iterations,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    keyLength * 8
+  );
+
+  return new Uint8Array(bits);
+}
+
+/**
+ * AES-256-GCM decrypt via Web Crypto API
+ */
+async function decryptAesGcmWebCrypto(
+  encrypted: Uint8Array,
+  authTag: Uint8Array,
+  key: Uint8Array,
+  iv: Uint8Array
+): Promise<string> {
+  // Web Crypto expects ciphertext + authTag concatenated
+  const combined = new Uint8Array(encrypted.length + authTag.length);
+  combined.set(encrypted);
+  combined.set(authTag, encrypted.length);
+
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    key,
+    'AES-GCM',
+    false,
+    ['decrypt']
+  );
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    cryptoKey,
+    combined
+  );
+
+  return new TextDecoder().decode(decrypted);
+}
+
+// =============================================================================
 // Key Derivation
 // =============================================================================
 
 /**
- * New (v2) key derivation using native PBKDF2 (quick-crypto)
+ * New (v2) key derivation using native PBKDF2 (quick-crypto) or Web Crypto fallback
  * Kept async for API compatibility.
  */
 export async function deriveKeyFromPin(pin: string): Promise<Uint8Array> {
-  return new Uint8Array(deriveKeyFromPinV2(pin, LEGACY_SALT));
+  if (_quickCryptoAvailable && QuickCrypto) {
+    return new Uint8Array(deriveKeyFromPinV2(pin, LEGACY_SALT));
+  }
+  return deriveKeyWebCrypto(pin, LEGACY_SALT, ITERATIONS, KEY_LENGTH);
 }
 
 function deriveKeyFromPinV2(pin: string, salt: string | Uint8Array): Uint8Array {
+  if (!QuickCrypto) throw new Error('quick-crypto not available');
   return new Uint8Array(
     QuickCrypto.pbkdf2Sync(pin, salt, ITERATIONS, KEY_LENGTH, 'sha256')
   );
@@ -235,30 +310,43 @@ export async function encryptData(
   plaintext: string,
   pin: string
 ): Promise<EncryptedData> {
-  if (!_quickCryptoAvailable || !QuickCrypto) {
-    // Fallback to V1 encryption if quick-crypto unavailable
-    console.warn('⚠️ [Crypto] quick-crypto unavailable, using V1 encryption');
-    return encryptDataV1(plaintext, pin);
-  }
   try {
-    const salt = QuickCrypto.randomBytes(SALT_LENGTH);
-    const key = deriveKeyFromPinV2(pin, salt);
-    const iv = QuickCrypto.randomBytes(IV_LENGTH);
-    const cipher = QuickCrypto.createCipheriv('aes-256-gcm', key, iv);
+    let saltArr: Uint8Array;
+    let keyArr: Uint8Array;
+    let ivArr: Uint8Array;
+    let combinedArr: Uint8Array;
 
-    const encrypted = Buffer.concat([
-      cipher.update(plaintext, 'utf8'),
-      cipher.final(),
-    ]);
-    const authTag = cipher.getAuthTag();
+    if (_quickCryptoAvailable && QuickCrypto) {
+      saltArr = new Uint8Array(QuickCrypto.randomBytes(SALT_LENGTH));
+      keyArr = deriveKeyFromPinV2(pin, saltArr);
+      ivArr = new Uint8Array(QuickCrypto.randomBytes(IV_LENGTH));
+      const cipher = QuickCrypto.createCipheriv('aes-256-gcm', Buffer.from(keyArr), Buffer.from(ivArr));
+      const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+      const authTag = cipher.getAuthTag();
+      combinedArr = new Uint8Array(Buffer.concat([encrypted, authTag]));
+    } else {
+      // Web Crypto fallback
+      console.log('🔑 [Crypto] Using Web Crypto API for encryption');
+      saltArr = new Uint8Array(SALT_LENGTH);
+      crypto.getRandomValues(saltArr);
+      keyArr = await deriveKeyWebCrypto(pin, saltArr, ITERATIONS, KEY_LENGTH);
+      ivArr = new Uint8Array(IV_LENGTH);
+      crypto.getRandomValues(ivArr);
 
-    // Append auth tag (16 bytes) to encrypted payload
-    const combined = Buffer.concat([encrypted, authTag]);
+      const cryptoKey = await crypto.subtle.importKey('raw', keyArr, 'AES-GCM', false, ['encrypt']);
+      const encoder = new TextEncoder();
+      const encryptedBuf = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: ivArr },
+        cryptoKey,
+        encoder.encode(plaintext)
+      );
+      combinedArr = new Uint8Array(encryptedBuf); // Web Crypto appends authTag automatically
+    }
 
     return {
-      data: Array.from(combined),
-      iv: Array.from(iv),
-      salt: Array.from(salt),
+      data: Array.from(combinedArr),
+      iv: Array.from(ivArr),
+      salt: Array.from(saltArr),
       timestamp: Date.now(),
       version: ENCRYPTION_VERSION,
     };
@@ -343,21 +431,13 @@ export async function decryptData(
     return decryptDataV1(encryptedData, pin);
   }
 
-  // V2/V3 require quick-crypto
-  if (!_quickCryptoAvailable || !QuickCrypto) {
-    throw new Error(
-      'Cannot decrypt V' + version + ' data: react-native-quick-crypto not available. ' +
-      'App needs rebuild with native module properly linked.'
-    );
-  }
-
   try {
-    const saltSource = encryptedData.salt
-      ? Buffer.from(encryptedData.salt)
-      : LEGACY_SALT;
-    const key = deriveKeyFromPinV2(pin, saltSource);
-    const fullData = Buffer.from(encryptedData.data);
-    const iv = Buffer.from(encryptedData.iv);
+    const saltBytes = encryptedData.salt
+      ? new Uint8Array(encryptedData.salt)
+      : undefined;
+    const saltSource = saltBytes || LEGACY_SALT;
+    const fullData = new Uint8Array(encryptedData.data);
+    const iv = new Uint8Array(encryptedData.iv);
 
     if (fullData.length < 16) {
       throw new Error('Invalid encrypted payload');
@@ -366,11 +446,26 @@ export async function decryptData(
     const authTag = fullData.slice(fullData.length - 16);
     const encrypted = fullData.slice(0, fullData.length - 16);
 
-    const decipher = QuickCrypto.createDecipheriv('aes-256-gcm', key, iv);
-    decipher.setAuthTag(authTag);
+    // Try quick-crypto first, fall back to Web Crypto API
+    if (_quickCryptoAvailable && QuickCrypto) {
+      const key = deriveKeyFromPinV2(pin, saltSource);
+      const decipher = QuickCrypto.createDecipheriv(
+        'aes-256-gcm',
+        Buffer.from(key),
+        Buffer.from(iv)
+      );
+      decipher.setAuthTag(Buffer.from(authTag));
+      const decrypted = Buffer.concat([
+        decipher.update(Buffer.from(encrypted)),
+        decipher.final(),
+      ]);
+      return decrypted.toString('utf8');
+    }
 
-    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
-    return decrypted.toString('utf8');
+    // Web Crypto fallback (Hermes crypto.subtle)
+    console.log('🔑 [Crypto] Using Web Crypto API for V' + version + ' decrypt');
+    const key = await deriveKeyWebCrypto(pin, saltSource, ITERATIONS, KEY_LENGTH);
+    return await decryptAesGcmWebCrypto(encrypted, authTag, key, iv);
   } catch (error) {
     console.warn('⚠️ [Crypto] Decryption failed:', error);
     throw new Error('Failed to decrypt data - invalid PIN or corrupted data');
