@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const ACCESS_TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
@@ -23,9 +23,9 @@ class TokenService {
    */
   async storeTokens(tokens: StoredTokens): Promise<void> {
     try {
-      await AsyncStorage.multiSet([
-        [ACCESS_TOKEN_KEY, tokens.accessToken],
-        [REFRESH_TOKEN_KEY, tokens.refreshToken],
+      await Promise.all([
+        SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.accessToken),
+        SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refreshToken),
       ]);
     } catch (error) {
       console.error('Error storing tokens:', error);
@@ -38,7 +38,7 @@ class TokenService {
    */
   async getAccessToken(): Promise<string | null> {
     try {
-      return await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+      return await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
     } catch (error) {
       console.error('Error getting access token:', error);
       return null;
@@ -50,7 +50,7 @@ class TokenService {
    */
   async getRefreshToken(): Promise<string | null> {
     try {
-      return await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+      return await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
     } catch (error) {
       console.error('Error getting refresh token:', error);
       return null;
@@ -62,9 +62,10 @@ class TokenService {
    */
   async getTokens(): Promise<StoredTokens | null> {
     try {
-      const values = await AsyncStorage.multiGet([ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY]);
-      const accessToken = values[0][1];
-      const refreshToken = values[1][1];
+      const [accessToken, refreshToken] = await Promise.all([
+        SecureStore.getItemAsync(ACCESS_TOKEN_KEY),
+        SecureStore.getItemAsync(REFRESH_TOKEN_KEY),
+      ]);
 
       if (accessToken && refreshToken) {
         return { accessToken, refreshToken };
@@ -81,7 +82,7 @@ class TokenService {
    */
   async storeUser(user: StoredUser): Promise<void> {
     try {
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(user));
+      await SecureStore.setItemAsync(USER_DATA_KEY, JSON.stringify(user));
     } catch (error) {
       console.error('Error storing user data:', error);
       throw new Error('Failed to store user data');
@@ -93,7 +94,7 @@ class TokenService {
    */
   async getUser(): Promise<StoredUser | null> {
     try {
-      const userData = await AsyncStorage.getItem(USER_DATA_KEY);
+      const userData = await SecureStore.getItemAsync(USER_DATA_KEY);
       return userData ? JSON.parse(userData) : null;
     } catch (error) {
       console.error('Error getting user data:', error);
@@ -106,7 +107,11 @@ class TokenService {
    */
   async clearAuth(): Promise<void> {
     try {
-      await AsyncStorage.multiRemove([ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_DATA_KEY]);
+      await Promise.all([
+        SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
+        SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
+        SecureStore.deleteItemAsync(USER_DATA_KEY),
+      ]);
     } catch (error) {
       console.error('Error clearing auth data:', error);
       throw new Error('Failed to clear authentication data');

@@ -6,7 +6,7 @@ const DEBUG = __DEV__; // Only log in development
 
 const baseURL = NetworkConfig.getApiBaseUrl();
 if (DEBUG) {
-  console.log('[API] Base URL:', baseURL);
+  console.log('[API] Client initialized');
 }
 
 export const apiClient = axios.create({
@@ -25,7 +25,7 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     if (DEBUG) {
-      console.log(`[API] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, config.data || '');
+      console.log(`[API] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
     }
     return config;
   },
@@ -41,7 +41,7 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => {
     if (DEBUG) {
-      console.log(`[API] Response ${response.status}:`, response.data);
+      console.log(`[API] Response ${response.status} ${response.config?.url || ''}`);
     }
     return response.data?.data ?? response.data;
   },
@@ -51,7 +51,6 @@ apiClient.interceptors.response.use(
         message: error.message,
         code: error.code,
         status: error.response?.status,
-        data: error.response?.data,
         url: error.config?.url,
       });
     }

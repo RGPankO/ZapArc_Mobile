@@ -40,10 +40,12 @@ export function useGoogleSignIn() {
 
   // Log for debugging
   useEffect(() => {
-    console.log('Google Auth Request ready:', !!request);
-    console.log('Platform:', Platform.OS);
-    if (request) {
-      console.log('Redirect URI:', request.redirectUri);
+    if (__DEV__) {
+      console.log('Google Auth Request ready:', !!request);
+      console.log('Platform:', Platform.OS);
+      if (request) {
+        console.log('Google Auth redirect URI configured');
+      }
     }
   }, [request]);
 
@@ -56,14 +58,16 @@ export function useGoogleSignIn() {
 
         if (idToken) {
           try {
-            console.log('Got ID token, authenticating with backend...');
+            if (__DEV__) {
+              console.log('Google sign-in success, authenticating with backend');
+            }
             await googleLogin.mutateAsync(idToken);
             queryClient.invalidateQueries({ queryKey: ['user'] });
           } catch (error) {
             console.error('Backend auth error:', error);
           }
         } else {
-          console.error('No ID token in response params:', response.params);
+          console.error('No ID token in Google OAuth response');
         }
       }
     };

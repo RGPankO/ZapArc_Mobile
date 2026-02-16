@@ -11,8 +11,9 @@
 export interface EncryptedData {
   data: number[]; // Encrypted bytes
   iv: number[]; // IV (12 bytes for GCM)
+  salt?: number[]; // Optional per-wallet salt (v3+); undefined for legacy payloads
   timestamp: number; // Encryption timestamp
-  version?: number; // 1 = old XOR, 2 = AES-GCM (undefined = 1 for backward compat)
+  version?: number; // 1 = old XOR, 2 = AES-GCM static salt, 3 = AES-GCM per-wallet salt
 }
 
 // =============================================================================

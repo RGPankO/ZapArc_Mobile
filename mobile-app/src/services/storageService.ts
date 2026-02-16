@@ -51,7 +51,7 @@ class StorageService {
       const version = await SecureStore.getItemAsync(STORAGE_KEYS.WALLET_VERSION);
 
       const exists = !!(data || version === '1');
-      console.log('🔍 [StorageService] walletExists() check', {
+      if (__DEV__) console.log('🔍 [StorageService] walletExists() check', {
         hasMultiWalletData: !!data,
         walletVersion: version,
         exists,
@@ -83,7 +83,7 @@ class StorageService {
     try {
       await SecureStore.setItemAsync(STORAGE_KEYS.IS_UNLOCKED, 'false');
       await SecureStore.setItemAsync(STORAGE_KEYS.LAST_ACTIVITY, '0');
-      console.log('🔒 [StorageService] Wallet locked');
+      if (__DEV__) console.log('🔒 [StorageService] Wallet locked');
     } catch (error) {
       console.error('❌ [StorageService] Failed to lock wallet:', error);
     }
@@ -99,7 +99,7 @@ class StorageService {
         STORAGE_KEYS.LAST_ACTIVITY,
         Date.now().toString()
       );
-      console.log('🔓 [StorageService] Wallet unlocked');
+      if (__DEV__) console.log('🔓 [StorageService] Wallet unlocked');
     } catch (error) {
       console.error('❌ [StorageService] Failed to unlock wallet:', error);
     }
@@ -143,7 +143,7 @@ class StorageService {
    * Save multi-wallet storage data
    */
   async saveMultiWalletStorage(storage: MultiWalletStorage): Promise<void> {
-    console.log('🔵 [StorageService] SAVE_MULTI_WALLET_STORAGE', {
+    if (__DEV__) console.log('🔵 [StorageService] SAVE_MULTI_WALLET_STORAGE', {
       masterKeyCount: storage.masterKeys.length,
       activeMasterKeyId: storage.activeMasterKeyId,
       version: storage.version,
@@ -176,7 +176,7 @@ class StorageService {
         storage.activeSubWalletIndex.toString()
       );
 
-      console.log('✅ [StorageService] SAVE_MULTI_WALLET_STORAGE SUCCESS');
+      if (__DEV__) console.log('✅ [StorageService] SAVE_MULTI_WALLET_STORAGE SUCCESS');
     } catch (error) {
       console.error('❌ [StorageService] SAVE_MULTI_WALLET_STORAGE FAILED', error);
       throw error;
@@ -257,7 +257,7 @@ class StorageService {
 
       // Save migrated data
       if (needsMigration) {
-        console.log('🔧 [StorageService] Saving migrated data...');
+        if (__DEV__) console.log('🔧 [StorageService] Saving migrated data...');
         await this.saveMultiWalletStorage(storage);
       }
 
@@ -280,7 +280,7 @@ class StorageService {
     nickname: string,
     pin: string
   ): Promise<string> {
-    console.log('🔵 [StorageService] CREATE_MASTER_KEY', { nickname });
+    if (__DEV__) console.log('🔵 [StorageService] CREATE_MASTER_KEY', { nickname });
 
     try {
       const normalizedMnemonic = mnemonic
@@ -304,7 +304,7 @@ class StorageService {
       }
 
       if (__DEV__) {
-        console.log('✅ [StorageService] Pre-storage mnemonic validation passed');
+        if (__DEV__) console.log('✅ [StorageService] Pre-storage mnemonic validation passed');
       }
 
       // Encrypt the mnemonic
@@ -409,10 +409,10 @@ class StorageService {
       }
 
       if (__DEV__) {
-        console.log('✅ [StorageService] Post-storage mnemonic round-trip validation passed');
+        if (__DEV__) console.log('✅ [StorageService] Post-storage mnemonic round-trip validation passed');
       }
 
-      console.log('✅ [StorageService] CREATE_MASTER_KEY SUCCESS', { masterKeyId });
+      if (__DEV__) console.log('✅ [StorageService] CREATE_MASTER_KEY SUCCESS', { masterKeyId });
       return masterKeyId;
     } catch (error) {
       console.error('❌ [StorageService] CREATE_MASTER_KEY FAILED', error);
@@ -424,7 +424,7 @@ class StorageService {
    * Decrypt and get the mnemonic for a master key
    */
   async getMasterKeyMnemonic(masterKeyId: string, pin: string): Promise<string | null> {
-    console.log('🔵 [StorageService] GET_MASTER_KEY_MNEMONIC', { masterKeyId });
+    if (__DEV__) console.log('🔵 [StorageService] GET_MASTER_KEY_MNEMONIC', { masterKeyId });
 
     try {
       const storage = await this.loadMultiWalletStorage();
@@ -445,16 +445,16 @@ class StorageService {
       // Decrypt mnemonic
       const mnemonic = await decryptData(masterKey.encryptedMnemonic, pin);
 
-      // Silent migration: legacy v1 (or undefined) -> v2 AES-GCM
-      if (!masterKey.encryptedMnemonic.version || masterKey.encryptedMnemonic.version === 1) {
-        console.log('🔄 [StorageService] Migrating encryption from V1 to V2');
+      // Silent migration: legacy v1/v2 payloads -> v3 AES-GCM (per-wallet salt)
+      if (!masterKey.encryptedMnemonic.version || masterKey.encryptedMnemonic.version < 3) {
+        if (__DEV__) console.log('🔄 [StorageService] Migrating encryption to V3');
         const newEncrypted = await encryptData(mnemonic, pin);
         masterKey.encryptedMnemonic = newEncrypted;
         await this.saveMultiWalletStorage(storage);
-        console.log('✅ [StorageService] Encryption migration complete');
+        if (__DEV__) console.log('✅ [StorageService] Encryption migration complete');
       }
 
-      console.log('✅ [StorageService] GET_MASTER_KEY_MNEMONIC SUCCESS');
+      if (__DEV__) console.log('✅ [StorageService] GET_MASTER_KEY_MNEMONIC SUCCESS');
       return mnemonic;
     } catch (error) {
       // Use warn instead of error to prevent red screen in dev mode
@@ -468,7 +468,7 @@ class StorageService {
    * Delete a master key and all its sub-wallets
    */
   async deleteMasterKey(masterKeyId: string): Promise<void> {
-    console.log('🔵 [StorageService] DELETE_MASTER_KEY', { masterKeyId });
+    if (__DEV__) console.log('🔵 [StorageService] DELETE_MASTER_KEY', { masterKeyId });
 
     try {
       const storage = await this.loadMultiWalletStorage();
@@ -488,13 +488,13 @@ class StorageService {
       if (storage.activeMasterKeyId === masterKeyId && storage.masterKeys.length > 0) {
         storage.activeMasterKeyId = storage.masterKeys[0].id;
         storage.activeSubWalletIndex = 0;
-        console.log('⚠️ [StorageService] Switched to different master key', {
+        if (__DEV__) console.log('⚠️ [StorageService] Switched to different master key', {
           newActiveMasterKeyId: storage.activeMasterKeyId,
         });
       }
 
       await this.saveMultiWalletStorage(storage);
-      console.log('✅ [StorageService] DELETE_MASTER_KEY SUCCESS');
+      if (__DEV__) console.log('✅ [StorageService] DELETE_MASTER_KEY SUCCESS');
     } catch (error) {
       console.error('❌ [StorageService] DELETE_MASTER_KEY FAILED', error);
       throw error;
@@ -505,7 +505,7 @@ class StorageService {
    * Verify PIN for a specific master key
    */
   async verifyMasterKeyPin(masterKeyId: string, pin: string): Promise<boolean> {
-    console.log('🔵 [StorageService] VERIFY_MASTER_KEY_PIN', { masterKeyId });
+    if (__DEV__) console.log('🔵 [StorageService] VERIFY_MASTER_KEY_PIN', { masterKeyId });
 
     try {
       const storage = await this.loadMultiWalletStorage();
@@ -519,7 +519,7 @@ class StorageService {
       }
 
       const isValid = await verifyPin(masterKey.encryptedMnemonic, pin);
-      console.log('✅ [StorageService] VERIFY_MASTER_KEY_PIN', { isValid });
+      if (__DEV__) console.log('✅ [StorageService] VERIFY_MASTER_KEY_PIN', { isValid });
       return isValid;
     } catch (error) {
       console.error('❌ [StorageService] VERIFY_MASTER_KEY_PIN FAILED', error);
@@ -540,7 +540,7 @@ class StorageService {
   ): Promise<number> {
     const nextIndex = await this.getNextSubWalletIndex(masterKeyId);
     
-    console.log('🔵 [StorageService] ADD_SUB_WALLET', {
+    if (__DEV__) console.log('🔵 [StorageService] ADD_SUB_WALLET', {
       masterKeyId,
       nickname,
       index: nextIndex,
@@ -581,7 +581,7 @@ class StorageService {
       masterKey.lastUsedAt = now;
 
       await this.saveMultiWalletStorage(storage);
-      console.log('✅ [StorageService] ADD_SUB_WALLET SUCCESS', { index: nextIndex });
+      if (__DEV__) console.log('✅ [StorageService] ADD_SUB_WALLET SUCCESS', { index: nextIndex });
       
       return nextIndex;
     } catch (error) {
@@ -594,7 +594,7 @@ class StorageService {
    * Archive a sub-wallet (move to archived list)
    */
   async archiveSubWallet(masterKeyId: string, subWalletIndex: number): Promise<void> {
-    console.log('🔵 [StorageService] ARCHIVE_SUB_WALLET', {
+    if (__DEV__) console.log('🔵 [StorageService] ARCHIVE_SUB_WALLET', {
       masterKeyId,
       subWalletIndex,
     });
@@ -623,7 +623,7 @@ class StorageService {
       masterKey.archivedSubWallets.push(subWallet);
 
       await this.saveMultiWalletStorage(storage);
-      console.log('✅ [StorageService] ARCHIVE_SUB_WALLET SUCCESS');
+      if (__DEV__) console.log('✅ [StorageService] ARCHIVE_SUB_WALLET SUCCESS');
     } catch (error) {
       console.error('❌ [StorageService] ARCHIVE_SUB_WALLET FAILED', error);
       throw error;
@@ -634,7 +634,7 @@ class StorageService {
    * Restore an archived sub-wallet
    */
   async restoreSubWallet(masterKeyId: string, subWalletIndex: number): Promise<void> {
-    console.log('🔵 [StorageService] RESTORE_SUB_WALLET', {
+    if (__DEV__) console.log('🔵 [StorageService] RESTORE_SUB_WALLET', {
       masterKeyId,
       subWalletIndex,
     });
@@ -667,7 +667,7 @@ class StorageService {
       masterKey.subWallets.sort((a, b) => a.index - b.index);
 
       await this.saveMultiWalletStorage(storage);
-      console.log('✅ [StorageService] RESTORE_SUB_WALLET SUCCESS');
+      if (__DEV__) console.log('✅ [StorageService] RESTORE_SUB_WALLET SUCCESS');
     } catch (error) {
       console.error('❌ [StorageService] RESTORE_SUB_WALLET FAILED', error);
       throw error;
@@ -713,7 +713,7 @@ class StorageService {
    * Rename a master key
    */
   async renameMasterKey(masterKeyId: string, nickname: string): Promise<void> {
-    console.log('🔵 [StorageService] RENAME_MASTER_KEY', { masterKeyId, nickname });
+    if (__DEV__) console.log('🔵 [StorageService] RENAME_MASTER_KEY', { masterKeyId, nickname });
 
     try {
       const storage = await this.loadMultiWalletStorage();
@@ -724,7 +724,7 @@ class StorageService {
 
       masterKey.nickname = nickname;
       await this.saveMultiWalletStorage(storage);
-      console.log('✅ [StorageService] RENAME_MASTER_KEY SUCCESS');
+      if (__DEV__) console.log('✅ [StorageService] RENAME_MASTER_KEY SUCCESS');
     } catch (error) {
       console.error('❌ [StorageService] RENAME_MASTER_KEY FAILED', error);
       throw error;
@@ -739,7 +739,7 @@ class StorageService {
     subWalletIndex: number,
     nickname: string
   ): Promise<void> {
-    console.log('🔵 [StorageService] RENAME_SUB_WALLET', {
+    if (__DEV__) console.log('🔵 [StorageService] RENAME_SUB_WALLET', {
       masterKeyId,
       subWalletIndex,
       nickname,
@@ -764,7 +764,7 @@ class StorageService {
 
       subWallet.nickname = nickname;
       await this.saveMultiWalletStorage(storage);
-      console.log('✅ [StorageService] RENAME_SUB_WALLET SUCCESS');
+      if (__DEV__) console.log('✅ [StorageService] RENAME_SUB_WALLET SUCCESS');
     } catch (error) {
       console.error('❌ [StorageService] RENAME_SUB_WALLET FAILED', error);
       throw error;
@@ -782,7 +782,7 @@ class StorageService {
     // Default to index 0 if not specified
     const safeSubWalletIndex = subWalletIndex ?? 0;
     
-    console.log('🔵 [StorageService] SET_ACTIVE_WALLET', {
+    if (__DEV__) console.log('🔵 [StorageService] SET_ACTIVE_WALLET', {
       masterKeyId,
       subWalletIndex: safeSubWalletIndex,
     });
@@ -814,7 +814,7 @@ class StorageService {
       subWallet.lastUsedAt = Date.now();
 
       await this.saveMultiWalletStorage(storage);
-      console.log('✅ [StorageService] SET_ACTIVE_WALLET SUCCESS');
+      if (__DEV__) console.log('✅ [StorageService] SET_ACTIVE_WALLET SUCCESS');
     } catch (error) {
       console.error('❌ [StorageService] SET_ACTIVE_WALLET FAILED', error);
       throw error;
@@ -865,7 +865,7 @@ class StorageService {
    * Delete all wallet data (factory reset)
    */
   async deleteAllWallets(): Promise<void> {
-    console.log('🔵 [StorageService] DELETE_ALL_WALLETS');
+    if (__DEV__) console.log('🔵 [StorageService] DELETE_ALL_WALLETS');
 
     try {
       await SecureStore.deleteItemAsync(STORAGE_KEYS.MULTI_WALLET_DATA);
@@ -875,7 +875,7 @@ class StorageService {
       await SecureStore.deleteItemAsync(STORAGE_KEYS.ACTIVE_MASTER_KEY_ID);
       await SecureStore.deleteItemAsync(STORAGE_KEYS.ACTIVE_SUB_WALLET_INDEX);
 
-      console.log('✅ [StorageService] DELETE_ALL_WALLETS SUCCESS');
+      if (__DEV__) console.log('✅ [StorageService] DELETE_ALL_WALLETS SUCCESS');
     } catch (error) {
       console.error('❌ [StorageService] DELETE_ALL_WALLETS FAILED', error);
       throw error;
@@ -933,7 +933,7 @@ class StorageService {
       // Store in SecureStore (encrypted at rest)
       // Authentication is checked via LocalAuthentication before retrieving
       await SecureStore.setItemAsync(key, pin);
-      console.log('✅ [StorageService] Biometric PIN stored for master key:', masterKeyId);
+      if (__DEV__) console.log('✅ [StorageService] Biometric PIN stored for master key:', masterKeyId);
     } catch (error) {
       console.error('❌ [StorageService] Failed to store biometric PIN:', error);
       throw error;
@@ -952,9 +952,9 @@ class StorageService {
       const pin = await SecureStore.getItemAsync(key);
 
       if (pin) {
-        console.log('✅ [StorageService] Biometric PIN retrieved for master key:', masterKeyId);
+        if (__DEV__) console.log('✅ [StorageService] Biometric PIN retrieved for master key:', masterKeyId);
       } else {
-        console.log('⚠️ [StorageService] No biometric PIN found for master key:', masterKeyId);
+        if (__DEV__) console.log('⚠️ [StorageService] No biometric PIN found for master key:', masterKeyId);
       }
 
       return pin;
@@ -971,7 +971,7 @@ class StorageService {
     try {
       const key = `${STORAGE_KEYS.BIOMETRIC_PIN_PREFIX}${masterKeyId}`;
       await SecureStore.deleteItemAsync(key);
-      console.log('✅ [StorageService] Biometric PIN deleted for master key:', masterKeyId);
+      if (__DEV__) console.log('✅ [StorageService] Biometric PIN deleted for master key:', masterKeyId);
     } catch (error) {
       console.error('❌ [StorageService] Failed to delete biometric PIN:', error);
       // Don't throw - deletion failure shouldn't block other operations

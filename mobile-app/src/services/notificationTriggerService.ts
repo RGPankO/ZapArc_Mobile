@@ -111,8 +111,9 @@ export const NotificationTriggerService = {
         return { success: false, error: 'Must provide pushToken, pubKey, or lightningAddress' };
       }
 
-      const identifier = recipient.lightningAddress || recipient.pubKey || recipient.pushToken;
-      console.log(`🔔 [Notification] Sending ${amountSats} sats notification to ${identifier}...`);
+      if (__DEV__) {
+        console.log('🔔 [Notification] Sending transaction notification');
+      }
 
       const response = await fetch(NOTIFICATION_ENDPOINT, {
         method: 'POST',

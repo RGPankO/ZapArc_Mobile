@@ -4,7 +4,7 @@
 import * as Crypto from 'expo-crypto';
 import { Buffer } from 'buffer';
 
-import { pbkdf2Sync, randomBytes, createCipheriv, createDecipheriv } from 'react-native-quick-crypto';
+import QuickCrypto from 'react-native-quick-crypto';
 
 import type { EncryptedData } from '../features/wallet/types';
 
@@ -12,11 +12,12 @@ import type { EncryptedData } from '../features/wallet/types';
 // Constants
 // =============================================================================
 
-const SALT = 'lightning-tipping-salt';
+const LEGACY_SALT = 'lightning-tipping-salt';
+const SALT_LENGTH = 32; // 256-bit per-wallet random salt (v3)
 const ITERATIONS = 100000;
 const KEY_LENGTH = 32; // 256 bits for AES-256
 const IV_LENGTH = 12; // 96 bits for AES-GCM
-const ENCRYPTION_VERSION = 2;
+const ENCRYPTION_VERSION = 3;
 
 // =============================================================================
 // Helper Functions
@@ -33,7 +34,7 @@ export function generateUUID(): string {
  * Generate cryptographically secure random bytes
  */
 export async function generateRandomBytes(length: number): Promise<Uint8Array> {
-  const bytes = randomBytes(length);
+  const bytes = QuickCrypto.randomBytes(length);
   return new Uint8Array(bytes);
 }
 
@@ -80,11 +81,13 @@ function hexToBytes(hex: string): Uint8Array {
  * Kept async for API compatibility.
  */
 export async function deriveKeyFromPin(pin: string): Promise<Uint8Array> {
-  return new Uint8Array(deriveKeyFromPinV2(pin));
+  return new Uint8Array(deriveKeyFromPinV2(pin, LEGACY_SALT));
 }
 
-function deriveKeyFromPinV2(pin: string): Buffer {
-  return pbkdf2Sync(pin, SALT, ITERATIONS, KEY_LENGTH, 'sha256');
+function deriveKeyFromPinV2(pin: string, salt: string | Uint8Array): Uint8Array {
+  return new Uint8Array(
+    QuickCrypto.pbkdf2Sync(pin, salt, ITERATIONS, KEY_LENGTH, 'sha256')
+  );
 }
 
 /**
@@ -93,7 +96,7 @@ function deriveKeyFromPinV2(pin: string): Buffer {
  */
 async function deriveKeyFromPinV1(pin: string): Promise<Uint8Array> {
   // Combine PIN with salt
-  const saltedPin = `${pin}${SALT}`;
+  const saltedPin = `${pin}${LEGACY_SALT}`;
 
   // Initial hash
   let hash = await Crypto.digestStringAsync(
@@ -155,9 +158,10 @@ export async function encryptData(
   pin: string
 ): Promise<EncryptedData> {
   try {
-    const key = deriveKeyFromPinV2(pin);
-    const iv = randomBytes(IV_LENGTH);
-    const cipher = createCipheriv('aes-256-gcm', key, iv);
+    const salt = QuickCrypto.randomBytes(SALT_LENGTH);
+    const key = deriveKeyFromPinV2(pin, salt);
+    const iv = QuickCrypto.randomBytes(IV_LENGTH);
+    const cipher = QuickCrypto.createCipheriv('aes-256-gcm', key, iv);
 
     const encrypted = Buffer.concat([
       cipher.update(plaintext, 'utf8'),
@@ -171,6 +175,7 @@ export async function encryptData(
     return {
       data: Array.from(combined),
       iv: Array.from(iv),
+      salt: Array.from(salt),
       timestamp: Date.now(),
       version: ENCRYPTION_VERSION,
     };
@@ -256,7 +261,10 @@ export async function decryptData(
   }
 
   try {
-    const key = deriveKeyFromPinV2(pin);
+    const saltSource = encryptedData.salt
+      ? Buffer.from(encryptedData.salt)
+      : LEGACY_SALT;
+    const key = deriveKeyFromPinV2(pin, saltSource);
     const fullData = Buffer.from(encryptedData.data);
     const iv = Buffer.from(encryptedData.iv);
 
@@ -267,7 +275,7 @@ export async function decryptData(
     const authTag = fullData.slice(fullData.length - 16);
     const encrypted = fullData.slice(0, fullData.length - 16);
 
-    const decipher = createDecipheriv('aes-256-gcm', key, iv);
+    const decipher = QuickCrypto.createDecipheriv('aes-256-gcm', key, iv);
     decipher.setAuthTag(authTag);
 
     const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
