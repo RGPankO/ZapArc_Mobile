@@ -1174,6 +1174,77 @@ export async function prepareSendPayment(
 }
 
 /**
+ * Send a prepared on-chain payment
+ * @param prepareResponse - The response from prepareSendPayment
+ * @param confirmationSpeed - Desired confirmation speed
+ * @param idempotencyKey - Optional idempotency key
+ */
+export async function sendOnchainPayment(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  prepareResponse: any,
+  confirmationSpeed: 'fast' | 'medium' | 'slow',
+  idempotencyKey?: string
+): Promise<PaymentResult> {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 500;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    if (!_isNativeAvailable) {
+      return { success: false, error: 'SDK not available (native module missing)' };
+    }
+
+    if (!sdkInstance) {
+      if (attempt < MAX_RETRIES) {
+        console.log(
+          '⏳ [BreezSparkService] SDK instance not ready, retrying in ' +
+            RETRY_DELAY_MS +
+            'ms (attempt ' +
+            attempt +
+            '/' +
+            MAX_RETRIES +
+            ')'
+        );
+        await new Promise(resolve => global.setTimeout(resolve, RETRY_DELAY_MS));
+        continue;
+      }
+      return { success: false, error: 'SDK not available (not initialized)' };
+    }
+
+    break;
+  }
+
+  try {
+    const response = await sdkInstance.sendPayment({
+      prepareResponse,
+      idempotencyKey,
+      options: {
+        type: 'bitcoinAddress',
+        confirmationSpeed,
+      },
+    });
+
+    const paymentId = response.payment?.id;
+    if (paymentId) {
+      recentlySentPaymentIds.add(paymentId);
+      global.setTimeout(() => {
+        recentlySentPaymentIds.delete(paymentId);
+      }, SENT_PAYMENT_TRACKING_MS);
+    }
+
+    return {
+      success: true,
+      paymentId,
+    };
+  } catch (error) {
+    console.error('Failed to send on-chain payment:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Payment failed',
+    };
+  }
+}
+
+/**
  * Send a prepared payment
  * @param prepareResponse - The response from prepareSendPayment
  * @param originalPaymentRequest - Original payment request (for notification trigger)
@@ -1369,6 +1440,7 @@ export const BreezSparkService = {
   getBalance,
   prepareSendPayment,
   sendPayment,
+  sendOnchainPayment,
   payInvoice,
   receivePayment,
   getSparkAddress,

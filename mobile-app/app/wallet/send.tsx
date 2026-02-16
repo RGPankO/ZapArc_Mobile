@@ -20,8 +20,15 @@ import { StyledTextInput } from '../../src/components';
 import { useContacts } from '../../src/features/addressBook/hooks/useContacts';
 import { ContactSelectionModal } from '../../src/features/addressBook/components/ContactSelectionModal';
 import { Contact } from '../../src/features/addressBook/types';
+import { t } from '../../src/services/i18nService';
 
-type SendStep = 'input' | 'preview' | 'scanning';
+type SendStep = 'input' | 'preview' | 'onchain-preview' | 'scanning';
+type ConfirmationSpeed = 'fast' | 'medium' | 'slow';
+
+interface OnchainFeeQuote {
+  feeSats: number;
+  estimatedConfirmationTime?: string;
+}
 
 interface PaymentPreview {
   recipient: string;
@@ -60,6 +67,12 @@ export default function SendScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [prepareResponse, setPrepareResponse] = useState<any>(null);
   const [scanned, setScanned] = useState(false);
+  const [isOnchainDetected, setIsOnchainDetected] = useState(false);
+  const [onchainFeeQuotes, setOnchainFeeQuotes] = useState<
+    | { fast: OnchainFeeQuote; medium: OnchainFeeQuote; slow: OnchainFeeQuote }
+    | null
+  >(null);
+  const [selectedSpeed, setSelectedSpeed] = useState<ConfirmationSpeed>('medium');
 
   // Currency selection state
   const [inputCurrency, setInputCurrency] = useState<InputCurrency>('sats');
@@ -92,6 +105,29 @@ export default function SendScreen() {
     return formatSatsWithFiat(balance);
   }, [balance, formatSatsWithFiat]);
 
+  const looksLikeBitcoinAddress = useMemo(() => {
+    const trimmed = paymentInput.trim().toLowerCase();
+    if (!trimmed) return false;
+    return trimmed.startsWith('bc1') || trimmed.startsWith('1') || trimmed.startsWith('3');
+  }, [paymentInput]);
+
+  const getOnchainFeeQuote = useCallback(
+    (
+      speed: ConfirmationSpeed,
+      feeQuotes?: { fast: OnchainFeeQuote; medium: OnchainFeeQuote; slow: OnchainFeeQuote } | null
+    ) => {
+      if (!feeQuotes) return 0;
+      return Number(feeQuotes[speed]?.feeSats || 0);
+    },
+    []
+  );
+
+  const formatEstimatedTime = useCallback((value?: string, fallbackMinutes?: string) => {
+    const base = value || fallbackMinutes || '0';
+    const minutes = base.replace(/[^0-9]/g, '') || base;
+    return t('send.estimatedTime').replace('%s', minutes);
+  }, []);
+
   // Handle currency change
   const handleCurrencyChange = useCallback((currency: InputCurrency) => {
     setInputCurrency(currency);
@@ -115,13 +151,24 @@ export default function SendScreen() {
   // Auto-fill amount when invoice is pasted (debounced to avoid excessive parsing)
   useEffect(() => {
     const trimmedInput = paymentInput.trim();
-    if (!trimmedInput) return;
+    if (!trimmedInput) {
+      setIsOnchainDetected(false);
+      return;
+    }
+
+    setIsOnchainDetected(looksLikeBitcoinAddress);
 
     // Debounce parsing to avoid excessive calls while typing
     const timeoutId = setTimeout(async () => {
       try {
         const parsed = await BreezSparkService.parsePaymentRequest(trimmedInput);
         console.log('🔍 [Send] Parsed:', parsed.type, 'Valid:', parsed.isValid, 'Amount:', parsed.amountSat);
+
+        if (parsed.isValid) {
+          setIsOnchainDetected(parsed.type === 'bitcoinAddress');
+        } else if (!looksLikeBitcoinAddress) {
+          setIsOnchainDetected(false);
+        }
 
         if (parsed.isValid && parsed.amountSat !== undefined) {
           console.log('✅ [Send] Auto-filling amount:', parsed.amountSat);
@@ -137,7 +184,7 @@ export default function SendScreen() {
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timeoutId);
-  }, [paymentInput]);
+  }, [paymentInput, looksLikeBitcoinAddress]);
 
   const handleScanQR = useCallback(async () => {
     if (permission?.granted) {
@@ -184,7 +231,7 @@ export default function SendScreen() {
 
   const handlePreviewPayment = useCallback(async () => {
     if (!paymentInput.trim()) {
-      Alert.alert('Error', 'Please enter a Lightning invoice or address');
+      Alert.alert('Error', 'Please enter a Lightning invoice, address, or Bitcoin address');
       return;
     }
 
@@ -193,11 +240,12 @@ export default function SendScreen() {
 
       // Parse the payment request
       const parsedRequest = await BreezSparkService.parsePaymentRequest(paymentInput);
+      const isOnchainRequest = parsedRequest.type === 'bitcoinAddress' || looksLikeBitcoinAddress;
 
       if (!parsedRequest.isValid) {
         Alert.alert(
           'Invalid Payment Request',
-          'Please enter a valid Lightning invoice, LNURL, or Lightning address'
+          'Please enter a valid Lightning invoice, LNURL, Lightning address, or Bitcoin address'
         );
         return;
       }
@@ -243,19 +291,53 @@ export default function SendScreen() {
       // Extract fee from prepare response
       // The fee is in paymentMethod.inner (either lightningFeeSats or feeQuote depending on type)
       let feeAmount = 0;
+      let extractedFeeQuotes: { fast: OnchainFeeQuote; medium: OnchainFeeQuote; slow: OnchainFeeQuote } | null = null;
       if (prepared.paymentMethod) {
         const method = prepared.paymentMethod;
+        const methodInner = method.inner || method;
         if (method.tag === 'Bolt11Invoice' || method.tag === 'SparkInvoice') {
           feeAmount = Number(method.inner?.lightningFeeSats || 0);
           // Add spark transfer fee if present
           if (method.inner?.sparkTransferFeeSats) {
             feeAmount += Number(method.inner.sparkTransferFeeSats);
           }
-        } else if (method.tag === 'BitcoinAddress') {
+        } else if (method.tag === 'BitcoinAddress' || method.type === 'bitcoinAddress') {
           // For on-chain, fee is in feeQuote
-          feeAmount = Number(method.inner?.feeQuote?.feeSats || 0);
+          const feeQuote = methodInner?.feeQuote || method?.feeQuote;
+          if (feeQuote?.speedFast || feeQuote?.speedMedium || feeQuote?.speedSlow) {
+            extractedFeeQuotes = {
+              fast: {
+                feeSats: Number(feeQuote.speedFast?.feeSats || 0),
+                estimatedConfirmationTime: feeQuote.speedFast?.estimatedConfirmationTime,
+              },
+              medium: {
+                feeSats: Number(feeQuote.speedMedium?.feeSats || 0),
+                estimatedConfirmationTime: feeQuote.speedMedium?.estimatedConfirmationTime,
+              },
+              slow: {
+                feeSats: Number(feeQuote.speedSlow?.feeSats || 0),
+                estimatedConfirmationTime: feeQuote.speedSlow?.estimatedConfirmationTime,
+              },
+            };
+            feeAmount = getOnchainFeeQuote(selectedSpeed, extractedFeeQuotes);
+          } else {
+            feeAmount = Number(methodInner?.feeQuote?.feeSats || 0);
+          }
         }
       }
+
+      if (isOnchainRequest) {
+        const defaultSpeed: ConfirmationSpeed = 'medium';
+        setSelectedSpeed(defaultSpeed);
+        setOnchainFeeQuotes(extractedFeeQuotes);
+        const onchainFeeAmount = extractedFeeQuotes
+          ? getOnchainFeeQuote(defaultSpeed, extractedFeeQuotes)
+          : feeAmount;
+        feeAmount = onchainFeeAmount;
+      } else {
+        setOnchainFeeQuotes(null);
+      }
+
       const totalAmount = paymentAmount + feeAmount;
 
       // Check total against balance
@@ -277,7 +359,7 @@ export default function SendScreen() {
       };
 
       setPreview(paymentPreview);
-      setStep('preview');
+      setStep(isOnchainRequest ? 'onchain-preview' : 'preview');
     } catch (error) {
       console.error('Failed to prepare payment:', error);
       
@@ -292,7 +374,7 @@ export default function SendScreen() {
     } finally {
       setIsPreparing(false);
     }
-  }, [paymentInput, amount, comment, balance, inputCurrency, convertToSats]);
+  }, [paymentInput, amount, comment, balance, inputCurrency, convertToSats, looksLikeBitcoinAddress, getOnchainFeeQuote, selectedSpeed]);
 
   const handleSendPayment = useCallback(async () => {
     if (!preview || !prepareResponse) {
@@ -302,11 +384,14 @@ export default function SendScreen() {
     try {
       setIsSending(true);
 
-      const result = await BreezSparkService.sendPayment(
-        prepareResponse,
-        paymentInput,  // Original payment request for notification
-        preview.amount // Amount for notification
-      );
+      const isOnchainFlow = step === 'onchain-preview';
+      const result = isOnchainFlow
+        ? await BreezSparkService.sendOnchainPayment(prepareResponse, selectedSpeed)
+        : await BreezSparkService.sendPayment(
+            prepareResponse,
+            paymentInput,  // Original payment request for notification
+            preview.amount // Amount for notification
+          );
 
       if (result.success) {
         // Refresh balance immediately
@@ -331,13 +416,72 @@ export default function SendScreen() {
     } finally {
       setIsSending(false);
     }
-  }, [preview, prepareResponse, refreshBalance]);
+  }, [preview, prepareResponse, refreshBalance, step, selectedSpeed, paymentInput]);
 
   const handleBackToInput = useCallback(() => {
     setStep('input');
     setPreview(null);
     setPrepareResponse(null);
+    setOnchainFeeQuotes(null);
+    setSelectedSpeed('medium');
   }, []);
+
+  const handleSelectSpeed = useCallback(
+    (speed: ConfirmationSpeed) => {
+      if (!preview) {
+        setSelectedSpeed(speed);
+        return;
+      }
+
+      const feeAmount = getOnchainFeeQuote(speed, onchainFeeQuotes);
+      const totalAmount = preview.amount + feeAmount;
+      if (totalAmount > balance) {
+        Alert.alert(
+          'Insufficient Balance',
+          'Total (' +
+            totalAmount.toLocaleString() +
+            ' sats including ' +
+            feeAmount.toLocaleString() +
+            ' sats fee) exceeds your balance of ' +
+            balance.toLocaleString() +
+            ' sats'
+        );
+        return;
+      }
+
+      setSelectedSpeed(speed);
+      setPreview({
+        ...preview,
+        fee: feeAmount,
+        total: totalAmount,
+      });
+    },
+    [preview, onchainFeeQuotes, balance, getOnchainFeeQuote]
+  );
+
+  const speedOptions = useMemo(
+    () => [
+      {
+        key: 'fast' as ConfirmationSpeed,
+        label: t('send.speedFast'),
+        time: formatEstimatedTime(onchainFeeQuotes?.fast?.estimatedConfirmationTime, '10'),
+        fee: Number(onchainFeeQuotes?.fast?.feeSats || 0),
+      },
+      {
+        key: 'medium' as ConfirmationSpeed,
+        label: t('send.speedMedium'),
+        time: formatEstimatedTime(onchainFeeQuotes?.medium?.estimatedConfirmationTime, '30'),
+        fee: Number(onchainFeeQuotes?.medium?.feeSats || 0),
+      },
+      {
+        key: 'slow' as ConfirmationSpeed,
+        label: t('send.speedSlow'),
+        time: formatEstimatedTime(onchainFeeQuotes?.slow?.estimatedConfirmationTime, '60'),
+        fee: Number(onchainFeeQuotes?.slow?.feeSats || 0),
+      },
+    ],
+    [onchainFeeQuotes, formatEstimatedTime]
+  );
 
   // Render QR Scanner
   if (step === 'scanning') {
@@ -391,7 +535,9 @@ export default function SendScreen() {
   }
 
   // Render Payment Preview
-  if (step === 'preview' && preview) {
+  if ((step === 'preview' || step === 'onchain-preview') && preview) {
+    const isOnchainPreview = step === 'onchain-preview';
+
     return (
       <LinearGradient colors={gradientColors} style={styles.gradient}>
         <SafeAreaView style={styles.container}>
@@ -399,12 +545,48 @@ export default function SendScreen() {
             <TouchableOpacity onPress={handleBackToInput}>
               <Text style={styles.backButton}>← Back</Text>
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: primaryTextColor }]}>Withdraw Funds</Text>
+            <Text style={[styles.headerTitle, { color: primaryTextColor }]}>{isOnchainPreview ? t('send.onchainTitle') : t('wallet.send')}</Text>
             <View style={styles.headerSpacer} />
           </View>
 
           <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
             <Text style={[styles.sectionTitle, { color: primaryTextColor }]}>Payment Preview</Text>
+
+            {isOnchainPreview && (
+              <View style={styles.onchainSelectorContainer}>
+                <Text style={[styles.label, { color: primaryTextColor }]}>{t('send.confirmationSpeed')}</Text>
+                <View style={styles.speedSelectorRow}>
+                  {speedOptions.map((option) => {
+                    const isSelected = selectedSpeed === option.key;
+                    return (
+                      <TouchableOpacity
+                        key={option.key}
+                        onPress={() => handleSelectSpeed(option.key)}
+                        style={[
+                          styles.speedOption,
+                          {
+                            borderColor: isSelected ? BRAND_COLOR : 'rgba(255, 255, 255, 0.2)',
+                            backgroundColor: isSelected
+                              ? 'rgba(255, 193, 7, 0.12)'
+                              : 'rgba(255, 255, 255, 0.05)',
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.speedOptionTitle, { color: primaryTextColor }]}>
+                          {option.label}
+                        </Text>
+                        <Text style={[styles.speedOptionSubtitle, { color: secondaryTextColor }]}>
+                          {option.time}
+                        </Text>
+                        <Text style={[styles.speedOptionFee, { color: primaryTextColor }]}>
+                          {option.fee.toLocaleString()} sats
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
 
             <View style={styles.previewContainer}>
               <View style={styles.previewRow}>
@@ -422,7 +604,7 @@ export default function SendScreen() {
               </View>
 
               <View style={styles.previewRow}>
-                <Text style={[styles.previewLabel, { color: secondaryTextColor }]}>Fee:</Text>
+                <Text style={[styles.previewLabel, { color: secondaryTextColor }]}>{`${isOnchainPreview ? t('send.networkFee') : 'Fee'}:`}</Text>
                 <Text style={[styles.previewFee, { color: secondaryTextColor }]}>
                   {preview.fee.toLocaleString()} sats
                 </Text>
@@ -480,7 +662,7 @@ export default function SendScreen() {
           <TouchableOpacity onPress={() => router.back()}>
             <Text style={styles.backButton}>← Back</Text>
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: primaryTextColor }]}>Withdraw Funds</Text>
+          <Text style={[styles.headerTitle, { color: primaryTextColor }]}>{t('wallet.send')}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -493,7 +675,14 @@ export default function SendScreen() {
             )}
           </View>
 
-          <Text style={[styles.sectionLabel, { color: primaryTextColor }]}>Lightning Invoice or Address:</Text>
+          <View style={styles.sectionLabelRow}>
+            <Text style={[styles.sectionLabel, { color: primaryTextColor }]}>Lightning Invoice or Address:</Text>
+            {isOnchainDetected && (
+              <View style={styles.onchainBadge}>
+                <Text style={styles.onchainBadgeText}>⛓️ {t('send.onchainDetected')}</Text>
+              </View>
+            )}
+          </View>
 
           {/* Show selected contact OR input field */}
           {selectedContact ? (
@@ -723,6 +912,27 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginTop: 12,
   },
+  sectionLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+    marginTop: 12,
+  },
+  onchainBadge: {
+    backgroundColor: 'rgba(255, 193, 7, 0.15)',
+    borderColor: 'rgba(255, 193, 7, 0.4)',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 8,
+  },
+  onchainBadgeText: {
+    color: BRAND_COLOR,
+    fontSize: 12,
+    fontWeight: '600',
+  },
   input: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     marginBottom: 0,
@@ -746,6 +956,34 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
+  },
+  onchainSelectorContainer: {
+    marginBottom: 16,
+  },
+  speedSelectorRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  speedOption: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  speedOptionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  speedOptionSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  speedOptionFee: {
+    fontSize: 12,
+    marginTop: 6,
+    fontWeight: '600',
   },
   previewRow: {
     flexDirection: 'row',

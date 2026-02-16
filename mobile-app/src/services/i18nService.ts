@@ -158,6 +158,17 @@ const translations: Record<SupportedLanguage, TranslationSet> = {
       tipSent: 'Tip sent successfully!',
     },
 
+    send: {
+      onchainTitle: 'Send to Bitcoin Address',
+      onchainDetected: 'On-chain',
+      confirmationSpeed: 'Confirmation Speed',
+      speedFast: 'Fast',
+      speedMedium: 'Medium',
+      speedSlow: 'Slow',
+      estimatedTime: '~%s min',
+      networkFee: 'Network Fee',
+    },
+
     // Settings
     settings: {
       title: 'Settings',
@@ -554,6 +565,17 @@ const translations: Record<SupportedLanguage, TranslationSet> = {
       invalidInvoice: 'Невалидна фактура',
       tip: 'Бакшиш',
       tipSent: 'Бакшишът е изпратен успешно!',
+    },
+
+    send: {
+      onchainTitle: 'Изпращане към Bitcoin адрес',
+      onchainDetected: 'On-chain',
+      confirmationSpeed: 'Скорост на потвърждение',
+      speedFast: 'Бързо',
+      speedMedium: 'Средно',
+      speedSlow: 'Бавно',
+      estimatedTime: '~%s мин',
+      networkFee: 'Мрежова такса',
     },
 
     // Settings - Bulgarian
