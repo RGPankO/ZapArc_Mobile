@@ -788,17 +788,31 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
                               </Text>
                             )}
                           </View>
-                          <Button
-                            mode={matchedBackup ? 'outlined' : 'contained'}
-                            onPress={() => handleCreateBackup(key.id)}
-                            icon={matchedBackup ? 'cloud-sync' : 'cloud-upload'}
-                            compact
-                            style={matchedBackup ? [styles.walletActionBtn, { borderColor: BRAND_COLOR }] : [styles.walletActionBtn, { backgroundColor: BRAND_COLOR }]}
-                            textColor={matchedBackup ? BRAND_COLOR : '#1a1a2e'}
-                            labelStyle={matchedBackup ? undefined : { color: '#1a1a2e' }}
-                          >
-                            {matchedBackup ? 'Update Backup' : 'Back Up Now'}
-                          </Button>
+                          <View style={styles.walletActionRow}>
+                            <Button
+                              mode={matchedBackup ? 'outlined' : 'contained'}
+                              onPress={() => handleCreateBackup(key.id)}
+                              icon={matchedBackup ? 'cloud-sync' : 'cloud-upload'}
+                              compact
+                              style={matchedBackup ? [styles.walletActionBtn, { borderColor: BRAND_COLOR, flex: 1 }] : [styles.walletActionBtn, { backgroundColor: BRAND_COLOR, flex: 1 }]}
+                              textColor={matchedBackup ? BRAND_COLOR : '#1a1a2e'}
+                              labelStyle={matchedBackup ? undefined : { color: '#1a1a2e' }}
+                            >
+                              {matchedBackup ? 'Update Backup' : 'Back Up Now'}
+                            </Button>
+                            {matchedBackup && (
+                              <Button
+                                mode="outlined"
+                                onPress={() => handleDeleteBackup(matchedBackup)}
+                                icon="delete-outline"
+                                compact
+                                style={[styles.walletActionBtn, { borderColor: '#ef5350', marginLeft: 8 }]}
+                                textColor="#ef5350"
+                              >
+                                Delete
+                              </Button>
+                            )}
+                          </View>
                         </View>
                       );
                     })
@@ -1023,6 +1037,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  walletActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   walletActionBtn: {
     borderRadius: 8,
