@@ -613,11 +613,10 @@ export function useWallet(): WalletState & WalletActions {
 
         // Fetch fresh data from SDK
         if (!BreezSparkService.isSDKInitialized()) {
-          if (!cached && activeWalletKeyRef.current === walletKey) {
-            setBalance(0);
-            setIsLoading(false);
-          }
+          // SDK not ready — keep current/cached balance displayed.
+          // The SDK polling effect will trigger refreshBalance when SDK becomes available.
           if (activeWalletKeyRef.current === walletKey) {
+            setIsLoading(false);
             setIsRefreshing(false);
           }
           return;
@@ -700,9 +699,7 @@ export function useWallet(): WalletState & WalletActions {
         const sdkInitialized = BreezSparkService.isSDKInitialized();
 
         if (!sdkInitialized) {
-          if (!cached && activeWalletKeyRef.current === walletKey) {
-            setTransactions([]);
-          }
+          // SDK not ready — keep current/cached transactions displayed.
           if (activeWalletKeyRef.current === walletKey) {
             setIsRefreshing(false);
           }
