@@ -4,9 +4,34 @@
 import * as Crypto from 'expo-crypto';
 import { Buffer } from 'buffer';
 
-import QuickCrypto from 'react-native-quick-crypto';
-
 import type { EncryptedData } from '../features/wallet/types';
+
+// =============================================================================
+// Quick Crypto — safe import with runtime check
+// =============================================================================
+
+let QuickCrypto: typeof import('react-native-quick-crypto').default | null = null;
+let _quickCryptoAvailable = false;
+
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  QuickCrypto = require('react-native-quick-crypto').default;
+  // Test that native module actually works at runtime
+  if (QuickCrypto && typeof QuickCrypto.pbkdf2Sync === 'function') {
+    // Quick smoke test — if native isn't linked this will throw
+    QuickCrypto.pbkdf2Sync('test', 'salt', 1, 32, 'sha256');
+    _quickCryptoAvailable = true;
+    console.log('✅ [Crypto] react-native-quick-crypto available');
+  }
+} catch (e) {
+  console.warn('⚠️ [Crypto] react-native-quick-crypto NOT available, using legacy crypto only');
+  QuickCrypto = null;
+  _quickCryptoAvailable = false;
+}
+
+export function isQuickCryptoAvailable(): boolean {
+  return _quickCryptoAvailable;
+}
 
 // =============================================================================
 // Constants
@@ -146,6 +171,59 @@ async function xorDecrypt(data: Uint8Array, key: Uint8Array): Promise<Uint8Array
 }
 
 // =============================================================================
+// V1 Encryption (XOR fallback when quick-crypto unavailable)
+// =============================================================================
+
+/**
+ * Encrypt data using V1 format (XOR + integrity hash)
+ * Used as fallback when react-native-quick-crypto is not available
+ */
+async function encryptDataV1(
+  plaintext: string,
+  pin: string
+): Promise<EncryptedData> {
+  const key = await deriveKeyFromPinV1(pin);
+  const ivHex = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    `${Date.now()}-${pin}-iv`,
+    { encoding: Crypto.CryptoEncoding.HEX }
+  );
+  const iv = hexToBytes(ivHex.substring(0, 32)); // 16 bytes
+
+  // Create combined key
+  const combinedKeyHex = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    bytesToHex(key) + bytesToHex(iv),
+    { encoding: Crypto.CryptoEncoding.HEX }
+  );
+  const combinedKey = hexToBytes(combinedKeyHex);
+
+  // Encrypt
+  const data = stringToBytes(plaintext);
+  const encrypted = await xorEncrypt(data, combinedKey);
+
+  // Integrity hash
+  const integrityHash = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    bytesToHex(encrypted) + bytesToHex(key),
+    { encoding: Crypto.CryptoEncoding.HEX }
+  );
+  const integrity = hexToBytes(integrityHash.substring(0, 16)); // 8 bytes
+
+  // Combine encrypted + integrity
+  const combined = new Uint8Array(encrypted.length + integrity.length);
+  combined.set(encrypted);
+  combined.set(integrity, encrypted.length);
+
+  return {
+    data: Array.from(combined),
+    iv: Array.from(iv),
+    timestamp: Date.now(),
+    version: 1,
+  };
+}
+
+// =============================================================================
 // AES-GCM Encryption/Decryption
 // =============================================================================
 
@@ -157,6 +235,11 @@ export async function encryptData(
   plaintext: string,
   pin: string
 ): Promise<EncryptedData> {
+  if (!_quickCryptoAvailable || !QuickCrypto) {
+    // Fallback to V1 encryption if quick-crypto unavailable
+    console.warn('⚠️ [Crypto] quick-crypto unavailable, using V1 encryption');
+    return encryptDataV1(plaintext, pin);
+  }
   try {
     const salt = QuickCrypto.randomBytes(SALT_LENGTH);
     const key = deriveKeyFromPinV2(pin, salt);
@@ -258,6 +341,14 @@ export async function decryptData(
 
   if (version === 1) {
     return decryptDataV1(encryptedData, pin);
+  }
+
+  // V2/V3 require quick-crypto
+  if (!_quickCryptoAvailable || !QuickCrypto) {
+    throw new Error(
+      'Cannot decrypt V' + version + ' data: react-native-quick-crypto not available. ' +
+      'App needs rebuild with native module properly linked.'
+    );
   }
 
   try {

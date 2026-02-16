@@ -446,7 +446,9 @@ class StorageService {
       const mnemonic = await decryptData(masterKey.encryptedMnemonic, pin);
 
       // Silent migration: legacy v1/v2 payloads -> v3 AES-GCM (per-wallet salt)
-      if (!masterKey.encryptedMnemonic.version || masterKey.encryptedMnemonic.version < 3) {
+      // Only migrate if quick-crypto is available (V3 requires it)
+      const { isQuickCryptoAvailable } = await import('./crypto');
+      if (isQuickCryptoAvailable() && (!masterKey.encryptedMnemonic.version || masterKey.encryptedMnemonic.version < 3)) {
         if (__DEV__) console.log('🔄 [StorageService] Migrating encryption to V3');
         const newEncrypted = await encryptData(mnemonic, pin);
         masterKey.encryptedMnemonic = newEncrypted;
