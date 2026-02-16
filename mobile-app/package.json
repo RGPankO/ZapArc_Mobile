@@ -43,7 +43,6 @@
     "expo-dev-client": "~5.0.12",
     "expo-linear-gradient": "~14.0.2",
     "expo-local-authentication": "~15.0.2",
-    "expo-location": "~18.0.10",
     "expo-navigation-bar": "~4.0.8",
     "expo-notifications": "~0.29.14",
     "expo-router": "~4.0.17",
