@@ -17,7 +17,7 @@ import type { EncryptedData } from '../features/wallet/types';
 
 const LEGACY_SALT = 'lightning-tipping-salt';
 const SALT_LENGTH = 32; // 256-bit per-wallet random salt (v3)
-const ITERATIONS = 100000;
+const ITERATIONS = 10000;
 const KEY_LENGTH = 32; // 256 bits for AES-256
 const IV_LENGTH = 12; // 96 bits for AES-GCM
 const ENCRYPTION_VERSION = 3;
@@ -65,8 +65,12 @@ function bytesToString(bytes: Uint8Array): string {
  * Uses @noble/hashes — pure JS, audited
  */
 async function deriveKeyV2(pin: string, salt: Uint8Array | string): Promise<Uint8Array> {
+  return deriveKeyWithIterations(pin, salt, ITERATIONS);
+}
+
+async function deriveKeyWithIterations(pin: string, salt: Uint8Array | string, iterations: number): Promise<Uint8Array> {
   const saltBytes = typeof salt === 'string' ? stringToBytes(salt) : salt;
-  return pbkdf2Async(sha256, pin, saltBytes, { c: ITERATIONS, dkLen: KEY_LENGTH, asyncTick: 10 });
+  return pbkdf2Async(sha256, pin, saltBytes, { c: iterations, dkLen: KEY_LENGTH, asyncTick: 10 });
 }
 
 /**
@@ -224,25 +228,29 @@ export async function decryptData(
   }
 
   // v2/v3: AES-256-GCM via @noble/ciphers
-  try {
-    const salt = encryptedData.salt
-      ? new Uint8Array(encryptedData.salt)
-      : stringToBytes(LEGACY_SALT);
+  const salt = encryptedData.salt
+    ? new Uint8Array(encryptedData.salt)
+    : stringToBytes(LEGACY_SALT);
+  const fullData = new Uint8Array(encryptedData.data);
+  const iv = new Uint8Array(encryptedData.iv);
 
-    const key = await deriveKeyV2(pin, salt);
-    const fullData = new Uint8Array(encryptedData.data);
-    const iv = new Uint8Array(encryptedData.iv);
+  // Try current iteration count first, then legacy 100k for old data
+  const iterationCounts = ITERATIONS === 100000 ? [ITERATIONS] : [ITERATIONS, 100000];
 
-    // fullData = ciphertext + authTag (16 bytes), as stored by both
-    // quick-crypto and @noble/ciphers
-    const aes = gcm(key, iv);
-    const decrypted = aes.decrypt(fullData);
-
-    return bytesToString(decrypted);
-  } catch (error) {
-    console.warn('⚠️ [Crypto] V' + version + ' decryption failed:', error);
-    throw new Error('Failed to decrypt data - invalid PIN or corrupted data');
+  for (const iters of iterationCounts) {
+    try {
+      const key = await deriveKeyWithIterations(pin, salt, iters);
+      const aes = gcm(key, iv);
+      const decrypted = aes.decrypt(fullData);
+      return bytesToString(decrypted);
+    } catch {
+      // Auth tag mismatch = wrong key = try next iteration count
+      continue;
+    }
   }
+
+  console.warn('⚠️ [Crypto] V' + version + ' decryption failed with all iteration counts');
+  throw new Error('Failed to decrypt data - invalid PIN or corrupted data');
 }
 
 // =============================================================================
