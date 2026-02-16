@@ -5,6 +5,10 @@
 import * as Crypto from 'expo-crypto';
 import * as aesjs from 'aes-js';
 import { Buffer } from 'buffer';
+import { gcm } from '@noble/ciphers/aes';
+import { pbkdf2 } from '@noble/hashes/pbkdf2';
+import { sha256 } from '@noble/hashes/sha256';
+import { randomBytes } from '@noble/ciphers/webcrypto';
 
 // =============================================================================
 // Types
@@ -187,32 +191,15 @@ export async function encryptMnemonic(
       throw new Error('Password does not meet security requirements');
     }
 
-    const salt = new Uint8Array(SALT_LENGTH);
-    crypto.getRandomValues(salt);
-    const iv = new Uint8Array(IV_LENGTH_GCM);
-    crypto.getRandomValues(iv);
+    const salt = randomBytes(SALT_LENGTH);
+    const iv = randomBytes(IV_LENGTH_GCM);
+    const key = pbkdf2(sha256, password, salt, { c: PBKDF2_ITERATIONS_V3, dkLen: KEY_LENGTH });
 
-    // PBKDF2 via Web Crypto
-    const keyMaterial = await crypto.subtle.importKey(
-      'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']
-    );
-    const keyBits = await crypto.subtle.deriveBits(
-      { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS_V3, hash: 'SHA-256' },
-      keyMaterial, KEY_LENGTH * 8
-    );
-    const key = new Uint8Array(keyBits);
-
-    // AES-256-GCM encrypt via Web Crypto
-    const cryptoKey = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['encrypt']);
-    const encResult = await crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv },
-      cryptoKey,
-      new TextEncoder().encode(mnemonic)
-    );
-    // Web Crypto returns ciphertext + 16-byte authTag
-    const encBytes = new Uint8Array(encResult);
-    const ciphertext = encBytes.slice(0, encBytes.length - 16);
-    const authTag = encBytes.slice(encBytes.length - 16);
+    const aes = gcm(key, iv);
+    const encrypted = aes.encrypt(new TextEncoder().encode(mnemonic));
+    // @noble/ciphers returns ciphertext + 16-byte authTag
+    const ciphertext = encrypted.slice(0, encrypted.length - 16);
+    const authTag = encrypted.slice(encrypted.length - 16);
 
     return {
       version: BACKUP_VERSION,
@@ -248,27 +235,15 @@ export async function decryptMnemonic(
     const ciphertext = new Uint8Array(Buffer.from(backup.ciphertext, 'base64'));
     const authTag = new Uint8Array(Buffer.from(backup.authTag, 'base64'));
 
-    // PBKDF2 via Web Crypto
-    const keyMaterial = await crypto.subtle.importKey(
-      'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']
-    );
-    const keyBits = await crypto.subtle.deriveBits(
-      { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS_V3, hash: 'SHA-256' },
-      keyMaterial, KEY_LENGTH * 8
-    );
-    const key = new Uint8Array(keyBits);
+    const key = pbkdf2(sha256, password, salt, { c: PBKDF2_ITERATIONS_V3, dkLen: KEY_LENGTH });
 
-    // AES-256-GCM decrypt via Web Crypto (expects ciphertext + authTag concatenated)
+    // @noble/ciphers expects ciphertext + authTag concatenated
     const combined = new Uint8Array(ciphertext.length + authTag.length);
     combined.set(ciphertext);
     combined.set(authTag, ciphertext.length);
 
-    const cryptoKey = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['decrypt']);
-    const decrypted = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
-      cryptoKey,
-      combined
-    );
+    const aes = gcm(key, iv);
+    const decrypted = aes.decrypt(combined);
 
     return new TextDecoder().decode(decrypted);
   } catch (error) {

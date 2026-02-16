@@ -1,19 +1,15 @@
 // Crypto utilities for wallet encryption/decryption
-// Uses Web Crypto API (crypto.subtle) for AES-256-GCM (v2/v3)
+// Uses @noble/ciphers (AES-256-GCM) + @noble/hashes (PBKDF2)
+// Pure JS, audited, zero native dependencies
 // Preserves legacy XOR (v1) decryption for backward compatibility
 
 import * as Crypto from 'expo-crypto';
+import { gcm } from '@noble/ciphers/aes';
+import { pbkdf2 } from '@noble/hashes/pbkdf2';
+import { sha256 } from '@noble/hashes/sha256';
+import { randomBytes } from '@noble/ciphers/webcrypto';
 
 import type { EncryptedData } from '../features/wallet/types';
-
-// =============================================================================
-// Runtime capability check
-// =============================================================================
-
-const _hasSubtle = typeof crypto !== 'undefined' && typeof crypto?.subtle?.importKey === 'function';
-console.log('🔐 [Crypto] crypto available:', typeof crypto !== 'undefined');
-console.log('🔐 [Crypto] crypto.subtle available:', _hasSubtle);
-console.log('🔐 [Crypto] crypto.getRandomValues available:', typeof crypto?.getRandomValues === 'function');
 
 // =============================================================================
 // Constants
@@ -35,17 +31,7 @@ export function generateUUID(): string {
 }
 
 export async function generateRandomBytes(length: number): Promise<Uint8Array> {
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-  return bytes;
-}
-
-function stringToBytes(str: string): Uint8Array {
-  return new TextEncoder().encode(str);
-}
-
-function bytesToString(bytes: Uint8Array): string {
-  return new TextDecoder().decode(bytes);
+  return randomBytes(length);
 }
 
 function bytesToHex(bytes: Uint8Array): string {
@@ -62,78 +48,12 @@ function hexToBytes(hex: string): Uint8Array {
   return bytes;
 }
 
-// =============================================================================
-// Web Crypto — PBKDF2 + AES-256-GCM
-// =============================================================================
-
-/**
- * PBKDF2 key derivation via Web Crypto API (crypto.subtle)
- */
-async function deriveKeyPBKDF2(
-  pin: string,
-  salt: Uint8Array | string,
-  iterations: number,
-  keyLength: number
-): Promise<Uint8Array> {
-  const encoder = new TextEncoder();
-  const pinData = encoder.encode(pin);
-  const saltData = typeof salt === 'string' ? encoder.encode(salt) : salt;
-
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    pinData,
-    'PBKDF2',
-    false,
-    ['deriveBits']
-  );
-
-  const bits = await crypto.subtle.deriveBits(
-    {
-      name: 'PBKDF2',
-      salt: saltData,
-      iterations,
-      hash: 'SHA-256',
-    },
-    keyMaterial,
-    keyLength * 8
-  );
-
-  return new Uint8Array(bits);
+function stringToBytes(str: string): Uint8Array {
+  return new TextEncoder().encode(str);
 }
 
-/**
- * AES-256-GCM encrypt via Web Crypto API
- */
-async function encryptAesGcm(
-  plaintext: string,
-  key: Uint8Array,
-  iv: Uint8Array
-): Promise<Uint8Array> {
-  const cryptoKey = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['encrypt']);
-  const encrypted = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    cryptoKey,
-    new TextEncoder().encode(plaintext)
-  );
-  // Web Crypto returns ciphertext + 16-byte authTag concatenated
-  return new Uint8Array(encrypted);
-}
-
-/**
- * AES-256-GCM decrypt via Web Crypto API
- */
-async function decryptAesGcm(
-  ciphertextWithTag: Uint8Array,
-  key: Uint8Array,
-  iv: Uint8Array
-): Promise<string> {
-  const cryptoKey = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['decrypt']);
-  const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv },
-    cryptoKey,
-    ciphertextWithTag
-  );
-  return new TextDecoder().decode(decrypted);
+function bytesToString(bytes: Uint8Array): string {
+  return new TextDecoder().decode(bytes);
 }
 
 // =============================================================================
@@ -141,10 +61,19 @@ async function decryptAesGcm(
 // =============================================================================
 
 /**
- * Derive encryption key from PIN (v2/v3 — PBKDF2 100k iterations)
+ * Derive key using PBKDF2-HMAC-SHA256 (v2/v3)
+ * Uses @noble/hashes — pure JS, audited
+ */
+function deriveKeyV2(pin: string, salt: Uint8Array | string): Uint8Array {
+  const saltBytes = typeof salt === 'string' ? stringToBytes(salt) : salt;
+  return pbkdf2(sha256, pin, saltBytes, { c: ITERATIONS, dkLen: KEY_LENGTH });
+}
+
+/**
+ * Public API for key derivation (async for compatibility)
  */
 export async function deriveKeyFromPin(pin: string): Promise<Uint8Array> {
-  return deriveKeyPBKDF2(pin, LEGACY_SALT, ITERATIONS, KEY_LENGTH);
+  return deriveKeyV2(pin, LEGACY_SALT);
 }
 
 /**
@@ -192,7 +121,7 @@ async function xorDecrypt(data: Uint8Array, key: Uint8Array): Promise<Uint8Array
 }
 
 // =============================================================================
-// AES-GCM Encryption (v3)
+// AES-256-GCM Encryption (v3) — @noble/ciphers
 // =============================================================================
 
 /**
@@ -203,20 +132,18 @@ export async function encryptData(
   pin: string
 ): Promise<EncryptedData> {
   try {
-    const saltArr = new Uint8Array(SALT_LENGTH);
-    crypto.getRandomValues(saltArr);
+    const salt = randomBytes(SALT_LENGTH);
+    const key = deriveKeyV2(pin, salt);
+    const iv = randomBytes(IV_LENGTH);
 
-    const keyArr = await deriveKeyPBKDF2(pin, saltArr, ITERATIONS, KEY_LENGTH);
-
-    const ivArr = new Uint8Array(IV_LENGTH);
-    crypto.getRandomValues(ivArr);
-
-    const combinedArr = await encryptAesGcm(plaintext, keyArr, ivArr);
+    const aes = gcm(key, iv);
+    const ciphertext = aes.encrypt(stringToBytes(plaintext));
+    // @noble/ciphers gcm.encrypt returns ciphertext + 16-byte authTag appended
 
     return {
-      data: Array.from(combinedArr),
-      iv: Array.from(ivArr),
-      salt: Array.from(saltArr),
+      data: Array.from(ciphertext),
+      iv: Array.from(iv),
+      salt: Array.from(salt),
       timestamp: Date.now(),
       version: ENCRYPTION_VERSION,
     };
@@ -290,36 +217,30 @@ export async function decryptData(
 ): Promise<string> {
   const version = encryptedData.version || 1;
 
-  console.log('🔐 [Crypto] decryptData called, version:', version, 'hasSalt:', !!encryptedData.salt, 'dataLen:', encryptedData.data?.length);
+  console.log('🔐 [Crypto] decryptData version:', version, 'hasSalt:', !!encryptedData.salt);
 
   if (version === 1) {
     return decryptDataV1(encryptedData, pin);
   }
 
-  if (!_hasSubtle) {
-    console.error('🔐 [Crypto] crypto.subtle NOT available — cannot decrypt V' + version + ' data');
-    throw new Error('crypto.subtle not available in this runtime — cannot decrypt AES-GCM data');
-  }
-
-  // v2/v3: AES-256-GCM via Web Crypto
+  // v2/v3: AES-256-GCM via @noble/ciphers
   try {
-    const saltSource = encryptedData.salt
+    const salt = encryptedData.salt
       ? new Uint8Array(encryptedData.salt)
-      : LEGACY_SALT;
+      : stringToBytes(LEGACY_SALT);
 
-    const key = await deriveKeyPBKDF2(pin, saltSource, ITERATIONS, KEY_LENGTH);
+    const key = deriveKeyV2(pin, salt);
     const fullData = new Uint8Array(encryptedData.data);
     const iv = new Uint8Array(encryptedData.iv);
 
-    if (fullData.length < 16) {
-      throw new Error('Invalid encrypted payload');
-    }
+    // fullData = ciphertext + authTag (16 bytes), as stored by both
+    // quick-crypto and @noble/ciphers
+    const aes = gcm(key, iv);
+    const decrypted = aes.decrypt(fullData);
 
-    // fullData = ciphertext + authTag(16 bytes)
-    // Web Crypto expects them concatenated (which they already are)
-    return await decryptAesGcm(fullData, key, iv);
+    return bytesToString(decrypted);
   } catch (error) {
-    console.warn('⚠️ [Crypto] V' + (encryptedData.version || '?') + ' decryption failed:', error);
+    console.warn('⚠️ [Crypto] V' + version + ' decryption failed:', error);
     throw new Error('Failed to decrypt data - invalid PIN or corrupted data');
   }
 }
