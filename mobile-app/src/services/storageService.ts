@@ -491,10 +491,12 @@ class StorageService {
       }
 
       // Validate mnemonic word count — corrupted data from broken V1→V3 migration
-      const wordCount = mnemonic.trim().split(/\s+/).length;
-      if (wordCount !== 12 && wordCount !== 15 && wordCount !== 18 && wordCount !== 21 && wordCount !== 24) {
-        console.error(`❌ [StorageService] CORRUPTED mnemonic detected: ${wordCount} words (expected 12/15/18/21/24). Wallet ${masterKeyId} needs re-import.`);
-        return null;
+      {
+        const wc = mnemonic.trim().split(/\s+/).length;
+        if (wc !== 12 && wc !== 15 && wc !== 18 && wc !== 21 && wc !== 24) {
+          console.error(`❌ [StorageService] CORRUPTED mnemonic detected: ${wc} words (expected 12/15/18/21/24). Wallet ${masterKeyId} needs re-import.`);
+          return null;
+        }
       }
 
       if (__DEV__) console.log('✅ [StorageService] GET_MASTER_KEY_MNEMONIC SUCCESS');
