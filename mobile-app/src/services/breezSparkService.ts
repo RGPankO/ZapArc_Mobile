@@ -867,7 +867,7 @@ export async function listPayments(): Promise<TransactionInfo[]> {
 
     const payments = response.payments || [];
 
-    return payments.map((payment: any) => {
+    return payments.map((payment: any, index: number) => {
       // Try multiple field name variations (SDK may return different formats)
       const rawAmount = payment.amount ?? payment.amountSats ?? payment.amountSat ?? 0;
       const amountSat = typeof rawAmount === 'bigint' ? Number(rawAmount) : Number(rawAmount);
@@ -896,17 +896,24 @@ export async function listPayments(): Promise<TransactionInfo[]> {
 
       const description = payment.details?.description || payment.description || '';
 
-      const methodRaw = payment.method || payment.paymentMethod || payment.details?.type;
-      const methodString = String(methodRaw || '').toLowerCase();
-      const method: 'lightning' | 'onchain' =
-        methodString.includes('bitcoinaddress') ||
-        methodString.includes('bitcoin_address') ||
-        methodString.includes('onchain') ||
-        methodString.includes('deposit')
-          ? 'onchain'
-          : 'lightning';
+      // RN SDK: method is numeric (0=lightning, 3=deposit), details uses {tag, inner}
+      // Web SDK: method is string ("lightning", "deposit"), details uses {type, txId}
+      const methodNum = payment.method;
+      const detailsTag = String(payment.details?.tag || '').toLowerCase();
+      const detailsType = String(payment.details?.type || '').toLowerCase();
+      const methodStr = String(methodNum ?? '').toLowerCase();
 
-      const txid = payment.details?.txId || payment.details?.txid || payment.txid;
+      const isOnchain =
+        methodNum === 3 ||
+        detailsTag === 'deposit' ||
+        detailsType === 'deposit' ||
+        methodStr.includes('bitcoinaddress') ||
+        methodStr.includes('onchain') ||
+        methodStr.includes('deposit');
+
+      const method: 'lightning' | 'onchain' = isOnchain ? 'onchain' : 'lightning';
+
+      const txid = payment.details?.inner?.txId || payment.details?.txId || payment.details?.txid || payment.txid;
 
       const mappedStatus = mapPaymentStatus(payment.status);
 
