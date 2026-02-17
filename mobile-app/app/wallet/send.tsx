@@ -17,7 +17,6 @@ import { useWallet } from '../../src/hooks/useWallet';
 import { BreezSparkService } from '../../src/services/breezSparkService';
 import { useCurrency, type InputCurrency } from '../../src/hooks/useCurrency';
 import { useLightningAddress } from '../../src/hooks/useLightningAddress';
-import { StyledTextInput } from '../../src/components';
 import { useContacts } from '../../src/features/addressBook/hooks/useContacts';
 import { ContactSelectionModal } from '../../src/features/addressBook/components/ContactSelectionModal';
 import { Contact } from '../../src/features/addressBook/types';
