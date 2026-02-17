@@ -904,21 +904,14 @@ export async function listPayments(): Promise<TransactionInfo[]> {
       const detailsType = String(payment.details?.type || '').toLowerCase();
       const methodStr = String(methodNum ?? '').toLowerCase();
 
+      // RN SDK method numbers: 0=Lightning, 1=Spark, 3=Deposit (on-chain receive), 4=Withdraw (on-chain send)
       const isOnchain =
         methodNum === 3 ||
-        methodNum === 1 ||
-        methodNum === 2 ||
+        methodNum === 4 ||
         detailsTag === 'deposit' ||
         detailsTag === 'withdraw' ||
-        detailsTag === 'bitcoinaddress' ||
-        detailsType === 'deposit' ||
-        detailsType === 'withdraw' ||
-        detailsType === 'bitcoinaddress' ||
-        methodStr.includes('bitcoinaddress') ||
-        methodStr.includes('onchain') ||
         methodStr.includes('deposit') ||
-        methodStr.includes('withdraw') ||
-        methodStr.includes('bitcoin');
+        methodStr.includes('withdraw');
 
       const method: 'lightning' | 'onchain' = isOnchain ? 'onchain' : 'lightning';
 
