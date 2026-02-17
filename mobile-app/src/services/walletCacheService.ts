@@ -50,6 +50,31 @@ export function consumePreloadedTransactions(): Transaction[] | null {
 }
 
 // =============================================================================
+// Wallet Switch Event (cross-hook bridge)
+// =============================================================================
+// Simple event emitter so useWalletAuth.selectWallet can directly notify
+// useWallet to reload — more reliable than focus-based detection.
+
+export interface WalletSwitchEvent {
+  masterKeyId: string;
+  subWalletIndex: number;
+  balance: number;
+  transactions: Transaction[];
+}
+
+type WalletSwitchListener = (event: WalletSwitchEvent) => void;
+const _switchListeners: Set<WalletSwitchListener> = new Set();
+
+export function onWalletSwitch(listener: WalletSwitchListener): () => void {
+  _switchListeners.add(listener);
+  return () => { _switchListeners.delete(listener); };
+}
+
+export function emitWalletSwitch(event: WalletSwitchEvent): void {
+  _switchListeners.forEach((listener) => listener(event));
+}
+
+// =============================================================================
 // Constants
 // =============================================================================
 

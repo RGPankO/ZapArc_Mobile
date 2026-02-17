@@ -397,10 +397,18 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
           WalletCache.getCachedBalance(masterKeyId, subWalletIndex),
           WalletCache.getCachedTransactions(masterKeyId, subWalletIndex),
         ]);
-        WalletCache.setPreloadedData(
-          cachedBal?.balance ?? 0,
-          cachedTxs?.transactions ?? [],
-        );
+        const resolvedBalance = cachedBal?.balance ?? 0;
+        const resolvedTransactions = cachedTxs?.transactions ?? [];
+
+        WalletCache.setPreloadedData(resolvedBalance, resolvedTransactions);
+
+        // Emit wallet switch event — useWallet listens for this to update immediately
+        WalletCache.emitWalletSwitch({
+          masterKeyId,
+          subWalletIndex,
+          balance: resolvedBalance,
+          transactions: resolvedTransactions,
+        });
 
         // Cache PIN for future use
         sessionPinRef.current = pin;

@@ -202,6 +202,23 @@ export function useWallet(): WalletState & WalletActions {
     loadWalletData();
   }, [loadWalletData]);
 
+  // Listen for wallet switch events from useWalletAuth.selectWallet
+  // This is the most reliable way to update state across independent hook instances
+  useEffect(() => {
+    const unsubscribe = WalletCache.onWalletSwitch((event) => {
+      console.log('🔄 [useWallet] Wallet switch event received:', event.masterKeyId, event.subWalletIndex);
+      // Immediately update balance and transactions to the new wallet's data
+      setBalance(event.balance);
+      setTransactions(event.transactions);
+      setIsConnected(false); // SDK is reconnecting
+      // Update the cache load key so the activeWalletInfo effect doesn't override
+      lastCacheLoadKeyRef.current = `${event.masterKeyId}:${event.subWalletIndex}`;
+      // Reload storage to update activeWalletInfo
+      loadWalletData(true);
+    });
+    return unsubscribe;
+  }, [loadWalletData]);
+
   // ========================================
   // Wallet Creation/Import
   // ========================================
