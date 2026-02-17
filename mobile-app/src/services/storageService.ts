@@ -461,44 +461,65 @@ class StorageService {
       validatePayloadIntegrity(masterKey.encryptedMnemonic.timestamp);
 
       // Decrypt mnemonic
-      console.log('🔐 [StorageService] Decrypting mnemonic, version:', masterKey.encryptedMnemonic.version, 'dataLen:', masterKey.encryptedMnemonic.data?.length, 'ivLen:', masterKey.encryptedMnemonic.iv?.length, 'saltLen:', masterKey.encryptedMnemonic.salt?.length);
-      const mnemonic = await decryptData(masterKey.encryptedMnemonic, pin);
-      const wordCount = mnemonic.trim().split(/\s+/).length;
-      console.log('🔐 [StorageService] Decrypted mnemonic wordCount:', wordCount, 'version:', masterKey.encryptedMnemonic.version, 'firstChars:', mnemonic.substring(0, 20) + '...');
-
-      // Validate word count BEFORE caching — wrong PIN can produce garbage
-      if (wordCount !== 12 && wordCount !== 15 && wordCount !== 18 && wordCount !== 21 && wordCount !== 24) {
-        console.warn(`⚠️ [StorageService] Decryption produced invalid mnemonic: ${wordCount} words (expected 12/15/18/21/24). Likely wrong PIN for wallet ${masterKeyId}.`);
-        this._mnemonicCache.delete(masterKeyId); // Ensure no stale cache
+      const encVersion = masterKey.encryptedMnemonic.version || 1;
+      console.log('🔐 [StorageService] Decrypting mnemonic, version:', encVersion, 'dataLen:', masterKey.encryptedMnemonic.data?.length, 'ivLen:', masterKey.encryptedMnemonic.iv?.length, 'saltLen:', masterKey.encryptedMnemonic.salt?.length);
+      
+      let mnemonic: string;
+      try {
+        mnemonic = await decryptData(masterKey.encryptedMnemonic, pin);
+      } catch (decryptError) {
+        // AES-GCM auth tag failure = wrong PIN (expected, not an error)
+        console.warn('⚠️ [StorageService] Decryption failed (wrong PIN or corrupted data):', decryptError);
+        this._mnemonicCache.delete(masterKeyId);
         return null;
       }
 
-      // Cache for subsequent calls during this session (only valid mnemonics)
-      this._mnemonicCache.set(masterKeyId, mnemonic);
+      const wordCount = mnemonic.trim().split(/\s+/).length;
+      console.log('🔐 [StorageService] Decrypted wordCount:', wordCount, 'version:', encVersion);
 
-      // Silent migration: legacy v1/v2 payloads -> v3 AES-GCM (per-wallet salt)
-      // Silent migration: legacy v1/v2 payloads -> v3 AES-GCM (per-wallet salt)
-      // Only migrate if decrypted mnemonic is valid (prevents corrupted re-encryption)
-      if (!masterKey.encryptedMnemonic.version || masterKey.encryptedMnemonic.version < 3) {
-        const words = mnemonic.trim().split(/\s+/);
-        if (words.length === 12 || words.length === 15 || words.length === 18 || words.length === 21 || words.length === 24) {
-          console.log('🔄 [StorageService] Migrating encryption to V3');
-          const newEncrypted = await encryptData(mnemonic, pin);
-          // Verify round-trip: decrypt the new data and check it matches
-          const verifyMnemonic = await decryptData(newEncrypted, pin);
-          if (verifyMnemonic === mnemonic) {
-            masterKey.encryptedMnemonic = newEncrypted;
-            await this.saveMultiWalletStorage(storage);
-            console.log('✅ [StorageService] Encryption migration complete (verified)');
-          } else {
-            console.error('❌ [StorageService] Migration round-trip FAILED — keeping original encryption');
-          }
-        } else {
-          console.error('❌ [StorageService] Skipping migration — invalid mnemonic word count:', words.length);
-        }
+      // Validate word count — wrong PIN on some crypto implementations
+      // may return garbage instead of throwing
+      if (wordCount !== 12 && wordCount !== 15 && wordCount !== 18 && wordCount !== 21 && wordCount !== 24) {
+        console.warn(`⚠️ [StorageService] Invalid mnemonic: ${wordCount} words. Wrong PIN or corrupted data.`);
+        this._mnemonicCache.delete(masterKeyId);
+        return null;
       }
 
-      // Word count already validated above (before caching)
+      // Validate BIP39 — ultimate check that decryption produced real words
+      const normalizedMnemonic = mnemonic.trim().toLowerCase().replace(/[\s\r\n]+/g, ' ');
+      if (!bip39.validateMnemonic(normalizedMnemonic)) {
+        console.warn('⚠️ [StorageService] BIP39 validation failed — decrypted data is not a valid mnemonic. Wrong PIN or corrupted data.');
+        this._mnemonicCache.delete(masterKeyId);
+        return null;
+      }
+
+      // Cache for subsequent calls during this session (only BIP39-validated mnemonics)
+      this._mnemonicCache.set(masterKeyId, normalizedMnemonic);
+
+      // Silent migration: legacy v1/v2 payloads -> v3 AES-GCM (per-wallet salt)
+      // Only migrate if version is outdated
+      if (encVersion < 3) {
+        try {
+          console.log('🔄 [StorageService] Migrating encryption from V' + encVersion + ' to V3');
+          const newEncrypted = await encryptData(normalizedMnemonic, pin);
+          // Verify round-trip before saving
+          const verifyMnemonic = await decryptData(newEncrypted, pin);
+          if (verifyMnemonic.trim() === normalizedMnemonic) {
+            // Re-load storage to avoid race conditions with concurrent saves
+            const freshStorage = await this.loadMultiWalletStorage();
+            const freshKey = freshStorage?.masterKeys.find((mk) => mk.id === masterKeyId);
+            if (freshKey) {
+              freshKey.encryptedMnemonic = newEncrypted;
+              await this.saveMultiWalletStorage(freshStorage!);
+              console.log('✅ [StorageService] Encryption migration V' + encVersion + ' → V3 complete');
+            }
+          } else {
+            console.warn('⚠️ [StorageService] Migration round-trip mismatch — keeping original encryption');
+          }
+        } catch (migrationError) {
+          console.warn('⚠️ [StorageService] Migration failed — keeping original encryption:', migrationError);
+        }
+      }
 
       if (__DEV__) console.log('✅ [StorageService] GET_MASTER_KEY_MNEMONIC SUCCESS');
       return mnemonic;
@@ -556,14 +577,12 @@ class StorageService {
     try {
       // If we have a cached (validated) mnemonic for this key, PIN was already verified
       const cached = this._mnemonicCache.get(masterKeyId);
+      if (cached && bip39.validateMnemonic(cached.trim().toLowerCase().replace(/[\s\r\n]+/g, ' '))) {
+        if (__DEV__) console.log('⚡ [StorageService] VERIFY_MASTER_KEY_PIN from cache (BIP39 valid)');
+        return true;
+      }
+      // Clear invalid cache entry
       if (cached) {
-        // Double-check the cached value is a valid mnemonic, not garbage
-        const wc = cached.trim().split(/\s+/).length;
-        if (wc === 12 || wc === 15 || wc === 18 || wc === 21 || wc === 24) {
-          if (__DEV__) console.log('⚡ [StorageService] VERIFY_MASTER_KEY_PIN from cache');
-          return true;
-        }
-        // Cache has garbage — remove it and re-verify
         this._mnemonicCache.delete(masterKeyId);
       }
 
