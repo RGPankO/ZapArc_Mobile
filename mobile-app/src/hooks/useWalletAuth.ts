@@ -417,19 +417,17 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
         setIsUnlocked(true);
         updateActivity();
 
-        console.log('✅ [useWalletAuth] Wallet selected - ensuring SDK disconnected:', {
-          masterKeyId,
-          subWalletIndex,
-        });
+        console.log('✅ [useWalletAuth] Wallet selected — navigating immediately with cached data');
 
-        // Await the disconnect that was started early by beginDisconnectSDK() in WalletManagement.
-        // If it wasn't started, this does a fresh disconnect. Either way it's fast.
-        await BreezSparkService.disconnectSDK();
+        // Mark SDK as not initialized to prevent stale refreshes from old wallet
+        BreezSparkService.beginDisconnectSDK();
 
-        // NON-BLOCKING: Reinitialize SDK with new wallet in background
+        // NON-BLOCKING: Disconnect old + reinitialize new SDK entirely in background.
+        // HomeScreen shows cached data instantly; SDK refresh happens when ready.
         const nickname = walletInfo?.subWalletNickname;
         (async (): Promise<void> => {
           try {
+            await BreezSparkService.disconnectSDK(); // await in-flight disconnect
             const mnemonic = await storageService.getMasterKeyMnemonic(masterKeyId, pin);
             if (mnemonic) {
               const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, subWalletIndex);
