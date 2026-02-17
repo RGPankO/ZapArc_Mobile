@@ -909,14 +909,15 @@ export async function listPayments(): Promise<TransactionInfo[]> {
         methodNum === 1 ||
         methodNum === 2 ||
         detailsTag === 'deposit' ||
+        detailsTag === 'withdraw' ||
         detailsTag === 'bitcoinaddress' ||
-        detailsTag === 'bitcoin' ||
         detailsType === 'deposit' ||
+        detailsType === 'withdraw' ||
         detailsType === 'bitcoinaddress' ||
-        detailsType === 'bitcoin' ||
         methodStr.includes('bitcoinaddress') ||
         methodStr.includes('onchain') ||
         methodStr.includes('deposit') ||
+        methodStr.includes('withdraw') ||
         methodStr.includes('bitcoin');
 
       const method: 'lightning' | 'onchain' = isOnchain ? 'onchain' : 'lightning';
