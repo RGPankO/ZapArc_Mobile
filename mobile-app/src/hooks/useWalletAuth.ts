@@ -417,27 +417,23 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
         setIsUnlocked(true);
         updateActivity();
 
-        console.log('✅ [useWalletAuth] Wallet selected — navigating immediately with cached data');
+        console.log('✅ [useWalletAuth] Wallet selected — initializing SDK before navigation');
 
-        // Mark SDK as not initialized to prevent stale refreshes from old wallet
-        BreezSparkService.beginDisconnectSDK();
-
-        // NON-BLOCKING: Disconnect old + reinitialize new SDK entirely in background.
-        // HomeScreen shows cached data instantly; SDK refresh happens when ready.
+        // Await full SDK disconnect + reinit so HomeScreen is ready to send/receive.
+        // The PIN screen stays visible during this (isLoading=true).
         const nickname = walletInfo?.subWalletNickname;
-        (async (): Promise<void> => {
-          try {
-            await BreezSparkService.disconnectSDK(); // await in-flight disconnect
-            const mnemonic = await storageService.getMasterKeyMnemonic(masterKeyId, pin);
-            if (mnemonic) {
-              const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, subWalletIndex);
-              await BreezSparkService.initializeSDK(derivedMnemonic, undefined, nickname);
-              console.log('✅ [useWalletAuth] SDK reinitialized (background)');
-            }
-          } catch (sdkError) {
-            console.warn('⚠️ [useWalletAuth] SDK reinitialization failed:', sdkError);
+        try {
+          await BreezSparkService.disconnectSDK(); // await in-flight or fresh disconnect
+          const mnemonic = await storageService.getMasterKeyMnemonic(masterKeyId, pin);
+          if (mnemonic) {
+            const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, subWalletIndex);
+            await BreezSparkService.initializeSDK(derivedMnemonic, undefined, nickname);
+            console.log('✅ [useWalletAuth] SDK reinitialized for new wallet');
           }
-        })();
+        } catch (sdkError) {
+          // Non-fatal — user can still navigate, SDK will be unavailable
+          console.warn('⚠️ [useWalletAuth] SDK reinitialization failed:', sdkError);
+        }
 
         return true;
       } catch (err) {
