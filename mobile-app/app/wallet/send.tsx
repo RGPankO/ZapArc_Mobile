@@ -847,7 +847,9 @@ export default function SendScreen() {
                         <Text style={[styles.speedCardTitle, { color: primaryTextColor }]}>{option.label}</Text>
                         <Text style={[styles.speedCardTime, { color: secondaryTextColor }]}>{option.time}</Text>
                       </View>
-                      <Text style={[styles.speedCardFee, { color: primaryTextColor }]}>{option.fee.toLocaleString()} sats</Text>
+                      <Text style={[styles.speedCardFee, { color: onchainFeeQuotes ? primaryTextColor : secondaryTextColor }]}>
+                        {onchainFeeQuotes ? `${option.fee.toLocaleString()} sats` : '—'}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -856,7 +858,7 @@ export default function SendScreen() {
               <View style={styles.onchainFeeRow}>
                 <Text style={[styles.onchainFeeLabel, { color: secondaryTextColor }]}>{t('send.networkFee')}</Text>
                 <Text style={[styles.onchainFeeValue, { color: primaryTextColor }]}>
-                  {getOnchainFeeQuote(selectedSpeed, onchainFeeQuotes).toLocaleString()} sats
+                  {onchainFeeQuotes ? `${getOnchainFeeQuote(selectedSpeed, onchainFeeQuotes).toLocaleString()} sats` : '—'}
                 </Text>
               </View>
             </>
