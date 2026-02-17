@@ -1019,7 +1019,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     marginBottom: 0,
   },
   scanButton: {
