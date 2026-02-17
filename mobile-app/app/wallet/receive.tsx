@@ -334,7 +334,19 @@ export default function ReceiveScreen() {
                   </Button>
                 </View>
               ) : (
-                <Text style={[styles.helperText, { color: secondaryTextColor }]}>{t('deposit.registerAddressInSettings')}</Text>
+                <View style={styles.manageAddressRow}>
+                  <Text style={[styles.helperText, { color: secondaryTextColor }]}>{t('deposit.noAddressYet')}</Text>
+                  <Button
+                    mode="contained"
+                    onPress={() => router.push('/wallet/settings/lightning-address')}
+                    compact
+                    buttonColor={BRAND_COLOR}
+                    textColor="#1a1a2e"
+                    style={styles.manageButton}
+                  >
+                    Manage
+                  </Button>
+                </View>
               )}
 
               <Text style={[styles.sectionTitle, styles.invoiceSectionTitle, { color: primaryTextColor }]}>{t('deposit.invoiceSectionTitle')}</Text>
@@ -561,6 +573,8 @@ const styles = StyleSheet.create({
   invoiceSectionTitle: { marginTop: 20 },
   sectionSubtitle: { fontSize: 13, marginBottom: 14 },
   helperText: { fontSize: 13, marginBottom: 2 },
+  manageAddressRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  manageButton: { borderRadius: 8 },
   label: { fontSize: 15, marginBottom: 12 },
   input: { marginBottom: 16 },
   inputOutline: { borderRadius: 8 },
