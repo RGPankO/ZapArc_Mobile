@@ -775,11 +775,18 @@ export default function SendScreen() {
                 multiline
                 numberOfLines={2}
               />
-              {contacts.length > 0 && (
-                <TouchableOpacity style={styles.addressBookButton} onPress={() => setContactModalVisible(true)}>
-                  <IconButton icon="contacts" iconColor={BRAND_COLOR} size={24} style={styles.addressBookIcon} />
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={styles.addressBookButton}
+                onPress={() => {
+                  if (contacts.length > 0) {
+                    setContactModalVisible(true);
+                  } else {
+                    router.push('/wallet/settings/address-book');
+                  }
+                }}
+              >
+                <IconButton icon="contacts" iconColor={BRAND_COLOR} size={24} style={styles.addressBookIcon} />
+              </TouchableOpacity>
             </View>
           ) : (
             <StyledTextInput
