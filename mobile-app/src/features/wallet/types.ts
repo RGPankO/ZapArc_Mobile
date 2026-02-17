@@ -135,6 +135,8 @@ export interface Transaction {
   preimage?: string;
   feeSats?: number;
   destination?: string;
+  method?: 'lightning' | 'onchain';
+  txid?: string;
 }
 
 /**

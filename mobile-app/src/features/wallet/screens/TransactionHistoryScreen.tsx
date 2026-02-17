@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   Modal,
+  Linking,
 } from 'react-native';
 import { Text, IconButton, Chip, Button, Divider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -56,7 +57,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
   // Group transactions by date
   const groupedTransactions = useMemo(() => {
     const groups: { [key: string]: Transaction[] } = {};
-    
+
     filteredTransactions.forEach((tx) => {
       const date = new Date(tx.timestamp);
       const key = date.toLocaleDateString('en-US', {
@@ -64,7 +65,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
         month: 'long',
         day: 'numeric',
       });
-      
+
       if (!groups[key]) {
         groups[key] = [];
       }
@@ -106,6 +107,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
   // Render transaction item
   const renderTransaction = (tx: Transaction): React.JSX.Element => {
     const isReceived = tx.type === 'receive';
+    const method = tx.method || (tx.txid ? 'onchain' : 'lightning');
     const formattedAmount = formatTx(tx.amount ?? 0, isReceived);
 
     return (
@@ -120,7 +122,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
           ]}
         >
           <Text style={[styles.transactionIconText, { color: primaryTextColor }]}>
-            {isReceived ? '↓' : '↑'}
+            {method === 'onchain' ? '⛓️' : '⚡'}
           </Text>
         </View>
 
@@ -163,6 +165,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
 
     const tx = selectedTransaction;
     const isReceived = tx.type === 'receive';
+    const method = tx.method || (tx.txid ? 'onchain' : 'lightning');
     const date = new Date(tx.timestamp);
 
     return (
@@ -193,8 +196,8 @@ export function TransactionHistoryScreen(): React.JSX.Element {
                   isReceived ? styles.iconReceived : styles.iconSent,
                 ]}
               >
-                <Text style={[styles.modalIconText, { color: primaryTextColor }]}>
-                  {isReceived ? '↓' : '↑'}
+                <Text style={[styles.modalIconText, { color: primaryTextColor }]}> 
+                  {method === 'onchain' ? '⛓️' : '⚡'}
                 </Text>
               </View>
               <Text
@@ -220,6 +223,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
             {/* Details */}
             <View style={styles.detailsContainer}>
               <DetailRow label={t('wallet.type')} value={isReceived ? t('wallet.received') : t('wallet.sent')} />
+              <DetailRow label="Method" value={method === 'onchain' ? 'On-chain' : 'Lightning'} />
               <DetailRow
                 label={t('wallet.date')}
                 value={date.toLocaleDateString('en-US', {
@@ -234,6 +238,19 @@ export function TransactionHistoryScreen(): React.JSX.Element {
               )}
               {tx.feeSats !== undefined && tx.feeSats > 0 && (
                 <DetailRow label={t('wallet.fee')} value={`${tx.feeSats.toLocaleString()} ${t('wallet.sats')}`} />
+              )}
+              {method === 'onchain' && tx.txid && (
+                <>
+                  <DetailRow
+                    label="TXID"
+                    value={`${tx.txid.slice(0, 16)}...`}
+                    copyable
+                    fullValue={tx.txid}
+                  />
+                  <TouchableOpacity onPress={() => Linking.openURL(`https://mempool.space/tx/${tx.txid}`)}>
+                    <Text style={styles.mempoolLink}>View on mempool.space</Text>
+                  </TouchableOpacity>
+                </>
               )}
               {tx.paymentHash && (
                 <DetailRow
@@ -611,6 +628,12 @@ const styles = StyleSheet.create({
   copyButton: {
     margin: 0,
     marginLeft: 4,
+  },
+  mempoolLink: {
+    color: BRAND_COLOR,
+    fontSize: 13,
+    textAlign: 'right',
+    marginTop: 8,
   },
   closeModalButton: {
     borderColor: 'rgba(255, 255, 255, 0.3)',

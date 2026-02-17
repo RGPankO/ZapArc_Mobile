@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Modal,
   BackHandler,
+  Linking,
 } from 'react-native';
 import { Text, IconButton, ActivityIndicator, Button, Divider, Snackbar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -204,6 +205,7 @@ export function HomeScreen(): React.JSX.Element {
   // Render transaction item
   const renderTransaction = (tx: Transaction, index: number): React.JSX.Element => {
     const isReceived = tx.type === 'receive';
+    const method = tx.method || (tx.txid ? 'onchain' : 'lightning');
     const amount = tx.amount ?? 0;
     const timestamp = typeof tx.timestamp === 'number' && tx.timestamp > 0 ? tx.timestamp : Date.now();
     const date = new Date(timestamp).toLocaleDateString();
@@ -217,7 +219,7 @@ export function HomeScreen(): React.JSX.Element {
       >
         <View style={styles.transactionIcon}>
           <Text style={[styles.transactionIconText, { color: primaryTextColor }]}>
-            {isReceived ? '↓' : '↑'}
+            {method === 'onchain' ? '⛓️' : '⚡'}
           </Text>
         </View>
         <View style={styles.transactionInfo}>
@@ -413,6 +415,7 @@ export function HomeScreen(): React.JSX.Element {
 
     const tx = selectedTransaction;
     const isReceived = tx.type === 'receive';
+    const method = tx.method || (tx.txid ? 'onchain' : 'lightning');
     const date = new Date(tx.timestamp);
 
     return (
@@ -438,8 +441,8 @@ export function HomeScreen(): React.JSX.Element {
             {/* Amount */}
             <View style={styles.modalAmountContainer}>
               <View style={styles.modalIcon}>
-                <Text style={[styles.modalIconText, { color: primaryTextColor }]}>
-                  {isReceived ? '↓' : '↑'}
+                <Text style={[styles.modalIconText, { color: primaryTextColor }]}> 
+                  {method === 'onchain' ? '⛓️' : '⚡'}
                 </Text>
               </View>
               <Text
@@ -473,6 +476,7 @@ export function HomeScreen(): React.JSX.Element {
             {/* Details */}
             <View style={styles.detailsContainer}>
               <DetailRow label={t('wallet.type')} value={isReceived ? t('wallet.received') : t('wallet.sent')} />
+              <DetailRow label="Method" value={method === 'onchain' ? 'On-chain' : 'Lightning'} />
               <DetailRow
                 label={t('wallet.date')}
                 value={date.toLocaleDateString('en-US', {
@@ -487,6 +491,14 @@ export function HomeScreen(): React.JSX.Element {
               )}
               {tx.feeSats !== undefined && tx.feeSats > 0 && (
                 <DetailRow label={t('wallet.fee')} value={`${tx.feeSats.toLocaleString()} ${t('wallet.sats')}`} />
+              )}
+              {method === 'onchain' && tx.txid && (
+                <>
+                  <DetailRow label="TXID" value={`${tx.txid.slice(0, 16)}...`} />
+                  <TouchableOpacity onPress={() => Linking.openURL(`https://mempool.space/tx/${tx.txid}`)}>
+                    <Text style={styles.mempoolLink}>View on mempool.space</Text>
+                  </TouchableOpacity>
+                </>
               )}
             </View>
 
@@ -815,6 +827,12 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     flex: 1,
     marginLeft: 16,
+  },
+  mempoolLink: {
+    color: BRAND_COLOR,
+    fontSize: 13,
+    textAlign: 'right',
+    marginTop: 8,
   },
   closeModalButton: {
     borderColor: 'rgba(255, 255, 255, 0.3)',

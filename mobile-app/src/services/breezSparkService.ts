@@ -41,6 +41,15 @@ export interface TransactionInfo {
   timestamp: number;
   description?: string;
   paymentRequest?: string;
+  method?: 'lightning' | 'onchain';
+  txid?: string;
+}
+
+export interface DepositInfo {
+  txid: string;
+  vout: number;
+  amountSats: number;
+  claimError?: unknown;
 }
 
 export interface LightningAddressInfo {
@@ -456,6 +465,53 @@ async function setupEventListeners(): Promise<void> {
             });
           }
 
+          // Handle claim deposits events - trigger refresh for all listeners
+          if (
+            eventTag === 'claimDepositsSucceeded' ||
+            eventTag === 'ClaimDepositsSucceeded'
+          ) {
+            const syncEvent: TransactionInfo = {
+              id: 'sync-claim-succeeded-' + Date.now(),
+              type: 'receive',
+              amountSat: 0,
+              feeSat: 0,
+              status: 'completed',
+              timestamp: Date.now(),
+              description: '__SYNC_EVENT__',
+            };
+
+            paymentEventListeners.forEach((listener) => {
+              try {
+                listener(syncEvent);
+              } catch (err) {
+                console.error('❌ [BreezSparkService] Claim sync listener error:', err);
+              }
+            });
+          }
+
+          if (
+            eventTag === 'claimDepositsFailed' ||
+            eventTag === 'ClaimDepositsFailed'
+          ) {
+            const unclaimedDeposits = (
+              evt?.inner?.unclaimedDeposits ||
+              (event as Record<string, unknown>)?.unclaimedDeposits ||
+              []
+            ) as Array<Record<string, unknown>>;
+
+            for (const dep of unclaimedDeposits) {
+              const txid = String(dep?.txid || '');
+              const vout = Number(dep?.vout || 0);
+              if (!txid) continue;
+
+              try {
+                await claimDeposit(txid, vout);
+              } catch (claimErr) {
+                console.warn('⚠️ [BreezSparkService] Auto-retry claimDeposit failed:', claimErr);
+              }
+            }
+          }
+
           // Handle Synced event - trigger refresh for all listeners
           if (eventTag === 'Synced') {
             // Create a "sync" event to notify listeners to refresh their data
@@ -476,6 +532,18 @@ async function setupEventListeners(): Promise<void> {
                 console.error('❌ [BreezSparkService] Sync listener error:', err);
               }
             });
+
+            // Auto-claim any pending on-chain deposits
+            try {
+              const deposits = await listDeposits();
+              for (const dep of deposits) {
+                if (!dep.claimError) {
+                  await claimDeposit(dep.txid, dep.vout);
+                }
+              }
+            } catch (e) {
+              console.warn('[BreezSparkService] Auto-claim check failed:', e);
+            }
           }
 
         } catch (handlerError) {
@@ -748,6 +816,41 @@ export async function receiveOnchain(): Promise<string> {
 }
 
 /**
+ * List unclaimed on-chain deposits
+ */
+export async function listDeposits(): Promise<DepositInfo[]> {
+  if (!_isNativeAvailable || !sdkInstance) {
+    return [];
+  }
+
+  try {
+    const response = await sdkInstance.listDeposits();
+    const deposits = response?.deposits || response || [];
+
+    return deposits.map((deposit: any) => ({
+      txid: String(deposit?.txid || ''),
+      vout: Number(deposit?.vout || 0),
+      amountSats: Number(deposit?.amountSats || deposit?.amountSat || 0),
+      claimError: deposit?.claimError,
+    })).filter((deposit: DepositInfo) => !!deposit.txid);
+  } catch (error) {
+    console.error('❌ [BreezSparkService] Failed to list deposits:', error);
+    throw error;
+  }
+}
+
+/**
+ * Claim an on-chain deposit
+ */
+export async function claimDeposit(txid: string, vout: number): Promise<void> {
+  if (!_isNativeAvailable || !sdkInstance) {
+    throw new Error('SDK not available');
+  }
+
+  await sdkInstance.claimDeposit({ txid, vout });
+}
+
+/**
  * List all payments/transactions
  */
 export async function listPayments(): Promise<TransactionInfo[]> {
@@ -792,6 +895,17 @@ export async function listPayments(): Promise<TransactionInfo[]> {
 
       const description = payment.details?.description || payment.description || '';
 
+      const methodRaw = payment.method || payment.paymentMethod || payment.details?.type;
+      const methodString = String(methodRaw || '').toLowerCase();
+      const method: 'lightning' | 'onchain' =
+        methodString.includes('bitcoinaddress') ||
+        methodString.includes('bitcoin_address') ||
+        methodString.includes('onchain')
+          ? 'onchain'
+          : 'lightning';
+
+      const txid = payment.details?.txid || payment.txid;
+
       const mappedStatus = mapPaymentStatus(payment.status);
 
       return {
@@ -802,6 +916,8 @@ export async function listPayments(): Promise<TransactionInfo[]> {
         status: mappedStatus,
         timestamp: timestamp || Date.now(),
         description,
+        method,
+        txid: txid ? String(txid) : undefined,
       };
     });
   } catch (error) {
@@ -1464,6 +1580,8 @@ export const BreezSparkService = {
   payInvoice,
   receivePayment,
   receiveOnchain,
+  listDeposits,
+  claimDeposit,
   getSparkAddress,
   listPayments,
   getPayment,

@@ -15,6 +15,7 @@ import {
   BRAND_COLOR,
 } from '../../src/utils/theme-helpers';
 import { BreezSparkService, onPaymentReceived } from '../../src/services/breezSparkService';
+import { useWallet } from '../../src/hooks/useWallet';
 import { useCurrency, type InputCurrency } from '../../src/hooks/useCurrency';
 import { useLightningAddress } from '../../src/hooks/useLightningAddress';
 import { StyledTextInput } from '../../src/components';
@@ -39,6 +40,7 @@ export default function ReceiveScreen() {
 
   const { secondaryFiatCurrency, convertToSats, formatSatsWithFiat, isLoadingRates } = useCurrency();
   const { addressInfo, isRegistered, isLoading: isLoadingAddress, refresh: refreshAddress } = useLightningAddress();
+  const { refreshBalance, refreshTransactions } = useWallet();
   const { showSuccess } = useFeedback();
 
   useFocusEffect(
@@ -59,6 +61,7 @@ export default function ReceiveScreen() {
   const [onchainRequest, setOnchainRequest] = useState('');
   const [isGeneratingOnchain, setIsGeneratingOnchain] = useState(false);
   const [onchainError, setOnchainError] = useState<string | null>(null);
+  const [onchainClaimStatus, setOnchainClaimStatus] = useState<string | null>(null);
 
   const [inputCurrency, setInputCurrency] = useState<InputCurrency>('sats');
   const [currencyMenuVisible, setCurrencyMenuVisible] = useState(false);
@@ -237,6 +240,49 @@ export default function ReceiveScreen() {
 
   const onchainParsed = parseOnchainRequest(onchainRequest);
   const onchainAddress = onchainParsed.address;
+
+  useEffect(() => {
+    if (activeTab !== 'onchain' || !onchainAddress) {
+      setOnchainClaimStatus(null);
+      return;
+    }
+
+    let isCancelled = false;
+
+    const checkDeposits = async (): Promise<void> => {
+      try {
+        const deposits = await BreezSparkService.listDeposits();
+        if (!deposits.length || isCancelled) return;
+
+        const claimable = deposits.find((dep) => !dep.claimError);
+        if (!claimable) return;
+
+        setOnchainClaimStatus('⏳ Deposit detected — claiming...');
+        await BreezSparkService.claimDeposit(claimable.txid, claimable.vout);
+
+        if (isCancelled) return;
+
+        setOnchainClaimStatus('✅ Deposit claimed!');
+        await refreshBalance();
+        await refreshTransactions();
+      } catch (error) {
+        if (!isCancelled) {
+          console.warn('⚠️ [ReceiveScreen] Deposit polling/claim failed:', error);
+        }
+      }
+    };
+
+    void checkDeposits();
+    const interval = setInterval(() => {
+      void checkDeposits();
+    }, 15000);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+      setOnchainClaimStatus(null);
+    };
+  }, [activeTab, onchainAddress, refreshBalance, refreshTransactions]);
 
   const handleCopyOnchainAddress = useCallback(async () => {
     if (!onchainAddress) return;
@@ -523,6 +569,9 @@ export default function ReceiveScreen() {
                   )}
 
                   <Text style={[styles.onchainNote, { color: secondaryTextColor }]}>{t('deposit.onchainNote')}</Text>
+                  {onchainClaimStatus && (
+                    <Text style={[styles.claimStatusText, { color: secondaryTextColor }]}>{onchainClaimStatus}</Text>
+                  )}
                 </>
               ) : null}
             </View>
@@ -660,6 +709,7 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 14 },
   minimumText: { fontSize: 13, marginTop: 10 },
   onchainNote: { fontSize: 13, lineHeight: 18, marginTop: 8 },
+  claimStatusText: { fontSize: 14, marginTop: 12, fontWeight: '600' },
   addressLoadingContainer: { paddingVertical: 10, alignItems: 'center' },
   addressLoadingText: { fontSize: 14 },
   inlineValueRow: {

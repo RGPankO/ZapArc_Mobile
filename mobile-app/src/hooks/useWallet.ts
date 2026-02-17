@@ -474,7 +474,7 @@ export function useWallet(): WalletState & WalletActions {
         setIsLoading(false);
       }
     },
-    [loadWalletData, refreshBalance, refreshTransactions]
+    [loadWalletData]
   );
 
   // ========================================
@@ -728,6 +728,8 @@ export function useWallet(): WalletState & WalletActions {
           status: p.status,
           timestamp: p.timestamp,
           description: p.description,
+          method: p.method,
+          txid: p.txid,
         }));
 
         if (activeWalletKeyRef.current !== walletKey) {
