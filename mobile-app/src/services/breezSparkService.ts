@@ -901,11 +901,12 @@ export async function listPayments(): Promise<TransactionInfo[]> {
       const method: 'lightning' | 'onchain' =
         methodString.includes('bitcoinaddress') ||
         methodString.includes('bitcoin_address') ||
-        methodString.includes('onchain')
+        methodString.includes('onchain') ||
+        methodString.includes('deposit')
           ? 'onchain'
           : 'lightning';
 
-      const txid = payment.details?.txid || payment.txid;
+      const txid = payment.details?.txId || payment.details?.txid || payment.txid;
 
       const mappedStatus = mapPaymentStatus(payment.status);
 
