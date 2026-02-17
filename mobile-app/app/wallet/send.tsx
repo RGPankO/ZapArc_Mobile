@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
-import { Text, Button, TextInput, Menu, IconButton } from 'react-native-paper';
+import { Text, Button, Menu, IconButton } from 'react-native-paper';
+import { StyledTextInput } from '../../src/components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -696,23 +697,13 @@ export default function SendScreen() {
             </View>
           ) : isLightningTab ? (
             <View style={styles.inputWithButtonRow}>
-              <TextInput
-                mode="outlined"
+              <StyledTextInput
                 placeholder={t('send.lightningInputPlaceholder')}
                 value={paymentInput}
                 onChangeText={setPaymentInput}
                 style={[styles.input, styles.inputWithButton]}
-                outlineColor={secondaryTextColor}
-                activeOutlineColor={BRAND_COLOR}
-                textColor={primaryTextColor}
-                placeholderTextColor={secondaryTextColor}
                 multiline
                 numberOfLines={2}
-                theme={{
-                  colors: {
-                    background: undefined,
-                  },
-                }}
               />
               {contacts.length > 0 && (
                 <TouchableOpacity style={styles.addressBookButton} onPress={() => setContactModalVisible(true)}>
@@ -721,22 +712,12 @@ export default function SendScreen() {
               )}
             </View>
           ) : (
-            <TextInput
-              mode="outlined"
+            <StyledTextInput
               placeholder={t('send.onchainInputPlaceholder')}
               value={paymentInput}
               onChangeText={setPaymentInput}
               style={styles.input}
-              outlineColor={secondaryTextColor}
-              activeOutlineColor={BRAND_COLOR}
-              textColor={primaryTextColor}
-              placeholderTextColor={secondaryTextColor}
               multiline={false}
-              theme={{
-                colors: {
-                  background: undefined,
-                },
-              }}
             />
           )}
 
@@ -804,21 +785,11 @@ export default function SendScreen() {
 
               <Text style={[styles.label, { color: primaryTextColor }]}>Comment (optional):</Text>
 
-              <TextInput
-                mode="outlined"
+              <StyledTextInput
                 placeholder="Payment description"
                 value={comment}
                 onChangeText={setComment}
                 style={styles.input}
-                outlineColor={secondaryTextColor}
-                activeOutlineColor={BRAND_COLOR}
-                textColor={primaryTextColor}
-                placeholderTextColor={secondaryTextColor}
-                theme={{
-                  colors: {
-                    background: undefined,
-                  },
-                }}
               />
             </>
           ) : (
