@@ -120,6 +120,10 @@ const renderScreen = () =>
   );
 
 describe('SendScreen on-chain flow', () => {
+  const switchToOnchainTab = () => {
+    fireEvent.press(screen.getByText('₿ On-chain'));
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
@@ -146,27 +150,28 @@ describe('SendScreen on-chain flow', () => {
     cleanup();
   });
 
-  it('detects on-chain addresses (mainnet + testnet) and shows badge', async () => {
+  it('uses tab selection for on-chain flow', async () => {
     renderScreen();
+    switchToOnchainTab();
 
-    fireEvent.changeText(screen.getByPlaceholderText('Invoice or address...'), '1BoatSLRHtKNngkdXEeobR76b53LETtpyT');
-    expect(screen.getByText(/On-chain/i)).toBeTruthy();
+    expect(screen.getByText('Bitcoin on-chain transaction')).toBeTruthy();
 
-    fireEvent.changeText(screen.getByPlaceholderText('Invoice or address...'), 'tb1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh');
-    jest.advanceTimersByTime(600);
+    fireEvent.changeText(screen.getByPlaceholderText('bc1... or 1... or 3...'), 'tb1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh');
+    fireEvent.changeText(screen.getByTestId('amount-input'), '1000');
+    fireEvent.press(screen.getByText('Preview On-chain Transaction'));
 
     await waitFor(() => {
       expect(mockParsePaymentRequest).toHaveBeenCalled();
-      expect(screen.getByText(/On-chain/i)).toBeTruthy();
     });
   });
 
   it('shows on-chain preview with fee + speed selector and updates fee by speed', async () => {
     renderScreen();
+    switchToOnchainTab();
 
-    fireEvent.changeText(screen.getByPlaceholderText('Invoice or address...'), 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh');
+    fireEvent.changeText(screen.getByPlaceholderText('bc1... or 1... or 3...'), 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh');
     fireEvent.changeText(screen.getByTestId('amount-input'), '1000');
-    fireEvent.press(screen.getByText('Preview Payment'));
+    fireEvent.press(screen.getByText('Preview On-chain Transaction'));
 
     await waitFor(() => {
       expect(screen.getByText('Confirmation Speed')).toBeTruthy();
@@ -188,9 +193,10 @@ describe('SendScreen on-chain flow', () => {
   it('rejects invalid and empty amount edge cases', async () => {
     mockParsePaymentRequest.mockResolvedValueOnce({ type: 'unknown', isValid: false });
     renderScreen();
+    switchToOnchainTab();
 
-    fireEvent.changeText(screen.getByPlaceholderText('Invoice or address...'), 'not-a-payment-request');
-    fireEvent.press(screen.getByText('Preview Payment'));
+    fireEvent.changeText(screen.getByPlaceholderText('bc1... or 1... or 3...'), 'not-a-payment-request');
+    fireEvent.press(screen.getByText('Preview On-chain Transaction'));
 
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
@@ -200,12 +206,12 @@ describe('SendScreen on-chain flow', () => {
     });
 
     mockParsePaymentRequest.mockResolvedValue({ type: 'bitcoinAddress', isValid: true });
-    fireEvent.changeText(screen.getByPlaceholderText('Invoice or address...'), 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh');
+    fireEvent.changeText(screen.getByPlaceholderText('bc1... or 1... or 3...'), 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh');
     fireEvent.changeText(screen.getByTestId('amount-input'), '');
-    fireEvent.press(screen.getByText('Preview Payment'));
+    fireEvent.press(screen.getByText('Preview On-chain Transaction'));
 
     await waitFor(() => {
-      expect(Alert.alert).toHaveBeenCalledWith('Error', 'Please enter a valid amount');
+      expect(Alert.alert).toHaveBeenCalledWith('Error', 'Please enter a valid amount in sats');
     });
   });
 
@@ -213,9 +219,10 @@ describe('SendScreen on-chain flow', () => {
     mockPrepareSendPayment.mockRejectedValueOnce(new Error('fee quote unavailable'));
 
     renderScreen();
-    fireEvent.changeText(screen.getByPlaceholderText('Invoice or address...'), 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh');
+    switchToOnchainTab();
+    fireEvent.changeText(screen.getByPlaceholderText('bc1... or 1... or 3...'), 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh');
     fireEvent.changeText(screen.getByTestId('amount-input'), '1000');
-    fireEvent.press(screen.getByText('Preview Payment'));
+    fireEvent.press(screen.getByText('Preview On-chain Transaction'));
 
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith('Payment Error', 'fee quote unavailable');

@@ -24,6 +24,7 @@ import { t } from '../../src/services/i18nService';
 
 type SendStep = 'input' | 'preview' | 'onchain-preview' | 'scanning';
 type ConfirmationSpeed = 'fast' | 'medium' | 'slow';
+type SendTab = 'lightning' | 'onchain';
 
 interface OnchainFeeQuote {
   feeSats: number;
@@ -38,7 +39,6 @@ interface PaymentPreview {
   description?: string;
 }
 
-// Currency labels for display
 const currencyLabels: Record<InputCurrency, string> = {
   sats: 'sats',
   btc: 'BTC',
@@ -53,11 +53,12 @@ export default function SendScreen() {
   const secondaryTextColor = getSecondaryTextColor(themeMode);
 
   const { balance, refreshBalance } = useWallet();
-  const { secondaryFiatCurrency, convertToSats, formatSatsWithFiat, rates, isLoadingRates } = useCurrency();
+  const { secondaryFiatCurrency, convertToSats, formatSatsWithFiat, isLoadingRates } = useCurrency();
   const { contacts } = useContacts();
   const { addressInfo } = useLightningAddress();
 
   const [step, setStep] = useState<SendStep>('input');
+  const [activeTab, setActiveTab] = useState<SendTab>('lightning');
   const [paymentInput, setPaymentInput] = useState('');
   const [amount, setAmount] = useState('');
   const [comment, setComment] = useState('');
@@ -67,49 +68,36 @@ export default function SendScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [prepareResponse, setPrepareResponse] = useState<any>(null);
   const [scanned, setScanned] = useState(false);
-  const [isOnchainDetected, setIsOnchainDetected] = useState(false);
   const [onchainFeeQuotes, setOnchainFeeQuotes] = useState<
     | { fast: OnchainFeeQuote; medium: OnchainFeeQuote; slow: OnchainFeeQuote }
     | null
   >(null);
   const [selectedSpeed, setSelectedSpeed] = useState<ConfirmationSpeed>('medium');
 
-  // Currency selection state
   const [inputCurrency, setInputCurrency] = useState<InputCurrency>('sats');
   const [currencyMenuVisible, setCurrencyMenuVisible] = useState(false);
 
-  // Address book state
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [contactModalVisible, setContactModalVisible] = useState(false);
 
-  // Available currency options
   const currencyOptions: InputCurrency[] = useMemo(() => {
     return ['sats', secondaryFiatCurrency];
   }, [secondaryFiatCurrency]);
 
-  // Convert current amount to sats for preview
   const previewSats = useMemo(() => {
     const numAmount = parseFloat(amount);
     if (!numAmount || isNaN(numAmount)) return 0;
     return convertToSats(numAmount, inputCurrency);
   }, [amount, inputCurrency, convertToSats]);
 
-  // Format preview display
   const previewDisplay = useMemo(() => {
     if (!previewSats) return null;
     return formatSatsWithFiat(previewSats);
   }, [previewSats, formatSatsWithFiat]);
 
-  // Format balance with fiat
   const balanceDisplay = useMemo(() => {
     return formatSatsWithFiat(balance);
   }, [balance, formatSatsWithFiat]);
-
-  const looksLikeBitcoinAddress = useMemo(() => {
-    const trimmed = paymentInput.trim().toLowerCase();
-    if (!trimmed) return false;
-    return trimmed.startsWith('bc1') || trimmed.startsWith('1') || trimmed.startsWith('3');
-  }, [paymentInput]);
 
   const getOnchainFeeQuote = useCallback(
     (
@@ -128,150 +116,156 @@ export default function SendScreen() {
     return t('send.estimatedTime').replace('%s', minutes);
   }, []);
 
-  // Handle currency change
+  const resetFormState = useCallback(() => {
+    setPaymentInput('');
+    setAmount('');
+    setComment('');
+    setPreview(null);
+    setPrepareResponse(null);
+    setOnchainFeeQuotes(null);
+    setSelectedSpeed('medium');
+    setSelectedContact(null);
+    setCurrencyMenuVisible(false);
+    setInputCurrency('sats');
+  }, []);
+
+  const handleTabChange = useCallback(
+    (tab: SendTab) => {
+      if (activeTab === tab) return;
+      setActiveTab(tab);
+      resetFormState();
+    },
+    [activeTab, resetFormState]
+  );
+
   const handleCurrencyChange = useCallback((currency: InputCurrency) => {
     setInputCurrency(currency);
     setCurrencyMenuVisible(false);
-    setAmount(''); // Reset amount when switching currencies
+    setAmount('');
   }, []);
 
-  // Handle contact selection from address book
   const handleContactSelect = useCallback((contact: Contact) => {
     setSelectedContact(contact);
     setPaymentInput(contact.lightningAddress);
     setContactModalVisible(false);
   }, []);
 
-  // Clear selected contact
   const handleClearContact = useCallback(() => {
     setSelectedContact(null);
     setPaymentInput('');
   }, []);
 
-  // Auto-fill amount when invoice is pasted (debounced to avoid excessive parsing)
   useEffect(() => {
+    if (activeTab !== 'lightning') return;
+
     const trimmedInput = paymentInput.trim();
-    if (!trimmedInput) {
-      setIsOnchainDetected(false);
-      return;
-    }
+    if (!trimmedInput) return;
 
-    setIsOnchainDetected(looksLikeBitcoinAddress);
-
-    // Debounce parsing to avoid excessive calls while typing
     const timeoutId = setTimeout(async () => {
       try {
         const parsed = await BreezSparkService.parsePaymentRequest(trimmedInput);
-        console.log('🔍 [Send] Parsed:', parsed.type, 'Valid:', parsed.isValid, 'Amount:', parsed.amountSat);
-
-        if (parsed.isValid) {
-          setIsOnchainDetected(parsed.type === 'bitcoinAddress');
-        } else if (!looksLikeBitcoinAddress) {
-          setIsOnchainDetected(false);
-        }
-
-        if (parsed.isValid && parsed.amountSat !== undefined) {
-          console.log('✅ [Send] Auto-filling amount:', parsed.amountSat);
+        if (parsed.isValid && parsed.type === 'bolt11' && parsed.amountSat !== undefined) {
           setAmount(parsed.amountSat.toString());
         }
-        // Don't log warning for Lightning Addresses - they never have amounts
       } catch (error) {
-        // Only log if it looks like a complete input (not mid-typing)
         if (trimmedInput.length > 10) {
           console.error('❌ [Send] Failed to parse payment request:', error);
         }
       }
-    }, 500); // 500ms debounce
+    }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [paymentInput, looksLikeBitcoinAddress]);
+  }, [paymentInput, activeTab]);
 
   const handleScanQR = useCallback(async () => {
     if (permission?.granted) {
-      setScanned(false); // Reset scanned flag
+      setScanned(false);
       setStep('scanning');
       return;
     }
 
     const response = await requestPermission();
     if (response.granted) {
-      setScanned(false); // Reset scanned flag
+      setScanned(false);
       setStep('scanning');
     } else {
-      Alert.alert(
-        'Permission Required',
-        'Camera permission is required to scan QR codes'
-      );
+      Alert.alert('Permission Required', 'Camera permission is required to scan QR codes');
     }
   }, [permission, requestPermission]);
 
   const handleBarCodeScanned = useCallback(
     async ({ data }: BarcodeScanningResult) => {
-      if (scanned) return; // Prevent multiple scans
+      if (scanned) return;
       setScanned(true);
 
-      console.log('📷 [Send] QR Code scanned, navigating to input');
       setPaymentInput(data);
       setStep('input');
 
-      // Try to parse and auto-fill amount if present
-      try {
-        const parsed = await BreezSparkService.parsePaymentRequest(data);
-        if (parsed.isValid && parsed.amountSat !== undefined) {
-          setAmount(parsed.amountSat.toString());
+      if (activeTab === 'lightning') {
+        try {
+          const parsed = await BreezSparkService.parsePaymentRequest(data);
+          if (parsed.isValid && parsed.type === 'bolt11' && parsed.amountSat !== undefined) {
+            setAmount(parsed.amountSat.toString());
+          }
+        } catch (error) {
+          console.error('Failed to parse scanned QR code:', error);
         }
-      } catch (error) {
-        console.error('Failed to parse scanned QR code:', error);
       }
-
-      // No popup - user can see the form is filled
     },
-    [scanned]
+    [scanned, activeTab]
   );
 
   const handlePreviewPayment = useCallback(async () => {
     if (!paymentInput.trim()) {
-      Alert.alert('Error', 'Please enter a Lightning invoice, address, or Bitcoin address');
+      Alert.alert('Error', t('send.enterDestination'));
       return;
     }
 
     try {
       setIsPreparing(true);
 
-      // Parse the payment request
-      const parsedRequest = await BreezSparkService.parsePaymentRequest(paymentInput);
-      const isOnchainRequest = parsedRequest.type === 'bitcoinAddress' || looksLikeBitcoinAddress;
+      const parsedRequest = await BreezSparkService.parsePaymentRequest(paymentInput.trim());
+      const isOnchainFlow = activeTab === 'onchain';
 
       if (!parsedRequest.isValid) {
-        Alert.alert(
-          'Invalid Payment Request',
-          'Please enter a valid Lightning invoice, LNURL, Lightning address, or Bitcoin address'
-        );
+        Alert.alert('Invalid Payment Request', t('send.invalidPaymentRequest'));
         return;
       }
 
-      // Determine amount
-      let paymentAmount: number;
+      if (isOnchainFlow && parsedRequest.type !== 'bitcoinAddress') {
+        Alert.alert('Invalid Bitcoin Address', t('send.invalidOnchainAddress'));
+        return;
+      }
 
-      if (parsedRequest.type === 'bolt11' && parsedRequest.amountSat !== undefined) {
-        // Bolt11 with embedded amount
+      if (!isOnchainFlow && parsedRequest.type === 'bitcoinAddress') {
+        Alert.alert('Lightning Only', t('send.invalidLightningDestination'));
+        return;
+      }
+
+      let paymentAmount: number;
+      if (isOnchainFlow) {
+        const satsAmount = Math.floor(Number(amount));
+        if (!satsAmount || satsAmount <= 0) {
+          Alert.alert('Error', t('send.amountRequiredOnchain'));
+          return;
+        }
+        paymentAmount = satsAmount;
+      } else if (parsedRequest.type === 'bolt11' && parsedRequest.amountSat !== undefined) {
         paymentAmount = parsedRequest.amountSat;
       } else {
-        // User must specify amount - convert if in fiat
         const parsedAmount = parseFloat(amount);
         if (!parsedAmount || parsedAmount <= 0) {
           Alert.alert('Error', 'Please enter a valid amount');
           return;
         }
         paymentAmount = convertToSats(parsedAmount, inputCurrency);
-        
+
         if (!paymentAmount || paymentAmount <= 0) {
           Alert.alert('Conversion Error', 'Could not convert amount. Please check exchange rates.');
           return;
         }
       }
 
-      // Check balance
       if (paymentAmount > balance) {
         Alert.alert(
           'Insufficient Balance',
@@ -280,16 +274,9 @@ export default function SendScreen() {
         return;
       }
 
-      // Prepare the payment to get fee estimate
-      const prepared = await BreezSparkService.prepareSendPayment(
-        paymentInput,
-        paymentAmount
-      );
-
+      const prepared = await BreezSparkService.prepareSendPayment(paymentInput.trim(), paymentAmount);
       setPrepareResponse(prepared);
 
-      // Extract fee from prepare response
-      // The fee is in paymentMethod.inner (either lightningFeeSats or feeQuote depending on type)
       let feeAmount = 0;
       let extractedFeeQuotes: { fast: OnchainFeeQuote; medium: OnchainFeeQuote; slow: OnchainFeeQuote } | null = null;
       if (prepared.paymentMethod) {
@@ -297,12 +284,10 @@ export default function SendScreen() {
         const methodInner = method.inner || method;
         if (method.tag === 'Bolt11Invoice' || method.tag === 'SparkInvoice') {
           feeAmount = Number(method.inner?.lightningFeeSats || 0);
-          // Add spark transfer fee if present
           if (method.inner?.sparkTransferFeeSats) {
             feeAmount += Number(method.inner.sparkTransferFeeSats);
           }
         } else if (method.tag === 'BitcoinAddress' || method.type === 'bitcoinAddress') {
-          // For on-chain, fee is in feeQuote
           const feeQuote = methodInner?.feeQuote || method?.feeQuote;
           if (feeQuote?.speedFast || feeQuote?.speedMedium || feeQuote?.speedSlow) {
             extractedFeeQuotes = {
@@ -326,21 +311,17 @@ export default function SendScreen() {
         }
       }
 
-      if (isOnchainRequest) {
+      if (isOnchainFlow) {
         const defaultSpeed: ConfirmationSpeed = 'medium';
         setSelectedSpeed(defaultSpeed);
         setOnchainFeeQuotes(extractedFeeQuotes);
-        const onchainFeeAmount = extractedFeeQuotes
-          ? getOnchainFeeQuote(defaultSpeed, extractedFeeQuotes)
-          : feeAmount;
-        feeAmount = onchainFeeAmount;
+        feeAmount = extractedFeeQuotes ? getOnchainFeeQuote(defaultSpeed, extractedFeeQuotes) : feeAmount;
       } else {
         setOnchainFeeQuotes(null);
       }
 
       const totalAmount = paymentAmount + feeAmount;
 
-      // Check total against balance
       if (totalAmount > balance) {
         Alert.alert(
           'Insufficient Balance',
@@ -349,9 +330,8 @@ export default function SendScreen() {
         return;
       }
 
-      // Create preview
       const paymentPreview: PaymentPreview = {
-        recipient: paymentInput,
+        recipient: paymentInput.trim(),
         amount: paymentAmount,
         fee: feeAmount,
         total: totalAmount,
@@ -359,22 +339,20 @@ export default function SendScreen() {
       };
 
       setPreview(paymentPreview);
-      setStep(isOnchainRequest ? 'onchain-preview' : 'preview');
+      setStep(isOnchainFlow ? 'onchain-preview' : 'preview');
     } catch (error) {
       console.error('Failed to prepare payment:', error);
-      
-      // Provide more specific error message for Lightning Address resolution failures
+
       let errorMessage = error instanceof Error ? error.message : 'Failed to prepare payment';
-      
       if (errorMessage.includes('Network request failed') || errorMessage.includes('Failed to resolve')) {
         errorMessage = 'Could not reach the Lightning Address provider. Please check the address is correct (e.g., user@wallet.com).';
       }
-      
+
       Alert.alert('Payment Error', errorMessage);
     } finally {
       setIsPreparing(false);
     }
-  }, [paymentInput, amount, comment, balance, inputCurrency, convertToSats, looksLikeBitcoinAddress, getOnchainFeeQuote, selectedSpeed]);
+  }, [paymentInput, amount, comment, balance, inputCurrency, convertToSats, getOnchainFeeQuote, selectedSpeed, activeTab]);
 
   const handleSendPayment = useCallback(async () => {
     if (!preview || !prepareResponse) {
@@ -387,20 +365,11 @@ export default function SendScreen() {
       const isOnchainFlow = step === 'onchain-preview';
       const result = isOnchainFlow
         ? await BreezSparkService.sendOnchainPayment(prepareResponse, selectedSpeed)
-        : await BreezSparkService.sendPayment(
-            prepareResponse,
-            paymentInput,  // Original payment request for notification
-            preview.amount // Amount for notification
-          );
+        : await BreezSparkService.sendPayment(prepareResponse, paymentInput, preview.amount);
 
       if (result.success) {
-        // Refresh balance immediately
         await refreshBalance();
-        
-        // Wait for SDK to sync the payment to its database
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Navigate to home - useFocusEffect will refresh transactions
         router.navigate('/wallet/home');
       } else {
         Alert.alert('Payment Failed', result.error || 'Unknown error occurred');
@@ -408,10 +377,7 @@ export default function SendScreen() {
       }
     } catch (error) {
       console.error('Failed to send payment:', error);
-      Alert.alert(
-        'Error',
-        error instanceof Error ? error.message : 'Failed to send payment'
-      );
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to send payment');
       setStep('input');
     } finally {
       setIsSending(false);
@@ -483,7 +449,6 @@ export default function SendScreen() {
     [onchainFeeQuotes, formatEstimatedTime]
   );
 
-  // Render QR Scanner
   if (step === 'scanning') {
     return (
       <LinearGradient colors={gradientColors} style={styles.gradient}>
@@ -505,18 +470,15 @@ export default function SendScreen() {
               }}
               onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
             />
-            {/* Scan Frame Overlay - matches QRScannerScreen */}
             <View style={styles.overlay}>
               <View style={styles.overlayTop} />
               <View style={styles.overlayMiddle}>
                 <View style={styles.overlaySide} />
                 <View style={styles.scanFrame}>
-                  {/* Corner decorations */}
                   <View style={[styles.corner, styles.cornerTopLeft]} />
                   <View style={[styles.corner, styles.cornerTopRight]} />
                   <View style={[styles.corner, styles.cornerBottomLeft]} />
                   <View style={[styles.corner, styles.cornerBottomRight]} />
-                  {/* Crosshair */}
                   <View style={styles.crosshairHorizontal} />
                   <View style={styles.crosshairVertical} />
                 </View>
@@ -524,7 +486,7 @@ export default function SendScreen() {
               </View>
               <View style={styles.overlayBottom}>
                 <Text style={styles.scannerText}>
-                  Point your camera at a Lightning QR code
+                  {activeTab === 'onchain' ? t('send.scanOnchainQr') : t('send.scanLightningQr')}
                 </Text>
               </View>
             </View>
@@ -534,7 +496,6 @@ export default function SendScreen() {
     );
   }
 
-  // Render Payment Preview
   if ((step === 'preview' || step === 'onchain-preview') && preview) {
     const isOnchainPreview = step === 'onchain-preview';
 
@@ -566,9 +527,7 @@ export default function SendScreen() {
                           styles.speedOption,
                           {
                             borderColor: isSelected ? BRAND_COLOR : 'rgba(255, 255, 255, 0.2)',
-                            backgroundColor: isSelected
-                              ? 'rgba(255, 193, 7, 0.12)'
-                              : 'rgba(255, 255, 255, 0.05)',
+                            backgroundColor: isSelected ? 'rgba(255, 193, 7, 0.12)' : 'rgba(255, 255, 255, 0.05)',
                           },
                         ]}
                       >
@@ -645,7 +604,7 @@ export default function SendScreen() {
                 buttonColor={BRAND_COLOR}
                 textColor="#1a1a2e"
               >
-                Send Payment
+                {isOnchainPreview ? t('send.sendOnchainCta') : 'Send Payment'}
               </Button>
             </View>
           </ScrollView>
@@ -654,7 +613,8 @@ export default function SendScreen() {
     );
   }
 
-  // Render Input Form
+  const isLightningTab = activeTab === 'lightning';
+
   return (
     <LinearGradient colors={gradientColors} style={styles.gradient}>
       <SafeAreaView style={styles.container}>
@@ -666,6 +626,33 @@ export default function SendScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            onPress={() => handleTabChange('lightning')}
+            style={[
+              styles.tabButton,
+              isLightningTab && styles.tabButtonActive,
+              { borderColor: BRAND_COLOR },
+            ]}
+          >
+            <Text style={[styles.tabText, { color: isLightningTab ? '#1a1a2e' : primaryTextColor }]}>
+              {t('send.lightningTab')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleTabChange('onchain')}
+            style={[
+              styles.tabButton,
+              !isLightningTab && styles.tabButtonActive,
+              { borderColor: BRAND_COLOR },
+            ]}
+          >
+            <Text style={[styles.tabText, { color: !isLightningTab ? '#1a1a2e' : primaryTextColor }]}>
+              {t('send.onchainTab')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           <View style={styles.balanceContainer}>
             <Text style={[styles.balanceLabel, { color: secondaryTextColor }]}>Available Balance:</Text>
@@ -675,17 +662,18 @@ export default function SendScreen() {
             )}
           </View>
 
-          <View style={styles.sectionLabelRow}>
-            <Text style={[styles.sectionLabel, { color: primaryTextColor }]}>Lightning Invoice or Address:</Text>
-            {isOnchainDetected && (
-              <View style={styles.onchainBadge}>
-                <Text style={styles.onchainBadgeText}>⛓️ {t('send.onchainDetected')}</Text>
-              </View>
-            )}
-          </View>
+          {!isLightningTab && (
+            <View style={styles.onchainInfoCard}>
+              <Text style={[styles.onchainInfoTitle, { color: primaryTextColor }]}>{t('send.onchainModeTitle')}</Text>
+              <Text style={[styles.onchainInfoText, { color: secondaryTextColor }]}>{t('send.onchainModeDescription')}</Text>
+            </View>
+          )}
 
-          {/* Show selected contact OR input field */}
-          {selectedContact ? (
+          <Text style={[styles.sectionLabel, { color: primaryTextColor }]}>
+            {isLightningTab ? t('send.lightningDestinationLabel') : t('send.onchainAddressLabel')}
+          </Text>
+
+          {isLightningTab && selectedContact ? (
             <View style={styles.selectedContactContainer}>
               <View style={styles.selectedContactHeader}>
                 <Text style={styles.selectedContactName}>{selectedContact.name}</Text>
@@ -701,15 +689,13 @@ export default function SendScreen() {
                 {selectedContact.lightningAddress}
               </Text>
             </View>
-          ) : (
+          ) : isLightningTab ? (
             <View style={styles.inputWithButtonRow}>
               <TextInput
                 mode="outlined"
-                placeholder="Invoice or address..."
+                placeholder={t('send.lightningInputPlaceholder')}
                 value={paymentInput}
-                onChangeText={(text) => {
-                  setPaymentInput(text);
-                }}
+                onChangeText={setPaymentInput}
                 style={[styles.input, styles.inputWithButton]}
                 outlineColor={secondaryTextColor}
                 activeOutlineColor={BRAND_COLOR}
@@ -720,23 +706,33 @@ export default function SendScreen() {
                 theme={{
                   colors: {
                     background: undefined,
-                  }
+                  },
                 }}
               />
               {contacts.length > 0 && (
-                <TouchableOpacity
-                  style={styles.addressBookButton}
-                  onPress={() => setContactModalVisible(true)}
-                >
-                  <IconButton
-                    icon="contacts"
-                    iconColor={BRAND_COLOR}
-                    size={24}
-                    style={styles.addressBookIcon}
-                  />
+                <TouchableOpacity style={styles.addressBookButton} onPress={() => setContactModalVisible(true)}>
+                  <IconButton icon="contacts" iconColor={BRAND_COLOR} size={24} style={styles.addressBookIcon} />
                 </TouchableOpacity>
               )}
             </View>
+          ) : (
+            <TextInput
+              mode="outlined"
+              placeholder={t('send.onchainInputPlaceholder')}
+              value={paymentInput}
+              onChangeText={setPaymentInput}
+              style={styles.input}
+              outlineColor={secondaryTextColor}
+              activeOutlineColor={BRAND_COLOR}
+              textColor={primaryTextColor}
+              placeholderTextColor={secondaryTextColor}
+              multiline={false}
+              theme={{
+                colors: {
+                  background: undefined,
+                },
+              }}
+            />
           )}
 
           <Button
@@ -749,7 +745,6 @@ export default function SendScreen() {
             Scan QR Code
           </Button>
 
-          {/* Contact Selection Modal */}
           <ContactSelectionModal
             visible={contactModalVisible}
             onDismiss={() => setContactModalVisible(false)}
@@ -758,88 +753,130 @@ export default function SendScreen() {
             myAddress={addressInfo?.lightningAddress}
           />
 
-          <Text style={[styles.label, { color: primaryTextColor }]}>Amount (leave empty for invoice amount):</Text>
+          {isLightningTab ? (
+            <>
+              <Text style={[styles.label, { color: primaryTextColor }]}>Amount (leave empty for invoice amount):</Text>
 
-          {/* Amount Input with Currency Selector */}
-          <View style={styles.amountInputRow}>
-            <StyledTextInput
-              label={`Amount in ${currencyLabels[inputCurrency]}`}
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="decimal-pad"
-              style={[styles.input, styles.amountInput]}
-            />
-            
-            {/* Currency Selector */}
-            <Menu
-              visible={currencyMenuVisible}
-              onDismiss={() => setCurrencyMenuVisible(false)}
-              anchor={
-                <TouchableOpacity
-                  style={[styles.currencySelector, { backgroundColor: gradientColors[1] || '#16213e' }]}
-                  onPress={() => setCurrencyMenuVisible(true)}
-                >
-                  <Text style={styles.currencySelectorText}>
-                    {currencyLabels[inputCurrency]} ▼
-                  </Text>
-                </TouchableOpacity>
-              }
-              contentStyle={[styles.currencyMenu, { backgroundColor: gradientColors[0] || '#1a1a2e' }]}
-            >
-              {currencyOptions.map((currency) => (
-                <Menu.Item
-                  key={currency}
-                  onPress={() => handleCurrencyChange(currency)}
-                  title={currencyLabels[currency]}
-                  titleStyle={inputCurrency === currency ? styles.currencyMenuItemActive : { color: primaryTextColor }}
+              <View style={styles.amountInputRow}>
+                <StyledTextInput
+                  label={`Amount in ${currencyLabels[inputCurrency]}`}
+                  value={amount}
+                  onChangeText={setAmount}
+                  keyboardType="decimal-pad"
+                  style={[styles.input, styles.amountInput]}
                 />
-              ))}
-            </Menu>
-          </View>
 
-          {/* Conversion Preview */}
-          {previewDisplay && previewSats > 0 && inputCurrency !== 'sats' && (
-            <View style={styles.conversionPreview}>
-              <Text style={styles.conversionText}>
-                ≈ {previewDisplay.satsDisplay}
-              </Text>
-              {previewDisplay.fiatDisplay && (
-                <Text style={styles.conversionFiat}>
-                  ({previewDisplay.fiatDisplay})
-                </Text>
+                <Menu
+                  visible={currencyMenuVisible}
+                  onDismiss={() => setCurrencyMenuVisible(false)}
+                  anchor={
+                    <TouchableOpacity
+                      style={[styles.currencySelector, { backgroundColor: gradientColors[1] || '#16213e' }]}
+                      onPress={() => setCurrencyMenuVisible(true)}
+                    >
+                      <Text style={styles.currencySelectorText}>{currencyLabels[inputCurrency]} ▼</Text>
+                    </TouchableOpacity>
+                  }
+                  contentStyle={[styles.currencyMenu, { backgroundColor: gradientColors[0] || '#1a1a2e' }]}
+                >
+                  {currencyOptions.map((currency) => (
+                    <Menu.Item
+                      key={currency}
+                      onPress={() => handleCurrencyChange(currency)}
+                      title={currencyLabels[currency]}
+                      titleStyle={inputCurrency === currency ? styles.currencyMenuItemActive : { color: primaryTextColor }}
+                    />
+                  ))}
+                </Menu>
+              </View>
+
+              {previewDisplay && previewSats > 0 && inputCurrency !== 'sats' && (
+                <View style={styles.conversionPreview}>
+                  <Text style={styles.conversionText}>≈ {previewDisplay.satsDisplay}</Text>
+                  {previewDisplay.fiatDisplay && <Text style={styles.conversionFiat}>({previewDisplay.fiatDisplay})</Text>}
+                </View>
               )}
-            </View>
+
+              <Text style={[styles.label, { color: primaryTextColor }]}>Comment (optional):</Text>
+
+              <TextInput
+                mode="outlined"
+                placeholder="Payment description"
+                value={comment}
+                onChangeText={setComment}
+                style={styles.input}
+                outlineColor={secondaryTextColor}
+                activeOutlineColor={BRAND_COLOR}
+                textColor={primaryTextColor}
+                placeholderTextColor={secondaryTextColor}
+                theme={{
+                  colors: {
+                    background: undefined,
+                  },
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <Text style={[styles.label, { color: primaryTextColor }]}>{t('send.amountRequiredOnchainLabel')}</Text>
+              <StyledTextInput
+                label={t('send.amountInSats')}
+                value={amount}
+                onChangeText={setAmount}
+                keyboardType="number-pad"
+                style={styles.input}
+              />
+
+              <Text style={[styles.label, { color: primaryTextColor }]}>{t('send.confirmationSpeed')}</Text>
+              <View style={styles.speedCardsColumn}>
+                {speedOptions.map((option) => {
+                  const isSelected = selectedSpeed === option.key;
+                  return (
+                    <TouchableOpacity
+                      key={option.key}
+                      onPress={() => setSelectedSpeed(option.key)}
+                      style={[
+                        styles.speedCard,
+                        {
+                          borderColor: isSelected ? BRAND_COLOR : 'rgba(255,255,255,0.18)',
+                          backgroundColor: isSelected ? 'rgba(255, 193, 7, 0.13)' : 'rgba(255,255,255,0.05)',
+                        },
+                      ]}
+                    >
+                      <View>
+                        <Text style={[styles.speedCardTitle, { color: primaryTextColor }]}>{option.label}</Text>
+                        <Text style={[styles.speedCardTime, { color: secondaryTextColor }]}>{option.time}</Text>
+                      </View>
+                      <Text style={[styles.speedCardFee, { color: primaryTextColor }]}>{option.fee.toLocaleString()} sats</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View style={styles.onchainFeeRow}>
+                <Text style={[styles.onchainFeeLabel, { color: secondaryTextColor }]}>{t('send.networkFee')}</Text>
+                <Text style={[styles.onchainFeeValue, { color: primaryTextColor }]}>
+                  {getOnchainFeeQuote(selectedSpeed, onchainFeeQuotes).toLocaleString()} sats
+                </Text>
+              </View>
+            </>
           )}
-
-          <Text style={[styles.label, { color: primaryTextColor }]}>Comment (optional):</Text>
-
-          <TextInput
-            mode="outlined"
-            placeholder="Payment description"
-            value={comment}
-            onChangeText={setComment}
-            style={styles.input}
-            outlineColor={secondaryTextColor}
-            activeOutlineColor={BRAND_COLOR}
-            textColor={primaryTextColor}
-            placeholderTextColor={secondaryTextColor}
-            theme={{
-              colors: {
-                background: undefined,
-              }
-            }}
-          />
 
           <Button
             mode="contained"
             onPress={handlePreviewPayment}
             loading={isPreparing}
-            disabled={isPreparing || !paymentInput.trim() || (inputCurrency !== 'sats' && isLoadingRates && amount !== '')}
+            disabled={
+              isPreparing ||
+              !paymentInput.trim() ||
+              (!isLightningTab && !amount.trim()) ||
+              (isLightningTab && inputCurrency !== 'sats' && isLoadingRates && amount !== '')
+            }
             style={styles.previewButton}
             buttonColor={BRAND_COLOR}
             textColor="#1a1a2e"
           >
-            Preview Payment
+            {isLightningTab ? 'Preview Payment' : t('send.previewOnchainCta')}
           </Button>
         </ScrollView>
       </SafeAreaView>
@@ -876,17 +913,43 @@ const styles = StyleSheet.create({
   headerSpacer: {
     width: 60,
   },
+  tabContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 24,
+    marginTop: 16,
+    marginBottom: 8,
+    borderRadius: 14,
+    padding: 4,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    gap: 6,
+  },
+  tabButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  tabButtonActive: {
+    backgroundColor: BRAND_COLOR,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     padding: 24,
+    paddingTop: 16,
   },
   balanceContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: 18,
     alignItems: 'center',
   },
   balanceLabel: {
@@ -899,6 +962,23 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: BRAND_COLOR,
   },
+  onchainInfoCard: {
+    backgroundColor: 'rgba(255, 193, 7, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 193, 7, 0.35)',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+  },
+  onchainInfoTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  onchainInfoText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
   label: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.9)',
@@ -909,29 +989,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 6,
-    marginTop: 12,
-  },
-  sectionLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-    marginTop: 12,
-  },
-  onchainBadge: {
-    backgroundColor: 'rgba(255, 193, 7, 0.15)',
-    borderColor: 'rgba(255, 193, 7, 0.4)',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginLeft: 8,
-  },
-  onchainBadgeText: {
-    color: BRAND_COLOR,
-    fontSize: 12,
-    fontWeight: '600',
+    marginBottom: 8,
+    marginTop: 10,
   },
   input: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -944,6 +1003,7 @@ const styles = StyleSheet.create({
   },
   previewButton: {
     marginTop: 24,
+    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 20,
@@ -984,6 +1044,48 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 6,
     fontWeight: '600',
+  },
+  speedCardsColumn: {
+    marginTop: 4,
+    gap: 8,
+  },
+  speedCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  speedCardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  speedCardTime: {
+    marginTop: 3,
+    fontSize: 12,
+  },
+  speedCardFee: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  onchainFeeRow: {
+    marginTop: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  onchainFeeLabel: {
+    fontSize: 13,
+  },
+  onchainFeeValue: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   previewRow: {
     flexDirection: 'row',
@@ -1043,7 +1145,6 @@ const styles = StyleSheet.create({
     flex: 1,
     position: 'relative',
   },
-  // Scanner overlay styles (matching QRScannerScreen)
   overlay: {
     flex: 1,
   },
@@ -1119,7 +1220,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
   },
-  // Currency input styles
   balanceFiat: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.7)',
@@ -1134,10 +1234,10 @@ const styles = StyleSheet.create({
   amountInput: {
     flex: 1,
     marginBottom: 0,
-    backgroundColor: undefined, // Let StyledTextInput handle background for proper label masking
+    backgroundColor: undefined,
   },
   currencySelector: {
-    backgroundColor: '#16213e', // Match input background
+    backgroundColor: '#16213e',
     paddingHorizontal: 14,
     borderRadius: 8,
     borderWidth: 1,
@@ -1181,7 +1281,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 14,
   },
-  // Address book integration styles
   selectedContactContainer: {
     backgroundColor: 'rgba(255, 193, 7, 0.12)',
     borderRadius: 12,
