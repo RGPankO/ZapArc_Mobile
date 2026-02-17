@@ -154,17 +154,18 @@ export function HomeScreen(): React.JSX.Element {
       // Always refresh settings when screen comes into focus
       refreshSettings();
 
-      // Reload wallet data from storage — critical for wallet switches
-      // This updates activeWalletInfo + loads the correct cached balance/transactions
-      // Silent mode: don't show loading spinner, just update data
+      // CRITICAL: Reload wallet data from storage on every focus.
+      // This catches wallet switches that happened via Manage Wallets → PIN → replace.
+      // loadWalletData reads the active wallet from storage, loads its cached balance/transactions,
+      // and resets state if the wallet changed.
       loadWalletData(true);
 
-      if (isConnected && !isLoading) {
+      if (isConnected) {
         // Refresh both balance and transactions to catch any updates
         refreshBalance();
         refreshTransactions();
       }
-    }, [isConnected, isLoading, refreshBalance, refreshTransactions, refreshSettings, loadWalletData])
+    }, [isConnected, refreshBalance, refreshTransactions, refreshSettings, loadWalletData])
   );
 
   // Show payment success toast when returning from successful payment (via PaymentConfirmationScreen)

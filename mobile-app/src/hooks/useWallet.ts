@@ -90,8 +90,16 @@ export function useWallet(): WalletState & WalletActions {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [balance, setBalance] = useState(() => WalletCache.consumePreloadedBalance() ?? 0);
-  const [transactions, setTransactions] = useState<Transaction[]>(() => WalletCache.consumePreloadedTransactions() ?? []);
+  const [balance, setBalance] = useState(() => {
+    const preloaded = WalletCache.consumePreloadedBalance();
+    console.log('🏗️ [useWallet] Initial balance from preload:', preloaded);
+    return preloaded ?? 0;
+  });
+  const [transactions, setTransactions] = useState<Transaction[]>(() => {
+    const preloaded = WalletCache.consumePreloadedTransactions();
+    console.log('🏗️ [useWallet] Initial transactions from preload:', preloaded?.length ?? 0);
+    return preloaded ?? [];
+  });
   const [storage, setStorage] = useState<MultiWalletStorage | null>(null);
 
   // Refs for stable access in callbacks without triggering identity changes
@@ -173,6 +181,7 @@ export function useWallet(): WalletState & WalletActions {
       // to prevent stale data from a previously viewed wallet persisting
       if (data?.activeMasterKeyId && data.activeSubWalletIndex !== undefined) {
         const walletKey = `${data.activeMasterKeyId}:${data.activeSubWalletIndex}`;
+        console.log('📦 [useWallet] loadWalletData: active wallet =', walletKey, 'prev =', lastCacheLoadKeyRef.current);
         lastCacheLoadKeyRef.current = walletKey;
 
         const [cachedBal, cachedTx] = await Promise.all([
@@ -180,6 +189,7 @@ export function useWallet(): WalletState & WalletActions {
            WalletCache.getCachedTransactions(data.activeMasterKeyId, data.activeSubWalletIndex)
         ]);
         
+        console.log('📦 [useWallet] loadWalletData: setting balance =', cachedBal?.balance ?? 0, 'txns =', cachedTx?.transactions?.length ?? 0);
         setBalance(cachedBal?.balance ?? 0);
         setTransactions(cachedTx?.transactions ?? []);
       } else {
@@ -200,23 +210,6 @@ export function useWallet(): WalletState & WalletActions {
 
   useEffect(() => {
     loadWalletData();
-  }, [loadWalletData]);
-
-  // Listen for wallet switch events from useWalletAuth.selectWallet
-  // This is the most reliable way to update state across independent hook instances
-  useEffect(() => {
-    const unsubscribe = WalletCache.onWalletSwitch((event) => {
-      console.log('🔄 [useWallet] Wallet switch event received:', event.masterKeyId, event.subWalletIndex);
-      // Immediately update balance and transactions to the new wallet's data
-      setBalance(event.balance);
-      setTransactions(event.transactions);
-      setIsConnected(false); // SDK is reconnecting
-      // Update the cache load key so the activeWalletInfo effect doesn't override
-      lastCacheLoadKeyRef.current = `${event.masterKeyId}:${event.subWalletIndex}`;
-      // Reload storage to update activeWalletInfo
-      loadWalletData(true);
-    });
-    return unsubscribe;
   }, [loadWalletData]);
 
   // ========================================
