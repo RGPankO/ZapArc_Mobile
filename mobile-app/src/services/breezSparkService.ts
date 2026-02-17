@@ -533,8 +533,17 @@ async function setupEventListeners(): Promise<void> {
               }
             });
 
-            // Note: on-chain deposit claiming is handled via claimDepositsSucceeded/Failed events
-            // The SDK auto-detects on-chain deposits and fires these events
+            // Auto-claim any pending on-chain deposits
+            try {
+              const deposits = await listDeposits();
+              for (const dep of deposits) {
+                if (!dep.claimError) {
+                  await claimDeposit(dep.txid, dep.vout);
+                }
+              }
+            } catch (e) {
+              console.warn('[BreezSparkService] Auto-claim check failed:', e);
+            }
           }
 
         } catch (handlerError) {
@@ -814,10 +823,21 @@ export async function listDeposits(): Promise<DepositInfo[]> {
     return [];
   }
 
-  // Note: listDeposits is not available on the BreezSdk instance (it's on Storage interface only).
-  // On-chain deposit detection is handled by SDK events (claimDepositsSucceeded/Failed).
-  console.log('ℹ️ [BreezSparkService] listDeposits: not available on SDK — deposits are claimed via events');
-  return [];
+  try {
+    const response = await sdkInstance.listUnclaimedDeposits({});
+    const deposits = response?.deposits || [];
+    console.log(`🔍 [BreezSparkService] listUnclaimedDeposits: ${deposits.length} found`);
+
+    return deposits.map((deposit: any) => ({
+      txid: String(deposit?.txid || ''),
+      vout: Number(deposit?.vout || 0),
+      amountSats: Number(deposit?.amountSats || deposit?.amountSat || 0),
+      claimError: deposit?.claimError,
+    })).filter((deposit: DepositInfo) => !!deposit.txid);
+  } catch (error) {
+    console.error('❌ [BreezSparkService] Failed to list deposits:', error);
+    return [];
+  }
 }
 
 /**
