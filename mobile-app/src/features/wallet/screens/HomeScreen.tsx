@@ -462,12 +462,12 @@ export function HomeScreen(): React.JSX.Element {
                 styles.modalStatus,
                 { color: secondaryTextColor },
                 tx.status === 'completed' && styles.statusCompleted,
-                tx.status === 'pending' && styles.statusPending,
+                (tx.status === 'pending' && !(method === 'onchain' && tx.txid)) && styles.statusPending,
                 tx.status === 'failed' && styles.statusFailed,
               ]}>
-                {tx.status === 'completed' ? `\u2713 ${t('wallet.statusCompleted')}` :
-                 tx.status === 'pending' ? `\u23F3 ${t('wallet.statusPending')}` :
-                 tx.status === 'failed' ? `\u2715 ${t('wallet.statusFailed')}` : tx.status}
+                {tx.status === 'failed' ? `\u2715 ${t('wallet.statusFailed')}` :
+                 (tx.status === 'pending' && !(method === 'onchain' && tx.txid)) ? `\u23F3 ${t('wallet.statusPending')}` :
+                 `\u2713 ${t('wallet.statusCompleted')}`}
               </Text>
             </View>
 
