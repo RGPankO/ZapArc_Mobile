@@ -49,6 +49,7 @@ export function HomeScreen(): React.JSX.Element {
     refreshBalance,
     refreshTransactions,
     activeWalletInfo,
+    loadWalletData,
   } = useWallet();
   const { lock } = useWalletAuth();
   const { t } = useLanguage();
@@ -147,18 +148,23 @@ export function HomeScreen(): React.JSX.Element {
   }, [refreshBalance, refreshTransactions]);
 
   // Refresh balance, transactions and settings when screen comes into focus
-  // This ensures data updates when returning from other screens or opening from notification
+  // This ensures data updates when returning from other screens, wallet switches, or opening from notification
   useFocusEffect(
     useCallback(() => {
       // Always refresh settings when screen comes into focus
       refreshSettings();
+
+      // Reload wallet data from storage — critical for wallet switches
+      // This updates activeWalletInfo + loads the correct cached balance/transactions
+      // Silent mode: don't show loading spinner, just update data
+      loadWalletData(true);
 
       if (isConnected && !isLoading) {
         // Refresh both balance and transactions to catch any updates
         refreshBalance();
         refreshTransactions();
       }
-    }, [isConnected, isLoading, refreshBalance, refreshTransactions, refreshSettings])
+    }, [isConnected, isLoading, refreshBalance, refreshTransactions, refreshSettings, loadWalletData])
   );
 
   // Show payment success toast when returning from successful payment (via PaymentConfirmationScreen)

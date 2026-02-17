@@ -61,6 +61,9 @@ export interface WalletActions {
   renameMasterKey: (masterKeyId: string, nickname: string) => Promise<void>;
   renameSubWallet: (masterKeyId: string, index: number, nickname: string) => Promise<void>;
 
+  // Data loading
+  loadWalletData: (silent?: boolean) => Promise<void>;
+
   // Balance and transactions
   refreshBalance: () => Promise<void>;
   refreshTransactions: () => Promise<void>;
@@ -151,13 +154,16 @@ export function useWallet(): WalletState & WalletActions {
     activeWalletKeyRef.current = getWalletKey(activeWalletInfo);
   }, [activeWalletInfo, getWalletKey]);
 
+  // Track which wallet key we last loaded cache for — skip re-runs if unchanged
+  const lastCacheLoadKeyRef = useRef<string | null>(null);
+
   // ========================================
   // Load wallet data
   // ========================================
 
-  const loadWalletData = useCallback(async () => {
+  const loadWalletData = useCallback(async (silent = false) => {
     try {
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
       setError(null);
 
       const data = await storageService.loadMultiWalletStorage();
@@ -166,6 +172,9 @@ export function useWallet(): WalletState & WalletActions {
       // Load cache for the ACTIVE wallet — always set balance/transactions
       // to prevent stale data from a previously viewed wallet persisting
       if (data?.activeMasterKeyId && data.activeSubWalletIndex !== undefined) {
+        const walletKey = `${data.activeMasterKeyId}:${data.activeSubWalletIndex}`;
+        lastCacheLoadKeyRef.current = walletKey;
+
         const [cachedBal, cachedTx] = await Promise.all([
            WalletCache.getCachedBalance(data.activeMasterKeyId, data.activeSubWalletIndex),
            WalletCache.getCachedTransactions(data.activeMasterKeyId, data.activeSubWalletIndex)
@@ -185,7 +194,7 @@ export function useWallet(): WalletState & WalletActions {
       console.error('❌ [useWallet] Failed to load wallet data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load wallet');
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, []);
 
@@ -778,9 +787,6 @@ export function useWallet(): WalletState & WalletActions {
   // Cache Loading Trigger
   // ========================================
 
-  // Track which wallet key we last loaded cache for — skip re-runs if unchanged
-  const lastCacheLoadKeyRef = useRef<string | null>(null);
-
   // Load wallet-specific cache and refresh whenever the active wallet changes in storage.
   useEffect(() => {
     if (!activeWalletInfo) return;
@@ -1170,6 +1176,7 @@ export function useWallet(): WalletState & WalletActions {
     getMnemonic,
     canAddSubWallet,
     getAddSubWalletDisabledReason,
+    loadWalletData,
 
   };
 }
