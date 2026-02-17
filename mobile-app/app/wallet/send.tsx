@@ -79,6 +79,7 @@ export default function SendScreen() {
 
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [contactModalVisible, setContactModalVisible] = useState(false);
+  const [isFetchingFees, setIsFetchingFees] = useState(false);
 
   const currencyOptions: InputCurrency[] = useMemo(() => {
     return ['sats', secondaryFiatCurrency];
@@ -176,6 +177,57 @@ export default function SendScreen() {
 
     return () => clearTimeout(timeoutId);
   }, [paymentInput, activeTab]);
+
+  // Auto-fetch on-chain fee quotes when address + amount are filled
+  useEffect(() => {
+    if (activeTab !== 'onchain') return;
+
+    const trimmedAddress = paymentInput.trim();
+    const satsAmount = Math.floor(Number(amount));
+    if (!trimmedAddress || !satsAmount || satsAmount <= 0) {
+      setOnchainFeeQuotes(null);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        setIsFetchingFees(true);
+        const prepared = await BreezSparkService.prepareSendPayment(trimmedAddress, satsAmount);
+        console.log('🔍 [Send] auto-fee prepared:', JSON.stringify(prepared, (_, v) => typeof v === 'bigint' ? v.toString() : v));
+        setPrepareResponse(prepared);
+
+        const method = prepared.paymentMethod;
+        const methodInner = method?.inner || method;
+        if (method?.tag === 'BitcoinAddress' || method?.type === 'bitcoinAddress') {
+          const feeQuote = methodInner?.feeQuote || method?.feeQuote;
+          if (feeQuote?.speedFast || feeQuote?.speedMedium || feeQuote?.speedSlow) {
+            const extractFee = (q: any) => Number(q?.userFeeSat ?? q?.feeSats ?? 0);
+            setOnchainFeeQuotes({
+              fast: {
+                feeSats: extractFee(feeQuote.speedFast),
+                estimatedConfirmationTime: feeQuote.speedFast?.estimatedConfirmationTime,
+              },
+              medium: {
+                feeSats: extractFee(feeQuote.speedMedium),
+                estimatedConfirmationTime: feeQuote.speedMedium?.estimatedConfirmationTime,
+              },
+              slow: {
+                feeSats: extractFee(feeQuote.speedSlow),
+                estimatedConfirmationTime: feeQuote.speedSlow?.estimatedConfirmationTime,
+              },
+            });
+          }
+        }
+      } catch (error) {
+        console.error('❌ [Send] auto-fee estimation failed:', error);
+        setOnchainFeeQuotes(null);
+      } finally {
+        setIsFetchingFees(false);
+      }
+    }, 800);
+
+    return () => clearTimeout(timeoutId);
+  }, [activeTab, paymentInput, amount]);
 
   const handleScanQR = useCallback(async () => {
     if (permission?.granted) {
@@ -820,7 +872,7 @@ export default function SendScreen() {
                         <Text style={[styles.speedCardTime, { color: secondaryTextColor }]}>{option.time}</Text>
                       </View>
                       <Text style={[styles.speedCardFee, { color: onchainFeeQuotes ? primaryTextColor : secondaryTextColor }]}>
-                        {onchainFeeQuotes ? `${option.fee.toLocaleString()} sats` : '—'}
+                        {isFetchingFees ? '...' : onchainFeeQuotes ? `${option.fee.toLocaleString()} sats` : '—'}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -830,7 +882,7 @@ export default function SendScreen() {
               <View style={styles.onchainFeeRow}>
                 <Text style={[styles.onchainFeeLabel, { color: secondaryTextColor }]}>{t('send.networkFee')}</Text>
                 <Text style={[styles.onchainFeeValue, { color: primaryTextColor }]}>
-                  {onchainFeeQuotes ? `${getOnchainFeeQuote(selectedSpeed, onchainFeeQuotes).toLocaleString()} sats` : '—'}
+                  {isFetchingFees ? '...' : onchainFeeQuotes ? `${getOnchainFeeQuote(selectedSpeed, onchainFeeQuotes).toLocaleString()} sats` : '—'}
                 </Text>
               </View>
             </>
