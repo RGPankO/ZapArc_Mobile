@@ -469,21 +469,19 @@ export default function ReceiveScreen() {
                     <QRCode
                       value={invoice}
                       size={200}
-                      backgroundColor="transparent"
-                      color={primaryTextColor}
+                      backgroundColor="#FFFFFF"
+                      color="#000000"
                     />
                   </View>
 
                   <View style={styles.invoiceContainer}>
                     <Text style={[styles.invoiceLabel, { color: secondaryTextColor }]}>{t('payments.invoice')}</Text>
-                    <View style={styles.inlineValueRow}>
-                      <Text style={[styles.invoiceTextSingleLine, { color: primaryTextColor }]} numberOfLines={1} ellipsizeMode="middle">
-                        {invoice}
-                      </Text>
-                      <Button mode="outlined" onPress={handleCopyInvoice} compact textColor={BRAND_COLOR} style={styles.inlineCopyButton}>
-                        {t('deposit.copyAddress')}
-                      </Button>
-                    </View>
+                    <Text style={[styles.fullValueText, { color: primaryTextColor }]} selectable>
+                      {invoice}
+                    </Text>
+                    <Button mode="outlined" onPress={handleCopyInvoice} compact textColor={BRAND_COLOR} style={styles.copyButton}>
+                      {t('deposit.copyAddress')}
+                    </Button>
                   </View>
 
                   <Text style={[styles.expiryText, { color: secondaryTextColor }]}>⏳ {t('deposit.expiresIn')}: {getRemainingTime()}</Text>
@@ -511,14 +509,12 @@ export default function ReceiveScreen() {
               ) : onchainAddress ? (
                 <>
                   <Text style={[styles.invoiceLabel, { color: secondaryTextColor }]}>{t('deposit.bitcoinAddress')}</Text>
-                  <View style={styles.inlineValueRow}>
-                    <Text style={[styles.inlineValueText, styles.onchainAddressText]} numberOfLines={1} ellipsizeMode="middle">
-                      {onchainAddress}
-                    </Text>
-                    <Button mode="outlined" onPress={handleCopyOnchainAddress} compact textColor={BRAND_COLOR} style={styles.inlineCopyButton}>
-                      {t('deposit.copyAddress')}
-                    </Button>
-                  </View>
+                  <Text style={[styles.fullValueText, { color: primaryTextColor }]} selectable>
+                    {onchainAddress}
+                  </Text>
+                  <Button mode="outlined" onPress={handleCopyOnchainAddress} compact textColor={BRAND_COLOR} style={styles.copyButton}>
+                    {t('deposit.copyAddress')}
+                  </Button>
 
                   {onchainParsed.minimumSats !== null && (
                     <Text style={[styles.minimumText, { color: secondaryTextColor }]}> 
@@ -600,7 +596,9 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 10 },
   snackbar: { marginBottom: 16 },
-  qrContainer: { alignItems: 'center', marginVertical: 16, padding: 16, backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 12, alignSelf: 'center' },
+  qrContainer: { alignItems: 'center', marginVertical: 16, padding: 16, backgroundColor: '#FFFFFF', borderRadius: 12, alignSelf: 'center' },
+  fullValueText: { fontSize: 12, fontFamily: 'monospace', lineHeight: 18, marginVertical: 8, wordBreak: 'break-all' } as any,
+  copyButton: { marginTop: 8, alignSelf: 'center', borderColor: BRAND_COLOR },
   invoiceSectionTitle: { marginTop: 20 },
   sectionSubtitle: { fontSize: 13, marginBottom: 14 },
   helperText: { fontSize: 13, marginBottom: 2 },
