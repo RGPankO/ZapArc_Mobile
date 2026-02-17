@@ -417,30 +417,27 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
         setIsUnlocked(true);
         updateActivity();
 
-        console.log('✅ [useWalletAuth] Wallet selected - starting background SDK init:', {
+        console.log('✅ [useWalletAuth] Wallet selected - disconnecting old SDK before navigation:', {
           masterKeyId,
           subWalletIndex,
         });
 
-        // NON-BLOCKING: Reinitialize SDK in background
+        // CRITICAL: Disconnect old SDK BEFORE returning so HomeScreen doesn't
+        // refresh against the old wallet's SDK instance and get stale data.
+        await BreezSparkService.disconnectSDK();
+        console.log('🔌 [useWalletAuth] Disconnected old SDK instance');
+
+        // NON-BLOCKING: Reinitialize SDK with new wallet in background
         const nickname = walletInfo?.subWalletNickname;
         (async (): Promise<void> => {
           try {
             const mnemonic = await storageService.getMasterKeyMnemonic(masterKeyId, pin);
             if (mnemonic) {
               const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, subWalletIndex);
-
-              // Disconnect old SDK instance first
-              await BreezSparkService.disconnectSDK();
-              console.log('🔌 [useWalletAuth] Disconnected old SDK instance');
-
-              // Initialize with new wallet's mnemonic
               await BreezSparkService.initializeSDK(derivedMnemonic, undefined, nickname);
               console.log('✅ [useWalletAuth] SDK reinitialized (background)');
             }
           } catch (sdkError) {
-            // Use warn instead of error to prevent red screen in dev mode
-            // This is a non-fatal error - SDK just won't be ready
             console.warn('⚠️ [useWalletAuth] SDK reinitialization failed:', sdkError);
           }
         })();
