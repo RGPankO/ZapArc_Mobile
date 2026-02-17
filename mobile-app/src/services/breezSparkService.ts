@@ -728,6 +728,26 @@ export async function receivePayment(
 }
 
 /**
+ * Generate an on-chain bitcoin receive address/URI
+ */
+export async function receiveOnchain(): Promise<string> {
+  if (!_isNativeAvailable || !sdkInstance) {
+    throw new Error('SDK not available');
+  }
+
+  try {
+    const response = await sdkInstance.receivePayment({
+      paymentMethod: BreezSDK.ReceivePaymentMethod.BitcoinAddress.new(),
+    });
+
+    return response.paymentRequest;
+  } catch (error) {
+    console.error('Failed to generate on-chain receive address:', error);
+    throw error;
+  }
+}
+
+/**
  * List all payments/transactions
  */
 export async function listPayments(): Promise<TransactionInfo[]> {
@@ -1443,6 +1463,7 @@ export const BreezSparkService = {
   sendOnchainPayment,
   payInvoice,
   receivePayment,
+  receiveOnchain,
   getSparkAddress,
   listPayments,
   getPayment,

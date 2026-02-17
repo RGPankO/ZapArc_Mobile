@@ -188,6 +188,18 @@ const translations: Record<SupportedLanguage, TranslationSet> = {
       scanOnchainQr: 'Point your camera at a Bitcoin on-chain QR code',
     },
 
+    deposit: {
+      lightningTab: '⚡ Lightning',
+      onchainTab: '₿ On-chain',
+      onchainTitle: 'Receive Bitcoin on-chain',
+      onchainDescription: 'Use this Bitcoin address to receive funds on-chain.',
+      bitcoinAddress: 'Bitcoin address',
+      generatingAddress: 'Generating on-chain address...',
+      copyAddress: 'Copy',
+      minimumDeposit: 'Minimum deposit: {{amount}} sats',
+      onchainNote: 'Send Bitcoin to this address. Funds will be available after confirmations.',
+    },
+
     // Settings
     settings: {
       title: 'Settings',
@@ -614,6 +626,18 @@ const translations: Record<SupportedLanguage, TranslationSet> = {
       sendOnchainCta: 'Изпрати on-chain транзакция',
       scanLightningQr: 'Насочете камерата към Lightning QR код',
       scanOnchainQr: 'Насочете камерата към Bitcoin on-chain QR код',
+    },
+
+    deposit: {
+      lightningTab: '⚡ Lightning',
+      onchainTab: '₿ On-chain',
+      onchainTitle: 'Получаване на Bitcoin on-chain',
+      onchainDescription: 'Използвайте този Bitcoin адрес, за да получавате on-chain плащания.',
+      bitcoinAddress: 'Bitcoin адрес',
+      generatingAddress: 'Генериране на on-chain адрес...',
+      copyAddress: 'Копирай',
+      minimumDeposit: 'Минимален депозит: {{amount}} сатс',
+      onchainNote: 'Изпратете Bitcoin към този адрес. Средствата ще са налични след потвърждения.',
     },
 
     // Settings - Bulgarian

@@ -20,9 +20,11 @@ import { useCurrency, type InputCurrency } from '../../src/hooks/useCurrency';
 import { useLightningAddress } from '../../src/hooks/useLightningAddress';
 import { StyledTextInput } from '../../src/components';
 import { useFeedback } from '../../src/features/wallet/components/FeedbackComponents';
+import { t } from '../../src/services/i18nService';
 
 type ReceiveStep = 'input' | 'invoice';
 type ReceiveMode = 'invoice' | 'address';
+type ReceiveTab = 'lightning' | 'onchain';
 
 // Currency labels for display
 const currencyLabels: Record<InputCurrency, string> = {
@@ -51,6 +53,7 @@ export default function ReceiveScreen() {
   );
 
   const [step, setStep] = useState<ReceiveStep>('input');
+  const [activeTab, setActiveTab] = useState<ReceiveTab>('lightning');
   const [receiveMode, setReceiveMode] = useState<ReceiveMode>('invoice');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
@@ -58,6 +61,8 @@ export default function ReceiveScreen() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [expiryTime, setExpiryTime] = useState<number | null>(null);
   const [invoiceSatsAmount, setInvoiceSatsAmount] = useState(0);
+  const [onchainRequest, setOnchainRequest] = useState('');
+  const [isGeneratingOnchain, setIsGeneratingOnchain] = useState(false);
 
   // Currency selection state
   const [inputCurrency, setInputCurrency] = useState<InputCurrency>('sats');
@@ -117,14 +122,14 @@ export default function ReceiveScreen() {
 
   const handleGenerateInvoice = useCallback(async () => {
     const numAmount = parseFloat(amount);
-    
+
     // Allow zero/empty amount for "any amount" invoices
     let satsAmount = 0;
-    
+
     if (numAmount && numAmount > 0) {
       // Convert to sats based on input currency
       satsAmount = convertToSats(numAmount, inputCurrency);
-      
+
       if (!satsAmount || satsAmount <= 0) {
         Alert.alert('Conversion Error', 'Could not convert amount. Please check exchange rates.');
         return;
@@ -196,6 +201,63 @@ export default function ReceiveScreen() {
     setInvoiceSatsAmount(0);
   }, []);
 
+  const parseOnchainRequest = useCallback((request: string) => {
+    const trimmed = request.trim();
+    if (!trimmed) return { address: '', minimumSats: null as number | null };
+
+    let address = trimmed;
+    let minimumSats: number | null = null;
+
+    if (trimmed.toLowerCase().startsWith('bitcoin:')) {
+      const withoutScheme = trimmed.slice(8);
+      const [rawAddress, rawQuery] = withoutScheme.split('?');
+      address = rawAddress || '';
+
+      if (rawQuery) {
+        const params = new URLSearchParams(rawQuery);
+        const amountBtc = params.get('amount');
+        const minimumAmountBtc = params.get('minimumAmount');
+        const minAmountSats = params.get('minAmountSats');
+
+        if (minAmountSats && !Number.isNaN(Number(minAmountSats))) {
+          minimumSats = Math.floor(Number(minAmountSats));
+        } else if (minimumAmountBtc && !Number.isNaN(Number(minimumAmountBtc))) {
+          minimumSats = Math.floor(Number(minimumAmountBtc) * 100_000_000);
+        } else if (amountBtc && !Number.isNaN(Number(amountBtc))) {
+          minimumSats = Math.floor(Number(amountBtc) * 100_000_000);
+        }
+      }
+    }
+
+    return { address, minimumSats };
+  }, []);
+
+  const handleGenerateOnchainAddress = useCallback(async () => {
+    try {
+      setIsGeneratingOnchain(true);
+      const request = await BreezSparkService.receiveOnchain();
+      setOnchainRequest(request);
+    } catch (error) {
+      console.error('Failed to generate on-chain address:', error);
+      Alert.alert('Error', error instanceof Error ? error.message : t('deposit.generatingAddress'));
+    } finally {
+      setIsGeneratingOnchain(false);
+    }
+  }, []);
+
+  const handleTabChange = useCallback(
+    (tab: ReceiveTab) => {
+      if (tab === activeTab) return;
+      setActiveTab(tab);
+      setStep('input');
+
+      if (tab === 'onchain' && !onchainRequest) {
+        void handleGenerateOnchainAddress();
+      }
+    },
+    [activeTab, onchainRequest, handleGenerateOnchainAddress]
+  );
+
   // Handle currency change
   const handleCurrencyChange = useCallback((currency: InputCurrency) => {
     setInputCurrency(currency);
@@ -214,6 +276,18 @@ export default function ReceiveScreen() {
       Alert.alert('Error', 'Failed to copy address');
     }
   }, [addressInfo]);
+
+  const handleCopyOnchainAddress = useCallback(async () => {
+    const parsed = parseOnchainRequest(onchainRequest);
+    if (!parsed.address) return;
+
+    try {
+      await Clipboard.setStringAsync(parsed.address);
+    } catch (error) {
+      console.error('Failed to copy on-chain address:', error);
+      Alert.alert('Error', 'Failed to copy address');
+    }
+  }, [onchainRequest, parseOnchainRequest]);
 
   // Calculate remaining time
   const getRemainingTime = useCallback(() => {
@@ -264,7 +338,10 @@ export default function ReceiveScreen() {
     return () => unsubscribe();
   }, [step, invoice, showSuccess]);
 
-  if (step === 'invoice') {
+  const onchainParsed = parseOnchainRequest(onchainRequest);
+  const onchainAddress = onchainParsed.address;
+
+  if (step === 'invoice' && activeTab === 'lightning') {
     return (
       <LinearGradient colors={gradientColors} style={styles.gradient}>
         <SafeAreaView style={styles.container}>
@@ -356,205 +433,240 @@ export default function ReceiveScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          {/* Mode Toggle */}
-          <View style={styles.modeToggle}>
-            <TouchableOpacity
-              style={[styles.modeButton, receiveMode === 'invoice' && styles.modeButtonActive]}
-              onPress={() => setReceiveMode('invoice')}
-            >
-              <Text style={[styles.modeButtonText, { color: receiveMode === 'invoice' ? '#1a1a2e' : secondaryTextColor }]}>
-                ⚡ Invoice
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modeButton, receiveMode === 'address' && styles.modeButtonActive]}
-              onPress={() => setReceiveMode('address')}
-            >
-              <Text style={[styles.modeButtonText, { color: receiveMode === 'address' ? '#1a1a2e' : secondaryTextColor }]}>
-                📧 Address
-              </Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            onPress={() => handleTabChange('lightning')}
+            style={[
+              styles.tabButton,
+              activeTab === 'lightning' && styles.tabButtonActive,
+              { borderColor: BRAND_COLOR },
+            ]}
+          >
+            <Text style={[styles.tabText, { color: activeTab === 'lightning' ? '#1a1a2e' : primaryTextColor }]}>
+              {t('deposit.lightningTab')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleTabChange('onchain')}
+            style={[
+              styles.tabButton,
+              activeTab === 'onchain' && styles.tabButtonActive,
+              { borderColor: BRAND_COLOR },
+            ]}
+          >
+            <Text style={[styles.tabText, { color: activeTab === 'onchain' ? '#1a1a2e' : primaryTextColor }]}>
+              {t('deposit.onchainTab')}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-          {/* Lightning Address Mode */}
-          {receiveMode === 'address' && (
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          {activeTab === 'lightning' ? (
             <>
-              {isLoadingAddress ? (
-                <View style={styles.addressLoadingContainer}>
-                  <Text style={[styles.addressLoadingText, { color: secondaryTextColor }]}>Loading...</Text>
-                </View>
-              ) : isRegistered && addressInfo ? (
-                /* Registered - Show Address Card */
-                <View style={styles.addressCard}>
-                  <View style={styles.addressQrContainer}>
+              {/* Mode Toggle */}
+              <View style={styles.modeToggle}>
+                <TouchableOpacity
+                  style={[styles.modeButton, receiveMode === 'invoice' && styles.modeButtonActive]}
+                  onPress={() => setReceiveMode('invoice')}
+                >
+                  <Text style={[styles.modeButtonText, { color: receiveMode === 'invoice' ? '#1a1a2e' : secondaryTextColor }]}>⚡ Invoice</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modeButton, receiveMode === 'address' && styles.modeButtonActive]}
+                  onPress={() => setReceiveMode('address')}
+                >
+                  <Text style={[styles.modeButtonText, { color: receiveMode === 'address' ? '#1a1a2e' : secondaryTextColor }]}>📧 Address</Text>
+                </TouchableOpacity>
+              </View>
+
+              {receiveMode === 'address' && (
+                <>
+                  {isLoadingAddress ? (
+                    <View style={styles.addressLoadingContainer}>
+                      <Text style={[styles.addressLoadingText, { color: secondaryTextColor }]}>Loading...</Text>
+                    </View>
+                  ) : isRegistered && addressInfo ? (
+                    <View style={styles.addressCard}>
+                      <View style={styles.addressQrContainer}>
+                        <View style={styles.qrCodeWrapper}>
+                          <QRCode value={addressInfo.lightningAddress} size={200} backgroundColor="white" color="black" />
+                        </View>
+                      </View>
+
+                      <View style={styles.addressDisplay}>
+                        <Text style={styles.addressText}>{addressInfo.lightningAddress}</Text>
+                      </View>
+
+                      <View style={styles.addressActions}>
+                        <Button mode="contained" onPress={handleCopyAddress} style={styles.addressCopyButton} labelStyle={styles.addressCopyButtonLabel} icon="content-copy">
+                          Copy
+                        </Button>
+                        <Button
+                          mode="outlined"
+                          onPress={() => router.push('/wallet/settings/lightning-address')}
+                          style={styles.addressManageButton}
+                          textColor={BRAND_COLOR}
+                        >
+                          Manage
+                        </Button>
+                      </View>
+
+                      <View style={styles.addressInfoBox}>
+                        <Text style={[styles.addressInfoText, { color: secondaryTextColor }]}>Share this address with anyone to receive Lightning payments instantly.</Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={styles.claimPromptCard}>
+                      <Text style={[styles.claimPromptTitle, { color: primaryTextColor }]}>Lightning Address</Text>
+                      <Text style={[styles.claimPromptText, { color: secondaryTextColor }]}>Get a Lightning Address to receive payments without generating invoices.</Text>
+                      <Button
+                        mode="outlined"
+                        onPress={() => router.push('/wallet/settings/lightning-address')}
+                        style={styles.claimButton}
+                        textColor={BRAND_COLOR}
+                        icon="at"
+                      >
+                        Claim Address
+                      </Button>
+                    </View>
+                  )}
+                </>
+              )}
+
+              {receiveMode === 'invoice' && (
+                <>
+                  <Text style={[styles.label, { color: primaryTextColor }]}>Enter amount (leave empty for any amount):</Text>
+
+                  <View style={styles.amountInputRow}>
+                    <StyledTextInput
+                      label={`Amount in ${currencyLabels[inputCurrency]}`}
+                      value={amount}
+                      onChangeText={setAmount}
+                      keyboardType="decimal-pad"
+                      style={[styles.input, styles.amountInput]}
+                    />
+
+                    <Menu
+                      visible={currencyMenuVisible}
+                      onDismiss={() => setCurrencyMenuVisible(false)}
+                      anchor={
+                        <TouchableOpacity
+                          style={[styles.currencySelector, { backgroundColor: gradientColors[1] || '#16213e' }]}
+                          onPress={() => setCurrencyMenuVisible(true)}
+                        >
+                          <Text style={styles.currencySelectorText}>{currencyLabels[inputCurrency]} ▼</Text>
+                        </TouchableOpacity>
+                      }
+                      contentStyle={[styles.currencyMenu, { backgroundColor: gradientColors[0] || '#1a1a2e' }]}
+                    >
+                      {currencyOptions.map((currency) => (
+                        <Menu.Item
+                          key={currency}
+                          onPress={() => handleCurrencyChange(currency)}
+                          title={currencyLabels[currency]}
+                          titleStyle={inputCurrency === currency ? styles.currencyMenuItemActive : { color: primaryTextColor }}
+                        />
+                      ))}
+                    </Menu>
+                  </View>
+
+                  {previewDisplay && previewSats > 0 && inputCurrency !== 'sats' && (
+                    <View style={styles.conversionPreview}>
+                      <Text style={styles.conversionText}>≈ {previewDisplay.satsDisplay}</Text>
+                      {previewDisplay.fiatDisplay && <Text style={styles.conversionFiat}>({previewDisplay.fiatDisplay})</Text>}
+                    </View>
+                  )}
+
+                  <View style={styles.presetsContainer}>
+                    {presets.map((preset) => (
+                      <Button
+                        key={preset}
+                        mode="outlined"
+                        onPress={() => handlePresetAmount(preset)}
+                        style={[styles.presetButton, { borderColor: secondaryTextColor }]}
+                        contentStyle={styles.presetButtonContent}
+                        labelStyle={styles.presetButtonLabel}
+                        textColor={primaryTextColor}
+                      >
+                        {formatPresetLabel(preset)}
+                      </Button>
+                    ))}
+                  </View>
+
+                  <StyledTextInput
+                    label="Description (optional)"
+                    value={description}
+                    onChangeText={setDescription}
+                    style={[styles.input, styles.descriptionInput, { backgroundColor: inputBackgroundColor }]}
+                    outlineColor={secondaryTextColor}
+                    activeOutlineColor={BRAND_COLOR}
+                    textColor={primaryTextColor}
+                    placeholderTextColor={secondaryTextColor}
+                    outlineStyle={styles.inputOutline}
+                    contentStyle={styles.inputContent}
+                    multiline
+                    numberOfLines={2}
+                    theme={{
+                      colors: {
+                        background: inputBackgroundColor,
+                        onSurfaceVariant: secondaryTextColor,
+                      },
+                    }}
+                  />
+
+                  <Button
+                    mode="contained"
+                    onPress={handleGenerateInvoice}
+                    loading={isGenerating}
+                    disabled={isGenerating || (amount !== '' && inputCurrency !== 'sats' && isLoadingRates)}
+                    style={styles.generateButton}
+                    buttonColor={BRAND_COLOR}
+                    textColor="#1a1a2e"
+                  >
+                    {isLoadingRates && inputCurrency !== 'sats' && amount !== ''
+                      ? 'Loading rates...'
+                      : amount === ''
+                        ? 'Generate Any Amount Invoice'
+                        : 'Generate Invoice'}
+                  </Button>
+                </>
+              )}
+            </>
+          ) : (
+            <View style={styles.onchainContainer}>
+              <Text style={[styles.onchainTitle, { color: primaryTextColor }]}>{t('deposit.onchainTitle')}</Text>
+              <Text style={[styles.onchainDescription, { color: secondaryTextColor }]}>{t('deposit.onchainDescription')}</Text>
+
+              {isGeneratingOnchain ? (
+                <Text style={[styles.generatingText, { color: secondaryTextColor }]}>{t('deposit.generatingAddress')}</Text>
+              ) : onchainAddress ? (
+                <>
+                  <View style={styles.qrContainer}>
                     <View style={styles.qrCodeWrapper}>
-                      <QRCode
-                        value={addressInfo.lightningAddress}
-                        size={200}
-                        backgroundColor="white"
-                        color="black"
-                      />
+                      <QRCode value={onchainRequest} size={220} backgroundColor="white" color="black" />
                     </View>
                   </View>
 
-                  <View style={styles.addressDisplay}>
-                    <Text style={styles.addressText}>{addressInfo.lightningAddress}</Text>
-                  </View>
-
-                  <View style={styles.addressActions}>
-                    <Button
-                      mode="contained"
-                      onPress={handleCopyAddress}
-                      style={styles.addressCopyButton}
-                      labelStyle={styles.addressCopyButtonLabel}
-                      icon="content-copy"
-                    >
-                      Copy
-                    </Button>
-                    <Button
-                      mode="outlined"
-                      onPress={() => router.push('/wallet/settings/lightning-address')}
-                      style={styles.addressManageButton}
-                      textColor={BRAND_COLOR}
-                    >
-                      Manage
-                    </Button>
-                  </View>
-
-                  <View style={styles.addressInfoBox}>
-                    <Text style={[styles.addressInfoText, { color: secondaryTextColor }]}>
-                      Share this address with anyone to receive Lightning payments instantly.
+                  <Text style={[styles.invoiceLabel, { color: secondaryTextColor }]}>{t('deposit.bitcoinAddress')}</Text>
+                  <View style={styles.invoiceContainer}>
+                    <Text style={[styles.invoiceText, { color: primaryTextColor }]} selectable>
+                      {onchainAddress}
                     </Text>
+                    <Button mode="outlined" onPress={handleCopyOnchainAddress} style={styles.copyButton} textColor={BRAND_COLOR}>
+                      {t('deposit.copyAddress')}
+                    </Button>
                   </View>
-                </View>
-              ) : (
-                /* Not Registered - Show Prompt */
-                <View style={styles.claimPromptCard}>
-                  <Text style={[styles.claimPromptTitle, { color: primaryTextColor }]}>Lightning Address</Text>
-                  <Text style={[styles.claimPromptText, { color: secondaryTextColor }]}>
-                    Get a Lightning Address to receive payments without generating invoices.
-                  </Text>
-                  <Button
-                    mode="outlined"
-                    onPress={() => router.push('/wallet/settings/lightning-address')}
-                    style={styles.claimButton}
-                    textColor={BRAND_COLOR}
-                    icon="at"
-                  >
-                    Claim Address
-                  </Button>
-                </View>
-              )}
-            </>
-          )}
 
-          {/* Invoice Mode */}
-          {receiveMode === 'invoice' && (
-            <>
-              <Text style={[styles.label, { color: primaryTextColor }]}>Enter amount (leave empty for any amount):</Text>
+                  {onchainParsed.minimumSats !== null && (
+                    <Text style={[styles.minimumText, { color: secondaryTextColor }]}> 
+                      {t('deposit.minimumDeposit').replace('{{amount}}', onchainParsed.minimumSats.toLocaleString())}
+                    </Text>
+                  )}
 
-              {/* Amount Input with Currency Selector */}
-          <View style={styles.amountInputRow}>
-            <StyledTextInput
-              label={`Amount in ${currencyLabels[inputCurrency]}`}
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="decimal-pad"
-              style={[styles.input, styles.amountInput]}
-            />
-            
-            {/* Currency Selector */}
-            <Menu
-              visible={currencyMenuVisible}
-              onDismiss={() => setCurrencyMenuVisible(false)}
-              anchor={
-                <TouchableOpacity
-                  style={[styles.currencySelector, { backgroundColor: gradientColors[1] || '#16213e' }]}
-                  onPress={() => setCurrencyMenuVisible(true)}
-                >
-                  <Text style={styles.currencySelectorText}>
-                    {currencyLabels[inputCurrency]} ▼
-                  </Text>
-                </TouchableOpacity>
-              }
-              contentStyle={[styles.currencyMenu, { backgroundColor: gradientColors[0] || '#1a1a2e' }]}
-            >
-              {currencyOptions.map((currency) => (
-                <Menu.Item
-                  key={currency}
-                  onPress={() => handleCurrencyChange(currency)}
-                  title={currencyLabels[currency]}
-                  titleStyle={inputCurrency === currency ? styles.currencyMenuItemActive : { color: primaryTextColor }}
-                />
-              ))}
-            </Menu>
-          </View>
-
-          {/* Conversion Preview */}
-          {previewDisplay && previewSats > 0 && inputCurrency !== 'sats' && (
-            <View style={styles.conversionPreview}>
-              <Text style={styles.conversionText}>
-                ≈ {previewDisplay.satsDisplay}
-              </Text>
-              {previewDisplay.fiatDisplay && (
-                <Text style={styles.conversionFiat}>
-                  ({previewDisplay.fiatDisplay})
-                </Text>
-              )}
+                  <Text style={[styles.onchainNote, { color: secondaryTextColor }]}>{t('deposit.onchainNote')}</Text>
+                </>
+              ) : null}
             </View>
-          )}
-
-          {/* Presets */}
-          <View style={styles.presetsContainer}>
-            {presets.map((preset) => (
-              <Button
-                key={preset}
-                mode="outlined"
-                onPress={() => handlePresetAmount(preset)}
-                style={[styles.presetButton, { borderColor: secondaryTextColor }]}
-                contentStyle={styles.presetButtonContent}
-                labelStyle={styles.presetButtonLabel}
-                textColor={primaryTextColor}
-              >
-                {formatPresetLabel(preset)}
-              </Button>
-            ))}
-          </View>
-
-          <StyledTextInput
-            label="Description (optional)"
-            value={description}
-            onChangeText={setDescription}
-            style={[styles.input, styles.descriptionInput, { backgroundColor: inputBackgroundColor }]}
-            outlineColor={secondaryTextColor}
-            activeOutlineColor={BRAND_COLOR}
-            textColor={primaryTextColor}
-            placeholderTextColor={secondaryTextColor}
-            outlineStyle={styles.inputOutline}
-            contentStyle={styles.inputContent}
-            multiline
-            numberOfLines={2}
-            theme={{
-              colors: {
-                background: inputBackgroundColor,
-                onSurfaceVariant: secondaryTextColor, // Label color
-              }
-            }}
-          />
-
-          <Button
-            mode="contained"
-            onPress={handleGenerateInvoice}
-            loading={isGenerating}
-            disabled={isGenerating || (amount !== '' && inputCurrency !== 'sats' && isLoadingRates)}
-            style={styles.generateButton}
-            buttonColor={BRAND_COLOR}
-            textColor="#1a1a2e"
-          >
-            {isLoadingRates && inputCurrency !== 'sats' && amount !== '' ? 'Loading rates...' : (amount === '' ? 'Generate Any Amount Invoice' : 'Generate Invoice')}
-          </Button>
-            </>
           )}
         </ScrollView>
       </SafeAreaView>
@@ -596,6 +708,32 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 24,
+    paddingTop: 16,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 24,
+    marginTop: 16,
+    marginBottom: 8,
+    borderRadius: 14,
+    padding: 4,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    gap: 6,
+  },
+  tabButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  tabButtonActive: {
+    backgroundColor: BRAND_COLOR,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   label: {
     fontSize: 16,
@@ -871,5 +1009,31 @@ const styles = StyleSheet.create({
   claimButton: {
     borderColor: BRAND_COLOR,
     borderRadius: 8,
+  },
+  onchainContainer: {
+    gap: 12,
+  },
+  onchainTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  onchainDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  generatingText: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 24,
+  },
+  minimumText: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  onchainNote: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 8,
   },
 });
