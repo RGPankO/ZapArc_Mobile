@@ -896,8 +896,9 @@ export async function listPayments(): Promise<TransactionInfo[]> {
 
       const description = payment.details?.description || payment.description || '';
 
-      // RN SDK: method is numeric (0=lightning, 3=deposit), details uses {tag, inner}
+      // RN SDK: method is numeric (0=lightning, 3=deposit, others TBD), details uses {tag, inner}
       // Web SDK: method is string ("lightning", "deposit"), details uses {type, txId}
+      console.log(`🔍 [BreezSparkService] Payment ${payment.id}: method=${payment.method}, details.tag=${payment.details?.tag}, details.type=${payment.details?.type}, paymentType=${payment.paymentType}`);
       const methodNum = payment.method;
       const detailsTag = String(payment.details?.tag || '').toLowerCase();
       const detailsType = String(payment.details?.type || '').toLowerCase();
@@ -905,11 +906,18 @@ export async function listPayments(): Promise<TransactionInfo[]> {
 
       const isOnchain =
         methodNum === 3 ||
+        methodNum === 1 ||
+        methodNum === 2 ||
         detailsTag === 'deposit' ||
+        detailsTag === 'bitcoinaddress' ||
+        detailsTag === 'bitcoin' ||
         detailsType === 'deposit' ||
+        detailsType === 'bitcoinaddress' ||
+        detailsType === 'bitcoin' ||
         methodStr.includes('bitcoinaddress') ||
         methodStr.includes('onchain') ||
-        methodStr.includes('deposit');
+        methodStr.includes('deposit') ||
+        methodStr.includes('bitcoin');
 
       const method: 'lightning' | 'onchain' = isOnchain ? 'onchain' : 'lightning';
 
