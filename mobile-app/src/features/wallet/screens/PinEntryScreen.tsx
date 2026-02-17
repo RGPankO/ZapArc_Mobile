@@ -9,6 +9,7 @@ import {
   Vibration,
   Animated,
   BackHandler,
+  ActivityIndicator,
 } from 'react-native';
 import { Text, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -68,6 +69,7 @@ export function PinEntryScreen(): React.JSX.Element {
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [attempts, setAttempts] = useState(0);
+  const [isUnlocking, setIsUnlocking] = useState(false);
 
   // Animation ref for shake effect
   const shakeAnimation = useRef(new Animated.Value(0)).current;
@@ -143,12 +145,16 @@ export function PinEntryScreen(): React.JSX.Element {
     if (pin.length !== PIN_LENGTH) return;
 
     try {
+      setIsUnlocking(true);
+      setError(null);
+
       // If we have target wallet params, use selectWallet to switch to it
       if (targetMasterKeyId) {
         const success = await selectWallet(targetMasterKeyId, targetSubWalletIndex, pin);
         if (success) {
           router.replace('/wallet/home');
         } else {
+          setIsUnlocking(false);
           setError(t('auth.incorrectPin'));
           setAttempts((prev) => prev + 1);
           shake();
@@ -160,6 +166,7 @@ export function PinEntryScreen(): React.JSX.Element {
         if (success) {
           router.replace('/wallet/home');
         } else {
+          setIsUnlocking(false);
           setError(t('auth.incorrectPin'));
           setAttempts((prev) => prev + 1);
           shake();
@@ -167,6 +174,7 @@ export function PinEntryScreen(): React.JSX.Element {
         }
       }
     } catch (err) {
+      setIsUnlocking(false);
       setError(err instanceof Error ? err.message : t('auth.unlockFailed'));
       shake();
       setPin('');
@@ -245,30 +253,41 @@ export function PinEntryScreen(): React.JSX.Element {
 
         {/* PIN Display */}
         <View style={styles.pinDisplayContainer}>
-          <Animated.View
-            style={[
-              styles.pinDisplay,
-              { transform: [{ translateX: shakeAnimation }] },
-            ]}
-          >
-            {Array(PIN_LENGTH)
-              .fill(0)
-              .map((_, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.pinDot,
-                    index < pin.length && styles.pinDotFilled,
-                    error && styles.pinDotError,
-                  ]}
-                />
-              ))}
-          </Animated.View>
+          {isUnlocking ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={BRAND_COLOR} />
+              <Text style={[styles.loadingText, { color: secondaryText }]}>
+                {targetMasterKeyId ? t('auth.switchingWallet') || 'Switching wallet…' : t('auth.unlocking') || 'Unlocking…'}
+              </Text>
+            </View>
+          ) : (
+            <>
+              <Animated.View
+                style={[
+                  styles.pinDisplay,
+                  { transform: [{ translateX: shakeAnimation }] },
+                ]}
+              >
+                {Array(PIN_LENGTH)
+                  .fill(0)
+                  .map((_, index) => (
+                    <View
+                      key={index}
+                      style={[
+                        styles.pinDot,
+                        index < pin.length && styles.pinDotFilled,
+                        error && styles.pinDotError,
+                      ]}
+                    />
+                  ))}
+              </Animated.View>
 
-          {/* Error Message */}
-          {error && <Text style={styles.errorText}>{error}</Text>}
-          {!error && pin.length > 0 && pin.length < PIN_LENGTH && (
-            <Text style={styles.pinHintText}>{t('auth.pinLengthRequirement')}</Text>
+              {/* Error Message */}
+              {error && <Text style={styles.errorText}>{error}</Text>}
+              {!error && pin.length > 0 && pin.length < PIN_LENGTH && (
+                <Text style={styles.pinHintText}>{t('auth.pinLengthRequirement')}</Text>
+              )}
+            </>
           )}
 
           {/* Attempts Warning */}
@@ -386,6 +405,16 @@ const styles = StyleSheet.create({
   },
   pinDisplayContainer: {
     alignItems: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 15,
+    fontWeight: '500',
   },
   pinDisplay: {
     flexDirection: 'row',
