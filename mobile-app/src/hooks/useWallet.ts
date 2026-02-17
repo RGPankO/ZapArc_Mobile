@@ -163,15 +163,19 @@ export function useWallet(): WalletState & WalletActions {
       const data = await storageService.loadMultiWalletStorage();
       setStorage(data);
 
-      // Pre-load cache to prevent flash of zero
+      // Load cache for the ACTIVE wallet — always set balance/transactions
+      // to prevent stale data from a previously viewed wallet persisting
       if (data?.activeMasterKeyId && data.activeSubWalletIndex !== undefined) {
         const [cachedBal, cachedTx] = await Promise.all([
            WalletCache.getCachedBalance(data.activeMasterKeyId, data.activeSubWalletIndex),
            WalletCache.getCachedTransactions(data.activeMasterKeyId, data.activeSubWalletIndex)
         ]);
         
-        if (cachedBal) setBalance(cachedBal.balance);
-        if (cachedTx) setTransactions(cachedTx.transactions);
+        setBalance(cachedBal?.balance ?? 0);
+        setTransactions(cachedTx?.transactions ?? []);
+      } else {
+        setBalance(0);
+        setTransactions([]);
       }
 
       if (data && BreezSparkService.isSDKInitialized()) {
@@ -809,15 +813,9 @@ export function useWallet(): WalletState & WalletActions {
 
         if (isCancelled || isSwitchingRef.current) return;
 
-        if (cachedBalance) {
-          setBalance(cachedBalance.balance);
-        }
-        // Don't set balance to 0 — keep preloaded/current value until SDK provides real data
-
-        if (cachedTxs) {
-          setTransactions(cachedTxs.transactions);
-        }
-        // Don't clear transactions — keep current until SDK provides real data
+        // Always set balance/transactions for the active wallet — clear stale data from previous wallet
+        setBalance(cachedBalance?.balance ?? 0);
+        setTransactions(cachedTxs?.transactions ?? []);
 
         setIsLoading(false);
         setIsRefreshing(true);
