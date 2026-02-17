@@ -257,7 +257,7 @@ export function PinEntryScreen(): React.JSX.Element {
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={BRAND_COLOR} />
               <Text style={[styles.loadingText, { color: secondaryText }]}>
-                {targetMasterKeyId ? t('auth.switchingWallet') || 'Switching wallet…' : t('auth.unlocking') || 'Unlocking…'}
+                {t('auth.unlocking') || 'Unlocking…'}
               </Text>
             </View>
           ) : (

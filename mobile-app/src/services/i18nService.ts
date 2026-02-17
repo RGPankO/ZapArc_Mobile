@@ -78,6 +78,7 @@ const translations: Record<SupportedLanguage, TranslationSet> = {
       attemptsRemaining: '{{count}} attempts remaining',
       forgotPin: 'Forgot PIN?',
       switchWallet: 'Switch Wallet',
+      unlocking: 'Unlocking…',
     },
 
     // Wallet
@@ -273,6 +274,10 @@ const translations: Record<SupportedLanguage, TranslationSet> = {
       securityTip1: 'Use a strong PIN that\'s not easy to guess',
       securityTip2: 'Enable biometric authentication for convenience',
       securityTip4: 'Never share your recovery phrase with anyone',
+      fingerprintUnlock: 'Fingerprint Unlock',
+      faceIdUnlock: 'Face ID Unlock',
+      biometricUnlock: 'Biometric Unlock',
+      biometricNotEnrolled: 'No biometric authentication is set up on this device. Go to your device settings to enroll.',
       saveChanges: 'Save Changes',
       // Language screen
       selectLanguage: 'Select Language',
@@ -536,6 +541,7 @@ const translations: Record<SupportedLanguage, TranslationSet> = {
       attemptsRemaining: '{{count}} оставащи опита',
       forgotPin: 'Забравен ПИН?',
       switchWallet: 'Смени портфейл',
+      unlocking: 'Отключване…',
     },
 
     // Wallet - Bulgarian
@@ -731,6 +737,10 @@ const translations: Record<SupportedLanguage, TranslationSet> = {
       securityTip1: 'Използвайте силен ПИН, който не е лесен за отгатване',
       securityTip2: 'Включете биометрична автентикация за удобство',
       securityTip4: 'Никога не споделяйте фразата си за възстановяване',
+      fingerprintUnlock: 'Отключване с пръстов отпечатък',
+      faceIdUnlock: 'Отключване с Face ID',
+      biometricUnlock: 'Биометрично отключване',
+      biometricNotEnrolled: 'На това устройство няма настроена биометрична автентикация. Отидете в настройките на устройството, за да я настроите.',
       saveChanges: 'Запази промените',
       // Language screen
       selectLanguage: 'Избор на език',
