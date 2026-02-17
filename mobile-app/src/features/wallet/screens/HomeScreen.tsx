@@ -461,7 +461,7 @@ export function HomeScreen(): React.JSX.Element {
               <Text style={[
                 styles.modalStatus,
                 { color: secondaryTextColor },
-                tx.status === 'completed' && styles.statusCompleted,
+                (tx.status === 'completed' || (tx.status === 'pending' && method === 'onchain' && tx.txid)) && styles.statusCompleted,
                 (tx.status === 'pending' && !(method === 'onchain' && tx.txid)) && styles.statusPending,
                 tx.status === 'failed' && styles.statusFailed,
               ]}>
