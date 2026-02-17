@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
+import QRCode from 'react-native-qrcode-svg';
 import { useAppTheme } from '../../src/contexts/ThemeContext';
 import {
   getGradientColors,
@@ -464,6 +465,15 @@ export default function ReceiveScreen() {
                       : t('deposit.anyAmount')}
                   </Text>
 
+                  <View style={styles.qrContainer}>
+                    <QRCode
+                      value={invoice}
+                      size={200}
+                      backgroundColor="transparent"
+                      color={primaryTextColor}
+                    />
+                  </View>
+
                   <View style={styles.invoiceContainer}>
                     <Text style={[styles.invoiceLabel, { color: secondaryTextColor }]}>{t('payments.invoice')}</Text>
                     <View style={styles.inlineValueRow}>
@@ -581,6 +591,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,193,7,0.06)',
   },
   sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 10 },
+  qrContainer: { alignItems: 'center', marginVertical: 16, padding: 16, backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 12, alignSelf: 'center' },
   invoiceSectionTitle: { marginTop: 20 },
   sectionSubtitle: { fontSize: 13, marginBottom: 14 },
   helperText: { fontSize: 13, marginBottom: 2 },
