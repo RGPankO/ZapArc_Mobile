@@ -1,12 +1,11 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
-import { Text, Button, TextInput, Menu } from 'react-native-paper';
+import { Text, Button, Menu } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
-import * as Sharing from 'expo-sharing';
 import { useAppTheme } from '../../src/contexts/ThemeContext';
 import {
   getGradientColors,
@@ -22,11 +21,6 @@ import { StyledTextInput } from '../../src/components';
 import { useFeedback } from '../../src/features/wallet/components/FeedbackComponents';
 import { t } from '../../src/services/i18nService';
 
-type ReceiveStep = 'input' | 'invoice';
-type ReceiveMode = 'invoice' | 'address';
-type ReceiveTab = 'lightning' | 'onchain';
-
-// Currency labels for display
 const currencyLabels: Record<InputCurrency, string> = {
   sats: 'sats',
   btc: 'BTC',
@@ -41,56 +35,48 @@ export default function ReceiveScreen() {
   const secondaryTextColor = getSecondaryTextColor(themeMode);
   const inputBackgroundColor = getInputBackgroundColor(themeMode);
 
-  const { secondaryFiatCurrency, convertToSats, formatSatsWithFiat, rates, isLoadingRates } = useCurrency();
+  const { secondaryFiatCurrency, convertToSats, formatSatsWithFiat, isLoadingRates } = useCurrency();
   const { addressInfo, isRegistered, isLoading: isLoadingAddress, refresh: refreshAddress } = useLightningAddress();
   const { showSuccess } = useFeedback();
 
-  // Refresh Lightning Address state when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       refreshAddress();
     }, [refreshAddress])
   );
 
-  const [step, setStep] = useState<ReceiveStep>('input');
-  const [activeTab, setActiveTab] = useState<ReceiveTab>('lightning');
-  const [receiveMode, setReceiveMode] = useState<ReceiveMode>('invoice');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [invoice, setInvoice] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [expiryTime, setExpiryTime] = useState<number | null>(null);
   const [invoiceSatsAmount, setInvoiceSatsAmount] = useState(0);
+
   const [onchainRequest, setOnchainRequest] = useState('');
   const [isGeneratingOnchain, setIsGeneratingOnchain] = useState(false);
+  const [onchainError, setOnchainError] = useState<string | null>(null);
 
-  // Currency selection state
   const [inputCurrency, setInputCurrency] = useState<InputCurrency>('sats');
   const [currencyMenuVisible, setCurrencyMenuVisible] = useState(false);
 
-  // Available currency options (sats + user's secondary fiat)
   const currencyOptions: InputCurrency[] = useMemo(() => {
     return ['sats', secondaryFiatCurrency];
   }, [secondaryFiatCurrency]);
 
-  // Convert current amount to sats for preview
   const previewSats = useMemo(() => {
     const numAmount = parseFloat(amount);
     if (!numAmount || isNaN(numAmount)) return 0;
     return convertToSats(numAmount, inputCurrency);
   }, [amount, inputCurrency, convertToSats]);
 
-  // Format preview display
   const previewDisplay = useMemo(() => {
     if (!previewSats) return null;
     return formatSatsWithFiat(previewSats);
   }, [previewSats, formatSatsWithFiat]);
 
-  // Dynamic presets based on currency
   const presets = useMemo(() => {
     switch (inputCurrency) {
       case 'eur':
-        return [10, 25, 50, 100];
       case 'usd':
         return [10, 25, 50, 100];
       case 'btc':
@@ -101,7 +87,6 @@ export default function ReceiveScreen() {
     }
   }, [inputCurrency]);
 
-  // Format preset label
   const formatPresetLabel = useCallback((preset: number): string => {
     switch (inputCurrency) {
       case 'eur':
@@ -122,80 +107,42 @@ export default function ReceiveScreen() {
 
   const handleGenerateInvoice = useCallback(async () => {
     const numAmount = parseFloat(amount);
-
-    // Allow zero/empty amount for "any amount" invoices
     let satsAmount = 0;
 
     if (numAmount && numAmount > 0) {
-      // Convert to sats based on input currency
       satsAmount = convertToSats(numAmount, inputCurrency);
-
       if (!satsAmount || satsAmount <= 0) {
-        Alert.alert('Conversion Error', 'Could not convert amount. Please check exchange rates.');
+        Alert.alert(t('common.error'), t('deposit.conversionError'));
         return;
       }
     }
 
     try {
       setIsGenerating(true);
-
-      const result = await BreezSparkService.receivePayment(
-        satsAmount,
-        description || undefined
-      );
+      const result = await BreezSparkService.receivePayment(satsAmount, description || undefined);
 
       setInvoice(result.paymentRequest);
       setInvoiceSatsAmount(satsAmount);
-
-      // Set expiry time (15 minutes from now)
-      const expiryTimestamp = Date.now() + 15 * 60 * 1000;
-      setExpiryTime(expiryTimestamp);
-
-      setStep('invoice');
+      setExpiryTime(Date.now() + 15 * 60 * 1000);
     } catch (error) {
       console.error('Failed to generate invoice:', error);
-      Alert.alert(
-        'Error',
-        error instanceof Error ? error.message : 'Failed to generate invoice'
-      );
+      Alert.alert(t('common.error'), error instanceof Error ? error.message : t('deposit.generateInvoiceFailed'));
     } finally {
       setIsGenerating(false);
     }
   }, [amount, description, inputCurrency, convertToSats]);
 
   const handleCopyInvoice = useCallback(async () => {
+    if (!invoice) return;
     try {
       await Clipboard.setStringAsync(invoice);
-      // Android's built-in clipboard notification will show a non-blocking toast
     } catch (error) {
       console.error('Failed to copy invoice:', error);
-      Alert.alert('Error', 'Failed to copy invoice');
+      Alert.alert(t('common.error'), t('deposit.copyFailed'));
     }
   }, [invoice]);
 
-  const handleShareInvoice = useCallback(async () => {
-    try {
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (!isAvailable) {
-        // Fallback to copy
-        await handleCopyInvoice();
-        return;
-      }
-
-      // Create a temporary text file to share
-      // In a production app, you might want to use react-native-fs to create a file
-      // For now, we'll just copy to clipboard as fallback
-      await handleCopyInvoice();
-    } catch (error) {
-      console.error('Failed to share invoice:', error);
-      Alert.alert('Error', 'Failed to share invoice');
-    }
-  }, [invoice, handleCopyInvoice]);
-
   const handleNewInvoice = useCallback(() => {
-    setStep('input');
-    setAmount('');
-    setDescription('');
     setInvoice('');
     setExpiryTime(null);
     setInvoiceSatsAmount(0);
@@ -235,99 +182,79 @@ export default function ReceiveScreen() {
   const handleGenerateOnchainAddress = useCallback(async () => {
     try {
       setIsGeneratingOnchain(true);
+      setOnchainError(null);
       const request = await BreezSparkService.receiveOnchain();
       setOnchainRequest(request);
     } catch (error) {
       console.error('Failed to generate on-chain address:', error);
-      Alert.alert('Error', error instanceof Error ? error.message : t('deposit.generatingAddress'));
+      const message = error instanceof Error ? error.message : t('deposit.generatingAddress');
+      setOnchainError(message);
     } finally {
       setIsGeneratingOnchain(false);
     }
   }, []);
 
-  const handleTabChange = useCallback(
-    (tab: ReceiveTab) => {
-      if (tab === activeTab) return;
-      setActiveTab(tab);
-      setStep('input');
+  useEffect(() => {
+    void handleGenerateOnchainAddress();
+  }, [handleGenerateOnchainAddress]);
 
-      if (tab === 'onchain' && !onchainRequest) {
-        void handleGenerateOnchainAddress();
-      }
-    },
-    [activeTab, onchainRequest, handleGenerateOnchainAddress]
-  );
-
-  // Handle currency change
   const handleCurrencyChange = useCallback((currency: InputCurrency) => {
     setInputCurrency(currency);
     setCurrencyMenuVisible(false);
-    setAmount(''); // Reset amount when switching currencies
+    setAmount('');
   }, []);
 
-  // Copy Lightning Address to clipboard
   const handleCopyAddress = useCallback(async () => {
     if (!addressInfo?.lightningAddress) return;
     try {
       await Clipboard.setStringAsync(addressInfo.lightningAddress);
-      // Android's built-in clipboard notification will show feedback
     } catch (error) {
       console.error('Failed to copy address:', error);
-      Alert.alert('Error', 'Failed to copy address');
+      Alert.alert(t('common.error'), t('deposit.copyFailed'));
     }
   }, [addressInfo]);
 
-  const handleCopyOnchainAddress = useCallback(async () => {
-    const parsed = parseOnchainRequest(onchainRequest);
-    if (!parsed.address) return;
+  const onchainParsed = parseOnchainRequest(onchainRequest);
+  const onchainAddress = onchainParsed.address;
 
+  const handleCopyOnchainAddress = useCallback(async () => {
+    if (!onchainAddress) return;
     try {
-      await Clipboard.setStringAsync(parsed.address);
+      await Clipboard.setStringAsync(onchainAddress);
     } catch (error) {
       console.error('Failed to copy on-chain address:', error);
-      Alert.alert('Error', 'Failed to copy address');
+      Alert.alert(t('common.error'), t('deposit.copyFailed'));
     }
-  }, [onchainRequest, parseOnchainRequest]);
+  }, [onchainAddress]);
 
-  // Calculate remaining time
   const getRemainingTime = useCallback(() => {
     if (!expiryTime) return '';
-
     const remaining = Math.max(0, expiryTime - Date.now());
     const minutes = Math.floor(remaining / 60000);
     const seconds = Math.floor((remaining % 60000) / 1000);
-
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }, [expiryTime]);
 
-  // Timer update (simple approach)
   const [, setTick] = useState(0);
   useEffect(() => {
-    if (step === 'invoice' && expiryTime) {
-      const interval = setInterval(() => {
-        setTick(t => t + 1);
+    if (!invoice || !expiryTime) return;
 
-        // Check if expired
-        if (Date.now() >= expiryTime) {
-          clearInterval(interval);
-          // Auto-return to input screen without popup
-          handleNewInvoice();
-        }
-      }, 1000);
+    const interval = setInterval(() => {
+      setTick((tVal) => tVal + 1);
+      if (Date.now() >= expiryTime) {
+        clearInterval(interval);
+        handleNewInvoice();
+      }
+    }, 1000);
 
-      return () => clearInterval(interval);
-    }
-  }, [step, expiryTime, handleNewInvoice]);
+    return () => clearInterval(interval);
+  }, [invoice, expiryTime, handleNewInvoice]);
 
-  // Listen for incoming payment when invoice is displayed
   useEffect(() => {
-    if (step !== 'invoice' || !invoice) return;
+    if (!invoice) return;
 
     const unsubscribe = onPaymentReceived((payment) => {
-      // Skip sync events
       if (payment.description === '__SYNC_EVENT__') return;
-
-      // Check if this is a received payment
       if (payment.type === 'receive' && payment.amountSat > 0) {
         const formattedAmount = payment.amountSat.toLocaleString();
         showSuccess(`Payment received: ${formattedAmount} sats`);
@@ -336,91 +263,7 @@ export default function ReceiveScreen() {
     });
 
     return () => unsubscribe();
-  }, [step, invoice, showSuccess]);
-
-  const onchainParsed = parseOnchainRequest(onchainRequest);
-  const onchainAddress = onchainParsed.address;
-
-  if (step === 'invoice' && activeTab === 'lightning') {
-    return (
-      <LinearGradient colors={gradientColors} style={styles.gradient}>
-        <SafeAreaView style={styles.container}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()}>
-              <Text style={styles.backButton}>← Back</Text>
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: primaryTextColor }]}>Deposit Funds</Text>
-            <View style={styles.headerSpacer} />
-          </View>
-
-          <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-            <View style={styles.qrContainer}>
-              <View style={styles.qrCodeWrapper}>
-                <QRCode
-                  value={invoice}
-                  size={240}
-                  backgroundColor="white"
-                  color="black"
-                />
-              </View>
-            </View>
-
-            <Text style={[styles.amountText, { color: primaryTextColor }]}>
-              {invoiceSatsAmount > 0 ? (
-                <>
-                  Amount: {invoiceSatsAmount.toLocaleString()} sats
-                  {formatSatsWithFiat(invoiceSatsAmount).fiatDisplay && (
-                    <Text style={[styles.amountFiatText, { color: secondaryTextColor }]}>
-                      {' '}({formatSatsWithFiat(invoiceSatsAmount).fiatDisplay})
-                    </Text>
-                  )}
-                </>
-              ) : (
-                <Text style={styles.anyAmountText}>Any Amount</Text>
-              )}
-            </Text>
-
-            <View style={styles.invoiceContainer}>
-              <Text style={[styles.invoiceLabel, { color: secondaryTextColor }]}>Lightning Invoice:</Text>
-              <ScrollView
-                style={styles.invoiceScroll}
-                contentContainerStyle={styles.invoiceScrollContent}
-              >
-                <Text style={[styles.invoiceText, { color: primaryTextColor }]} selectable>
-                  {invoice}
-                </Text>
-              </ScrollView>
-              <Button
-                mode="outlined"
-                onPress={handleCopyInvoice}
-                style={styles.copyButton}
-                textColor={BRAND_COLOR}
-              >
-                Copy
-              </Button>
-            </View>
-
-            <View style={styles.statusContainer}>
-              <Text style={[styles.waitingText, { color: primaryTextColor }]}>⏳ Waiting for payment...</Text>
-              <Text style={[styles.expiryText, { color: secondaryTextColor }]}>
-                Expires in: {getRemainingTime()}
-              </Text>
-            </View>
-
-            <Button
-              mode="contained"
-              onPress={handleNewInvoice}
-              style={styles.newInvoiceButton}
-              buttonColor={BRAND_COLOR}
-              textColor="#1a1a2e"
-            >
-              New Invoice
-            </Button>
-          </ScrollView>
-        </SafeAreaView>
-      </LinearGradient>
-    );
-  }
+  }, [invoice, showSuccess]);
 
   return (
     <LinearGradient colors={gradientColors} style={styles.gradient}>
@@ -429,245 +272,211 @@ export default function ReceiveScreen() {
           <TouchableOpacity onPress={() => router.back()}>
             <Text style={styles.backButton}>← Back</Text>
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: primaryTextColor }]}>Deposit Funds</Text>
+          <Text style={[styles.headerTitle, { color: primaryTextColor }]}>{t('wallet.receive')}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            onPress={() => handleTabChange('lightning')}
-            style={[
-              styles.tabButton,
-              activeTab === 'lightning' && styles.tabButtonActive,
-              { borderColor: BRAND_COLOR },
-            ]}
-          >
-            <Text style={[styles.tabText, { color: activeTab === 'lightning' ? '#1a1a2e' : primaryTextColor }]}>
-              {t('deposit.lightningTab')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => handleTabChange('onchain')}
-            style={[
-              styles.tabButton,
-              activeTab === 'onchain' && styles.tabButtonActive,
-              { borderColor: BRAND_COLOR },
-            ]}
-          >
-            <Text style={[styles.tabText, { color: activeTab === 'onchain' ? '#1a1a2e' : primaryTextColor }]}>
-              {t('deposit.onchainTab')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          {activeTab === 'lightning' ? (
-            <>
-              {/* Mode Toggle */}
-              <View style={styles.modeToggle}>
-                <TouchableOpacity
-                  style={[styles.modeButton, receiveMode === 'invoice' && styles.modeButtonActive]}
-                  onPress={() => setReceiveMode('invoice')}
-                >
-                  <Text style={[styles.modeButtonText, { color: receiveMode === 'invoice' ? '#1a1a2e' : secondaryTextColor }]}>⚡ Invoice</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modeButton, receiveMode === 'address' && styles.modeButtonActive]}
-                  onPress={() => setReceiveMode('address')}
-                >
-                  <Text style={[styles.modeButtonText, { color: receiveMode === 'address' ? '#1a1a2e' : secondaryTextColor }]}>📧 Address</Text>
-                </TouchableOpacity>
+          <View style={styles.card}>
+            <Text style={[styles.sectionTitle, { color: primaryTextColor }]}>{t('deposit.lightningSectionTitle')}</Text>
+            <Text style={[styles.sectionSubtitle, { color: secondaryTextColor }]}>{t('deposit.lightningSectionSubtitle')}</Text>
+
+            {isLoadingAddress ? (
+              <View style={styles.addressLoadingContainer}>
+                <Text style={[styles.addressLoadingText, { color: secondaryTextColor }]}>{t('common.loading')}</Text>
               </View>
+            ) : isRegistered && addressInfo ? (
+              <View style={styles.addressCardCompact}>
+                <Text style={[styles.addressCardTitle, { color: primaryTextColor }]}>{t('deposit.yourLightningAddress')}</Text>
+                <View style={styles.addressDisplayCompact}>
+                  <Text style={styles.addressTextCompact} numberOfLines={1}>{addressInfo.lightningAddress}</Text>
+                  <TouchableOpacity onPress={handleCopyAddress} style={styles.addressCopyIcon}>
+                    <Text style={{ color: BRAND_COLOR, fontSize: 14, fontWeight: '600' }}>{t('deposit.copyAddress')}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.claimBanner}
+                onPress={() => router.push('/wallet/settings/lightning-address')}
+              >
+                <Text style={styles.claimBannerText}>{t('deposit.claimLightningAddress')}</Text>
+              </TouchableOpacity>
+            )}
 
-              {receiveMode === 'address' && (
-                <>
-                  {isLoadingAddress ? (
-                    <View style={styles.addressLoadingContainer}>
-                      <Text style={[styles.addressLoadingText, { color: secondaryTextColor }]}>Loading...</Text>
-                    </View>
-                  ) : isRegistered && addressInfo ? (
-                    <View style={styles.addressCard}>
-                      <View style={styles.addressQrContainer}>
-                        <View style={styles.qrCodeWrapper}>
-                          <QRCode value={addressInfo.lightningAddress} size={200} backgroundColor="white" color="black" />
-                        </View>
-                      </View>
+            <Text style={[styles.label, { color: primaryTextColor }]}>{t('deposit.enterAmount')}</Text>
 
-                      <View style={styles.addressDisplay}>
-                        <Text style={styles.addressText}>{addressInfo.lightningAddress}</Text>
-                      </View>
+            <View style={styles.amountInputRow}>
+              <StyledTextInput
+                label={`${t('payments.amount')} (${currencyLabels[inputCurrency]})`}
+                value={amount}
+                onChangeText={setAmount}
+                keyboardType="decimal-pad"
+                style={[styles.input, styles.amountInput]}
+              />
 
-                      <View style={styles.addressActions}>
-                        <Button mode="contained" onPress={handleCopyAddress} style={styles.addressCopyButton} labelStyle={styles.addressCopyButtonLabel} icon="content-copy">
-                          Copy
-                        </Button>
-                        <Button
-                          mode="outlined"
-                          onPress={() => router.push('/wallet/settings/lightning-address')}
-                          style={styles.addressManageButton}
-                          textColor={BRAND_COLOR}
-                        >
-                          Manage
-                        </Button>
-                      </View>
-
-                      <View style={styles.addressInfoBox}>
-                        <Text style={[styles.addressInfoText, { color: secondaryTextColor }]}>Share this address with anyone to receive Lightning payments instantly.</Text>
-                      </View>
-                    </View>
-                  ) : (
-                    <View style={styles.claimPromptCard}>
-                      <Text style={[styles.claimPromptTitle, { color: primaryTextColor }]}>Lightning Address</Text>
-                      <Text style={[styles.claimPromptText, { color: secondaryTextColor }]}>Get a Lightning Address to receive payments without generating invoices.</Text>
-                      <Button
-                        mode="outlined"
-                        onPress={() => router.push('/wallet/settings/lightning-address')}
-                        style={styles.claimButton}
-                        textColor={BRAND_COLOR}
-                        icon="at"
-                      >
-                        Claim Address
-                      </Button>
-                    </View>
-                  )}
-                </>
-              )}
-
-              {receiveMode === 'invoice' && (
-                <>
-                  <Text style={[styles.label, { color: primaryTextColor }]}>Enter amount (leave empty for any amount):</Text>
-
-                  <View style={styles.amountInputRow}>
-                    <StyledTextInput
-                      label={`Amount in ${currencyLabels[inputCurrency]}`}
-                      value={amount}
-                      onChangeText={setAmount}
-                      keyboardType="decimal-pad"
-                      style={[styles.input, styles.amountInput]}
-                    />
-
-                    <Menu
-                      visible={currencyMenuVisible}
-                      onDismiss={() => setCurrencyMenuVisible(false)}
-                      anchor={
-                        <TouchableOpacity
-                          style={[styles.currencySelector, { backgroundColor: gradientColors[1] || '#16213e' }]}
-                          onPress={() => setCurrencyMenuVisible(true)}
-                        >
-                          <Text style={styles.currencySelectorText}>{currencyLabels[inputCurrency]} ▼</Text>
-                        </TouchableOpacity>
-                      }
-                      contentStyle={[styles.currencyMenu, { backgroundColor: gradientColors[0] || '#1a1a2e' }]}
-                    >
-                      {currencyOptions.map((currency) => (
-                        <Menu.Item
-                          key={currency}
-                          onPress={() => handleCurrencyChange(currency)}
-                          title={currencyLabels[currency]}
-                          titleStyle={inputCurrency === currency ? styles.currencyMenuItemActive : { color: primaryTextColor }}
-                        />
-                      ))}
-                    </Menu>
-                  </View>
-
-                  {previewDisplay && previewSats > 0 && inputCurrency !== 'sats' && (
-                    <View style={styles.conversionPreview}>
-                      <Text style={styles.conversionText}>≈ {previewDisplay.satsDisplay}</Text>
-                      {previewDisplay.fiatDisplay && <Text style={styles.conversionFiat}>({previewDisplay.fiatDisplay})</Text>}
-                    </View>
-                  )}
-
-                  <View style={styles.presetsContainer}>
-                    {presets.map((preset) => (
-                      <Button
-                        key={preset}
-                        mode="outlined"
-                        onPress={() => handlePresetAmount(preset)}
-                        style={[styles.presetButton, { borderColor: secondaryTextColor }]}
-                        contentStyle={styles.presetButtonContent}
-                        labelStyle={styles.presetButtonLabel}
-                        textColor={primaryTextColor}
-                      >
-                        {formatPresetLabel(preset)}
-                      </Button>
-                    ))}
-                  </View>
-
-                  <StyledTextInput
-                    label="Description (optional)"
-                    value={description}
-                    onChangeText={setDescription}
-                    style={[styles.input, styles.descriptionInput, { backgroundColor: inputBackgroundColor }]}
-                    outlineColor={secondaryTextColor}
-                    activeOutlineColor={BRAND_COLOR}
-                    textColor={primaryTextColor}
-                    placeholderTextColor={secondaryTextColor}
-                    outlineStyle={styles.inputOutline}
-                    contentStyle={styles.inputContent}
-                    multiline
-                    numberOfLines={2}
-                    theme={{
-                      colors: {
-                        background: inputBackgroundColor,
-                        onSurfaceVariant: secondaryTextColor,
-                      },
-                    }}
-                  />
-
-                  <Button
-                    mode="contained"
-                    onPress={handleGenerateInvoice}
-                    loading={isGenerating}
-                    disabled={isGenerating || (amount !== '' && inputCurrency !== 'sats' && isLoadingRates)}
-                    style={styles.generateButton}
-                    buttonColor={BRAND_COLOR}
-                    textColor="#1a1a2e"
+              <Menu
+                visible={currencyMenuVisible}
+                onDismiss={() => setCurrencyMenuVisible(false)}
+                anchor={
+                  <TouchableOpacity
+                    style={[styles.currencySelector, { backgroundColor: gradientColors[1] || '#16213e' }]}
+                    onPress={() => setCurrencyMenuVisible(true)}
                   >
-                    {isLoadingRates && inputCurrency !== 'sats' && amount !== ''
-                      ? 'Loading rates...'
-                      : amount === ''
-                        ? 'Generate Any Amount Invoice'
-                        : 'Generate Invoice'}
-                  </Button>
-                </>
-              )}
-            </>
-          ) : (
-            <View style={styles.onchainContainer}>
-              <Text style={[styles.onchainTitle, { color: primaryTextColor }]}>{t('deposit.onchainTitle')}</Text>
-              <Text style={[styles.onchainDescription, { color: secondaryTextColor }]}>{t('deposit.onchainDescription')}</Text>
-
-              {isGeneratingOnchain ? (
-                <Text style={[styles.generatingText, { color: secondaryTextColor }]}>{t('deposit.generatingAddress')}</Text>
-              ) : onchainAddress ? (
-                <>
-                  <View style={styles.qrContainer}>
-                    <View style={styles.qrCodeWrapper}>
-                      <QRCode value={onchainRequest} size={220} backgroundColor="white" color="black" />
-                    </View>
-                  </View>
-
-                  <Text style={[styles.invoiceLabel, { color: secondaryTextColor }]}>{t('deposit.bitcoinAddress')}</Text>
-                  <View style={styles.invoiceContainer}>
-                    <Text style={[styles.invoiceText, { color: primaryTextColor }]} selectable>
-                      {onchainAddress}
-                    </Text>
-                    <Button mode="outlined" onPress={handleCopyOnchainAddress} style={styles.copyButton} textColor={BRAND_COLOR}>
-                      {t('deposit.copyAddress')}
-                    </Button>
-                  </View>
-
-                  {onchainParsed.minimumSats !== null && (
-                    <Text style={[styles.minimumText, { color: secondaryTextColor }]}> 
-                      {t('deposit.minimumDeposit').replace('{{amount}}', onchainParsed.minimumSats.toLocaleString())}
-                    </Text>
-                  )}
-
-                  <Text style={[styles.onchainNote, { color: secondaryTextColor }]}>{t('deposit.onchainNote')}</Text>
-                </>
-              ) : null}
+                    <Text style={styles.currencySelectorText}>{currencyLabels[inputCurrency]} ▼</Text>
+                  </TouchableOpacity>
+                }
+                contentStyle={[styles.currencyMenu, { backgroundColor: gradientColors[0] || '#1a1a2e' }]}
+              >
+                {currencyOptions.map((currency) => (
+                  <Menu.Item
+                    key={currency}
+                    onPress={() => handleCurrencyChange(currency)}
+                    title={currencyLabels[currency]}
+                    titleStyle={inputCurrency === currency ? styles.currencyMenuItemActive : { color: primaryTextColor }}
+                  />
+                ))}
+              </Menu>
             </View>
-          )}
+
+            {previewDisplay && previewSats > 0 && inputCurrency !== 'sats' && (
+              <View style={styles.conversionPreview}>
+                <Text style={styles.conversionText}>≈ {previewDisplay.satsDisplay}</Text>
+                {previewDisplay.fiatDisplay && <Text style={styles.conversionFiat}>({previewDisplay.fiatDisplay})</Text>}
+              </View>
+            )}
+
+            <View style={styles.presetsContainer}>
+              {presets.map((preset) => (
+                <Button
+                  key={preset}
+                  mode="outlined"
+                  onPress={() => handlePresetAmount(preset)}
+                  style={[styles.presetButton, { borderColor: secondaryTextColor }]}
+                  contentStyle={styles.presetButtonContent}
+                  labelStyle={styles.presetButtonLabel}
+                  textColor={primaryTextColor}
+                >
+                  {formatPresetLabel(preset)}
+                </Button>
+              ))}
+            </View>
+
+            <StyledTextInput
+              label={t('payments.description')}
+              value={description}
+              onChangeText={setDescription}
+              style={[styles.input, styles.descriptionInput, { backgroundColor: inputBackgroundColor }]}
+              outlineColor={secondaryTextColor}
+              activeOutlineColor={BRAND_COLOR}
+              textColor={primaryTextColor}
+              placeholderTextColor={secondaryTextColor}
+              outlineStyle={styles.inputOutline}
+              contentStyle={styles.inputContent}
+              multiline
+              numberOfLines={2}
+              theme={{
+                colors: {
+                  background: inputBackgroundColor,
+                  onSurfaceVariant: secondaryTextColor,
+                },
+              }}
+            />
+
+            <Button
+              mode="contained"
+              onPress={handleGenerateInvoice}
+              loading={isGenerating}
+              disabled={isGenerating || (amount !== '' && inputCurrency !== 'sats' && isLoadingRates)}
+              style={styles.generateButton}
+              buttonColor={BRAND_COLOR}
+              textColor="#1a1a2e"
+            >
+              {isLoadingRates && inputCurrency !== 'sats' && amount !== ''
+                ? t('common.loading')
+                : amount === ''
+                  ? t('deposit.generateAnyAmountInvoice')
+                  : t('payments.generateInvoice')}
+            </Button>
+
+            {invoice ? (
+              <View style={styles.generatedSection}>
+                <View style={styles.qrContainer}>
+                  <View style={styles.qrCodeWrapper}>
+                    <QRCode value={invoice} size={220} backgroundColor="white" color="black" />
+                  </View>
+                </View>
+
+                <Text style={[styles.amountText, { color: primaryTextColor }]}> 
+                  {invoiceSatsAmount > 0
+                    ? `${t('payments.amount')}: ${invoiceSatsAmount.toLocaleString()} sats`
+                    : t('deposit.anyAmount')}
+                </Text>
+
+                <View style={styles.invoiceContainer}>
+                  <Text style={[styles.invoiceLabel, { color: secondaryTextColor }]}>{t('payments.invoice')}</Text>
+                  <ScrollView style={styles.invoiceScroll} contentContainerStyle={styles.invoiceScrollContent}>
+                    <Text style={[styles.invoiceText, { color: primaryTextColor }]} selectable>{invoice}</Text>
+                  </ScrollView>
+                  <Button mode="outlined" onPress={handleCopyInvoice} style={styles.copyButton} textColor={BRAND_COLOR}>
+                    {t('deposit.copyAddress')}
+                  </Button>
+                </View>
+
+                <Text style={[styles.expiryText, { color: secondaryTextColor }]}>⏳ {t('deposit.expiresIn')}: {getRemainingTime()}</Text>
+
+                <Button mode="text" onPress={handleNewInvoice} textColor={BRAND_COLOR}>
+                  {t('deposit.newInvoice')}
+                </Button>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.orDividerWrap}>
+            <View style={[styles.dividerLine, { backgroundColor: `${secondaryTextColor}40` }]} />
+            <View style={styles.orPill}><Text style={styles.orPillText}>OR</Text></View>
+            <View style={[styles.dividerLine, { backgroundColor: `${secondaryTextColor}40` }]} />
+          </View>
+
+          <View style={[styles.card, styles.onchainCard]}>
+            <Text style={[styles.sectionTitle, { color: primaryTextColor }]}>{t('deposit.onchainSectionTitle')}</Text>
+            <Text style={[styles.sectionSubtitle, { color: secondaryTextColor }]}>{t('deposit.onchainSectionSubtitle')}</Text>
+
+            {isGeneratingOnchain ? (
+              <Text style={[styles.generatingText, { color: secondaryTextColor }]}>{t('deposit.generatingAddress')}</Text>
+            ) : onchainError ? (
+              <View style={styles.errorWrap}>
+                <Text style={[styles.errorText, { color: secondaryTextColor }]}>{onchainError}</Text>
+                <Button mode="outlined" onPress={handleGenerateOnchainAddress} textColor={BRAND_COLOR}>
+                  {t('common.retry')}
+                </Button>
+              </View>
+            ) : onchainAddress ? (
+              <>
+                <View style={styles.qrContainer}>
+                  <View style={styles.qrCodeWrapper}>
+                    <QRCode value={onchainRequest} size={220} backgroundColor="white" color="black" />
+                  </View>
+                </View>
+
+                <Text style={[styles.invoiceLabel, { color: secondaryTextColor }]}>{t('deposit.bitcoinAddress')}</Text>
+                <View style={styles.invoiceContainer}>
+                  <Text style={[styles.invoiceText, { color: primaryTextColor }]} selectable>{onchainAddress}</Text>
+                  <Button mode="outlined" onPress={handleCopyOnchainAddress} style={styles.copyButton} textColor={BRAND_COLOR}>
+                    {t('deposit.copyAddress')}
+                  </Button>
+                </View>
+
+                {onchainParsed.minimumSats !== null && (
+                  <Text style={[styles.minimumText, { color: secondaryTextColor }]}>
+                    {t('deposit.minimumDeposit').replace('{{amount}}', onchainParsed.minimumSats.toLocaleString())}
+                  </Text>
+                )}
+
+                <Text style={[styles.onchainNote, { color: secondaryTextColor }]}>{t('deposit.onchainNote')}</Text>
+              </>
+            ) : null}
+          </View>
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
@@ -675,12 +484,8 @@ export default function ReceiveScreen() {
 }
 
 const styles = StyleSheet.create({
-  gradient: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-  },
+  gradient: { flex: 1 },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -690,163 +495,32 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
-  backButton: {
-    fontSize: 16,
-    color: BRAND_COLOR,
-    fontWeight: '600',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  headerSpacer: {
-    width: 60,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 24,
-    paddingTop: 16,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    marginHorizontal: 24,
-    marginTop: 16,
-    marginBottom: 8,
-    borderRadius: 14,
-    padding: 4,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    gap: 6,
-  },
-  tabButton: {
-    flex: 1,
+  backButton: { fontSize: 16, color: BRAND_COLOR, fontWeight: '600' },
+  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  headerSpacer: { width: 60 },
+  scrollView: { flex: 1 },
+  scrollContent: { padding: 24, paddingTop: 16, paddingBottom: 36 },
+  card: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'transparent',
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  tabButtonActive: {
-    backgroundColor: BRAND_COLOR,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  label: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    marginBottom: 16,
-  },
-  input: {
-    backgroundColor: '#1a1a2e',
-    marginBottom: 16,
-  },
-  inputOutline: {
-    borderRadius: 8,
-  },
-  inputContent: {
-    paddingTop: 8,
-  },
-  descriptionInput: {
-    marginTop: 8,
-  },
-  presetsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-    gap: 8,
-  },
-  presetButton: {
-    flex: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  presetButtonContent: {
-    paddingHorizontal: 4,
-    paddingVertical: 6,
-  },
-  presetButtonLabel: {
-    fontSize: 13,
-    marginHorizontal: 0,
-  },
-  generateButton: {
-    marginTop: 16,
-  },
-  qrContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  qrCodeWrapper: {
+    borderColor: 'rgba(255,255,255,0.12)',
     padding: 16,
-    backgroundColor: 'white',
-    borderRadius: 12,
-  },
-  amountText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  invoiceContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 12,
     marginBottom: 16,
   },
-  invoiceLabel: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: 6,
+  onchainCard: {
+    backgroundColor: 'rgba(255,193,7,0.06)',
   },
-  invoiceScroll: {
-    maxHeight: 120,
-    marginBottom: 10,
-  },
-  invoiceScrollContent: {
-    paddingVertical: 4,
-  },
-  invoiceText: {
-    fontSize: 11,
-    color: '#FFFFFF',
-    fontFamily: 'monospace',
-    lineHeight: 16,
-  },
-  copyButton: {
-    borderColor: BRAND_COLOR,
-  },
-  statusContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  waitingText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    marginBottom: 8,
-  },
-  expiryText: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  newInvoiceButton: {
-    marginTop: 8,
-  },
-  // Currency input styles
-  amountInputRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    marginBottom: 16,
-  },
-  amountInput: {
-    flex: 1,
-    marginBottom: 0,
-    backgroundColor: undefined, // Let StyledTextInput handle background for proper label masking
-  },
+  sectionTitle: { fontSize: 20, fontWeight: '700', marginBottom: 4 },
+  sectionSubtitle: { fontSize: 13, marginBottom: 14 },
+  label: { fontSize: 15, marginBottom: 12 },
+  input: { marginBottom: 16 },
+  inputOutline: { borderRadius: 8 },
+  inputContent: { paddingTop: 8 },
+  descriptionInput: { marginTop: 8 },
+  amountInputRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 16 },
+  amountInput: { flex: 1, marginBottom: 0, backgroundColor: undefined },
   currencySelector: {
-    backgroundColor: '#16213e', // Match input background
     paddingHorizontal: 14,
     borderRadius: 8,
     borderWidth: 1,
@@ -857,18 +531,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 6,
   },
-  currencySelectorText: {
-    color: BRAND_COLOR,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  currencyMenu: {
-    backgroundColor: '#1a1a2e',
-  },
-  currencyMenuItemActive: {
-    color: BRAND_COLOR,
-    fontWeight: 'bold',
-  },
+  currencySelectorText: { color: BRAND_COLOR, fontSize: 14, fontWeight: '600' },
+  currencyMenu: { backgroundColor: '#1a1a2e' },
+  currencyMenuItemActive: { color: BRAND_COLOR, fontWeight: 'bold' },
   conversionPreview: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -881,159 +546,72 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     gap: 8,
   },
-  conversionText: {
-    color: BRAND_COLOR,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  conversionFiat: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 14,
-  },
-  amountFiatText: {
-    fontWeight: 'normal',
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  anyAmountText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: BRAND_COLOR,
-  },
-  // Mode toggle styles
-  modeToggle: {
-    flexDirection: 'row',
+  conversionText: { color: BRAND_COLOR, fontSize: 16, fontWeight: '600' },
+  conversionFiat: { color: 'rgba(255, 255, 255, 0.7)', fontSize: 14 },
+  presetsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, gap: 8 },
+  presetButton: { flex: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
+  presetButtonContent: { paddingHorizontal: 4, paddingVertical: 6 },
+  presetButtonLabel: { fontSize: 13, marginHorizontal: 0 },
+  generateButton: { marginTop: 8 },
+  generatedSection: { marginTop: 20 },
+  qrContainer: { alignItems: 'center', marginBottom: 16 },
+  qrCodeWrapper: { padding: 16, backgroundColor: 'white', borderRadius: 12 },
+  amountText: { fontSize: 16, fontWeight: '600', textAlign: 'center', marginBottom: 12 },
+  invoiceContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 12,
-    padding: 4,
-    marginBottom: 20,
-  },
-  modeButton: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  modeButtonActive: {
-    backgroundColor: BRAND_COLOR,
-  },
-  modeButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  modeButtonTextActive: {
-    color: '#1a1a2e',
-  },
-  // Lightning Address styles
-  addressLoadingContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  addressLoadingText: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 16,
-  },
-  addressCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 16,
-    padding: 20,
-  },
-  addressQrContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  addressDisplay: {
-    backgroundColor: 'rgba(255, 193, 7, 0.1)',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  addressText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: BRAND_COLOR,
-    fontFamily: 'monospace',
-  },
-  addressActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  addressCopyButton: {
-    flex: 1,
-    backgroundColor: BRAND_COLOR,
-    borderRadius: 8,
-  },
-  addressCopyButtonLabel: {
-    color: '#1a1a2e',
-    fontWeight: '600',
-  },
-  addressManageButton: {
-    flex: 1,
-    borderColor: BRAND_COLOR,
-    borderRadius: 8,
-  },
-  addressInfoBox: {
-    backgroundColor: 'rgba(255, 193, 7, 0.1)',
-    borderRadius: 8,
     padding: 12,
+    marginBottom: 12,
   },
-  addressInfoText: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-    lineHeight: 18,
+  invoiceLabel: { fontSize: 13, marginBottom: 6 },
+  invoiceScroll: { maxHeight: 120, marginBottom: 10 },
+  invoiceScrollContent: { paddingVertical: 4 },
+  invoiceText: { fontSize: 11, fontFamily: 'monospace', lineHeight: 16 },
+  copyButton: { borderColor: BRAND_COLOR },
+  expiryText: { textAlign: 'center', fontSize: 14 },
+  orDividerWrap: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  dividerLine: { flex: 1, height: 1 },
+  orPill: {
+    marginHorizontal: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
-  // Claim prompt styles
-  claimPromptCard: {
+  orPillText: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '700' },
+  generatingText: { fontSize: 14, textAlign: 'center', marginTop: 8 },
+  errorWrap: { gap: 10, marginTop: 8 },
+  errorText: { fontSize: 14 },
+  minimumText: { fontSize: 13, marginTop: 2 },
+  onchainNote: { fontSize: 13, lineHeight: 18, marginTop: 8 },
+  addressLoadingContainer: { paddingVertical: 10, alignItems: 'center' },
+  addressLoadingText: { fontSize: 14 },
+  addressCardCompact: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+  },
+  addressCardTitle: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
+  addressDisplayCompact: {
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  claimPromptTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: 8,
-  },
-  claimPromptText: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 20,
-  },
-  claimButton: {
-    borderColor: BRAND_COLOR,
+    backgroundColor: 'rgba(255, 193, 7, 0.1)',
     borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    gap: 8,
   },
-  onchainContainer: {
-    gap: 12,
+  addressTextCompact: { flex: 1, color: BRAND_COLOR, fontFamily: 'monospace', fontSize: 13 },
+  addressCopyIcon: { paddingHorizontal: 6, paddingVertical: 4 },
+  claimBanner: {
+    backgroundColor: 'rgba(255, 193, 7, 0.12)',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 14,
   },
-  onchainTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  onchainDescription: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  generatingText: {
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 24,
-  },
-  minimumText: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  onchainNote: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginTop: 8,
-  },
+  claimBannerText: { color: BRAND_COLOR, fontSize: 13, fontWeight: '600' },
 });
