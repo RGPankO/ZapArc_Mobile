@@ -22,6 +22,16 @@ import { ContactSelectionModal } from '../../src/features/addressBook/components
 import { Contact } from '../../src/features/addressBook/types';
 import { t } from '../../src/services/i18nService';
 
+function isValidBitcoinAddress(address: string): boolean {
+  // Bech32 (native segwit): bc1q... or bc1p... (taproot)
+  if (/^bc1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{25,87}$/i.test(address)) return true;
+  // Legacy P2PKH: starts with 1
+  if (/^1[1-9A-HJ-NP-Za-km-z]{24,33}$/.test(address)) return true;
+  // P2SH: starts with 3
+  if (/^3[1-9A-HJ-NP-Za-km-z]{24,33}$/.test(address)) return true;
+  return false;
+}
+
 type SendStep = 'input' | 'preview' | 'onchain-preview' | 'scanning';
 type ConfirmationSpeed = 'fast' | 'medium' | 'slow';
 type SendTab = 'lightning' | 'onchain';
@@ -80,6 +90,7 @@ export default function SendScreen() {
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [contactModalVisible, setContactModalVisible] = useState(false);
   const [isFetchingFees, setIsFetchingFees] = useState(false);
+  const [addressError, setAddressError] = useState<string | null>(null);
 
   const currencyOptions: InputCurrency[] = useMemo(() => {
     return ['sats', secondaryFiatCurrency];
@@ -128,6 +139,7 @@ export default function SendScreen() {
     setSelectedContact(null);
     setCurrencyMenuVisible(false);
     setInputCurrency('sats');
+    setAddressError(null);
   }, []);
 
   const handleTabChange = useCallback(
@@ -184,6 +196,16 @@ export default function SendScreen() {
 
     const trimmedAddress = paymentInput.trim();
     const satsAmount = Math.floor(Number(amount));
+
+    // Validate address format
+    if (trimmedAddress.length > 0 && !isValidBitcoinAddress(trimmedAddress)) {
+      setAddressError(t('send.invalidOnchainAddress'));
+      setOnchainFeeQuotes(null);
+      return;
+    } else {
+      setAddressError(null);
+    }
+
     if (!trimmedAddress || !satsAmount || satsAmount <= 0) {
       setOnchainFeeQuotes(null);
       return;
@@ -766,7 +788,12 @@ export default function SendScreen() {
               onChangeText={setPaymentInput}
               style={styles.input}
               multiline={false}
+              error={!!addressError}
             />
+          )}
+
+          {addressError && activeTab === 'onchain' && (
+            <Text style={styles.addressErrorText}>{addressError}</Text>
           )}
 
           <Button
@@ -896,6 +923,7 @@ export default function SendScreen() {
               isPreparing ||
               !paymentInput.trim() ||
               (!isLightningTab && !amount.trim()) ||
+              (!isLightningTab && !!addressError) ||
               (isLightningTab && inputCurrency !== 'sats' && isLoadingRates && amount !== '')
             }
             style={styles.previewButton}
@@ -1020,6 +1048,12 @@ const styles = StyleSheet.create({
   },
   input: {
     marginBottom: 0,
+  },
+  addressErrorText: {
+    color: '#ef4444',
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 4,
   },
   scanButton: {
     borderColor: BRAND_COLOR,
