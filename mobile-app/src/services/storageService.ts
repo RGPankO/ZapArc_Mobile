@@ -467,7 +467,7 @@ class StorageService {
 
       // Validate word count BEFORE caching — wrong PIN can produce garbage
       if (wordCount !== 12 && wordCount !== 15 && wordCount !== 18 && wordCount !== 21 && wordCount !== 24) {
-        console.error(`❌ [StorageService] CORRUPTED mnemonic detected: ${wordCount} words (expected 12/15/18/21/24). Wallet ${masterKeyId} needs re-import or wrong PIN.`);
+        console.warn(`⚠️ [StorageService] Decryption produced invalid mnemonic: ${wordCount} words (expected 12/15/18/21/24). Likely wrong PIN for wallet ${masterKeyId}.`);
         this._mnemonicCache.delete(masterKeyId); // Ensure no stale cache
         return null;
       }
