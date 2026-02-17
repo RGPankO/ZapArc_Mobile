@@ -275,6 +275,7 @@ export default function SendScreen() {
       }
 
       const prepared = await BreezSparkService.prepareSendPayment(paymentInput.trim(), paymentAmount);
+      console.log('🔍 [Send] prepared response:', JSON.stringify(prepared, (_, v) => typeof v === 'bigint' ? v.toString() : v));
       setPrepareResponse(prepared);
 
       let feeAmount = 0;
@@ -290,17 +291,18 @@ export default function SendScreen() {
         } else if (method.tag === 'BitcoinAddress' || method.type === 'bitcoinAddress') {
           const feeQuote = methodInner?.feeQuote || method?.feeQuote;
           if (feeQuote?.speedFast || feeQuote?.speedMedium || feeQuote?.speedSlow) {
+            const extractFee = (q: any) => Number(q?.userFeeSat ?? q?.feeSats ?? 0);
             extractedFeeQuotes = {
               fast: {
-                feeSats: Number(feeQuote.speedFast?.feeSats || 0),
+                feeSats: extractFee(feeQuote.speedFast),
                 estimatedConfirmationTime: feeQuote.speedFast?.estimatedConfirmationTime,
               },
               medium: {
-                feeSats: Number(feeQuote.speedMedium?.feeSats || 0),
+                feeSats: extractFee(feeQuote.speedMedium),
                 estimatedConfirmationTime: feeQuote.speedMedium?.estimatedConfirmationTime,
               },
               slow: {
-                feeSats: Number(feeQuote.speedSlow?.feeSats || 0),
+                feeSats: extractFee(feeQuote.speedSlow),
                 estimatedConfirmationTime: feeQuote.speedSlow?.estimatedConfirmationTime,
               },
             };
