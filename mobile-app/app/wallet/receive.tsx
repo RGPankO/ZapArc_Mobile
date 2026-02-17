@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert, TouchableOpacity, Platform, ToastAndroid } from 'react-native';
-import { Text, Button, Menu } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { Text, Button, Menu, Snackbar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -136,12 +136,12 @@ export default function ReceiveScreen() {
     }
   }, [amount, description, inputCurrency, convertToSats]);
 
+  const [snackMsg, setSnackMsg] = useState('');
+  const [snackVisible, setSnackVisible] = useState(false);
+
   const showCopyToast = useCallback((label: string) => {
-    if (Platform.OS === 'android') {
-      ToastAndroid.show(`${label} copied`, ToastAndroid.SHORT);
-    } else {
-      Alert.alert('Copied', `${label} copied to clipboard`);
-    }
+    setSnackMsg(`${label} copied`);
+    setSnackVisible(true);
   }, []);
 
   const handleCopyInvoice = useCallback(async () => {
@@ -533,6 +533,14 @@ export default function ReceiveScreen() {
           )}
         </ScrollView>
       </SafeAreaView>
+      <Snackbar
+        visible={snackVisible}
+        onDismiss={() => setSnackVisible(false)}
+        duration={2000}
+        style={styles.snackbar}
+      >
+        {snackMsg}
+      </Snackbar>
     </LinearGradient>
   );
 }
@@ -591,6 +599,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,193,7,0.06)',
   },
   sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 10 },
+  snackbar: { marginBottom: 16 },
   qrContainer: { alignItems: 'center', marginVertical: 16, padding: 16, backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 12, alignSelf: 'center' },
   invoiceSectionTitle: { marginTop: 20 },
   sectionSubtitle: { fontSize: 13, marginBottom: 14 },
