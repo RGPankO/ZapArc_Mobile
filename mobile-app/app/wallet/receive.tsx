@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, TouchableOpacity, Platform, ToastAndroid } from 'react-native';
 import { Text, Button, Menu } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -135,15 +135,22 @@ export default function ReceiveScreen() {
     }
   }, [amount, description, inputCurrency, convertToSats]);
 
+  const showCopyToast = useCallback((label: string) => {
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(`${label} copied`, ToastAndroid.SHORT);
+    }
+  }, []);
+
   const handleCopyInvoice = useCallback(async () => {
     if (!invoice) return;
     try {
       await Clipboard.setStringAsync(invoice);
+      showCopyToast('Invoice');
     } catch (error) {
       console.error('Failed to copy invoice:', error);
       Alert.alert(t('common.error'), t('deposit.copyFailed'));
     }
-  }, [invoice]);
+  }, [invoice, showCopyToast]);
 
   const handleNewInvoice = useCallback(() => {
     setInvoice('');
@@ -218,11 +225,12 @@ export default function ReceiveScreen() {
     if (!addressInfo?.lightningAddress) return;
     try {
       await Clipboard.setStringAsync(addressInfo.lightningAddress);
+      showCopyToast('Lightning Address');
     } catch (error) {
       console.error('Failed to copy address:', error);
       Alert.alert(t('common.error'), t('deposit.copyFailed'));
     }
-  }, [addressInfo]);
+  }, [addressInfo, showCopyToast]);
 
   const onchainParsed = parseOnchainRequest(onchainRequest);
   const onchainAddress = onchainParsed.address;
@@ -231,11 +239,12 @@ export default function ReceiveScreen() {
     if (!onchainAddress) return;
     try {
       await Clipboard.setStringAsync(onchainAddress);
+      showCopyToast('Bitcoin Address');
     } catch (error) {
       console.error('Failed to copy on-chain address:', error);
       Alert.alert(t('common.error'), t('deposit.copyFailed'));
     }
-  }, [onchainAddress]);
+  }, [onchainAddress, showCopyToast]);
 
   const getRemainingTime = useCallback(() => {
     if (!expiryTime) return '';
