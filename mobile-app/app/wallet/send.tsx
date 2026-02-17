@@ -267,11 +267,6 @@ export default function SendScreen() {
         }
       }
 
-      if (isOnchainFlow && paymentAmount < 10000) {
-        Alert.alert('Minimum Amount', 'On-chain sends require at least 10,000 sats.');
-        return;
-      }
-
       if (paymentAmount > balance) {
         Alert.alert(
           'Insufficient Balance',
