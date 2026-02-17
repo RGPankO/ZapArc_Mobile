@@ -465,7 +465,14 @@ class StorageService {
       const wordCount = mnemonic.trim().split(/\s+/).length;
       console.log('🔐 [StorageService] Decrypted mnemonic wordCount:', wordCount, 'version:', masterKey.encryptedMnemonic.version);
 
-      // Cache for subsequent calls during this session
+      // Validate word count BEFORE caching — wrong PIN can produce garbage
+      if (wordCount !== 12 && wordCount !== 15 && wordCount !== 18 && wordCount !== 21 && wordCount !== 24) {
+        console.error(`❌ [StorageService] CORRUPTED mnemonic detected: ${wordCount} words (expected 12/15/18/21/24). Wallet ${masterKeyId} needs re-import or wrong PIN.`);
+        this._mnemonicCache.delete(masterKeyId); // Ensure no stale cache
+        return null;
+      }
+
+      // Cache for subsequent calls during this session (only valid mnemonics)
       this._mnemonicCache.set(masterKeyId, mnemonic);
 
       // Silent migration: legacy v1/v2 payloads -> v3 AES-GCM (per-wallet salt)
@@ -490,14 +497,7 @@ class StorageService {
         }
       }
 
-      // Validate mnemonic word count — corrupted data from broken V1→V3 migration
-      {
-        const wc = mnemonic.trim().split(/\s+/).length;
-        if (wc !== 12 && wc !== 15 && wc !== 18 && wc !== 21 && wc !== 24) {
-          console.error(`❌ [StorageService] CORRUPTED mnemonic detected: ${wc} words (expected 12/15/18/21/24). Wallet ${masterKeyId} needs re-import.`);
-          return null;
-        }
-      }
+      // Word count already validated above (before caching)
 
       if (__DEV__) console.log('✅ [StorageService] GET_MASTER_KEY_MNEMONIC SUCCESS');
       return mnemonic;
@@ -553,10 +553,17 @@ class StorageService {
     if (__DEV__) console.log('🔵 [StorageService] VERIFY_MASTER_KEY_PIN', { masterKeyId });
 
     try {
-      // If we have a cached mnemonic for this key, PIN was already verified
-      if (this._mnemonicCache.has(masterKeyId)) {
-        if (__DEV__) console.log('⚡ [StorageService] VERIFY_MASTER_KEY_PIN from cache');
-        return true;
+      // If we have a cached (validated) mnemonic for this key, PIN was already verified
+      const cached = this._mnemonicCache.get(masterKeyId);
+      if (cached) {
+        // Double-check the cached value is a valid mnemonic, not garbage
+        const wc = cached.trim().split(/\s+/).length;
+        if (wc === 12 || wc === 15 || wc === 18 || wc === 21 || wc === 24) {
+          if (__DEV__) console.log('⚡ [StorageService] VERIFY_MASTER_KEY_PIN from cache');
+          return true;
+        }
+        // Cache has garbage — remove it and re-verify
+        this._mnemonicCache.delete(masterKeyId);
       }
 
       // Try to decrypt — if it works, PIN is valid (also populates cache)
