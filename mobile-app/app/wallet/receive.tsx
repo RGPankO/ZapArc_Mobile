@@ -138,6 +138,8 @@ export default function ReceiveScreen() {
   const showCopyToast = useCallback((label: string) => {
     if (Platform.OS === 'android') {
       ToastAndroid.show(`${label} copied`, ToastAndroid.SHORT);
+    } else {
+      Alert.alert('Copied', `${label} copied to clipboard`);
     }
   }, []);
 
