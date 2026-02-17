@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Clipboard from 'expo-clipboard';
+import * as BreezSparkService from '../../../services/breezSparkService';
 import { StyledTextInput } from '../../../components';
 import {
   Text,
@@ -436,6 +437,11 @@ export function WalletManagementScreen(): React.JSX.Element {
             Alert.alert('Error', 'Failed to switch wallet');
           }
         } else {
+          // Start disconnecting SDK immediately — don't wait for PIN entry.
+          // This way by the time the user enters their PIN, the disconnect is likely done,
+          // and selectWallet won't need to wait for it.
+          BreezSparkService.beginDisconnectSDK();
+
           // Navigate to unlock with this wallet pre-selected
           router.push({
             pathname: '/wallet/unlock',

@@ -335,30 +335,54 @@ export async function initializeSDK(
 /**
  * Disconnect and cleanup SDK
  */
+// Track in-flight disconnect so multiple callers can await the same operation
+let _disconnectPromise: Promise<void> | null = null;
+
 export async function disconnectSDK(): Promise<void> {
+  // If a disconnect is already in progress, await it instead of starting another
+  if (_disconnectPromise) {
+    await _disconnectPromise;
+    return;
+  }
+
   if (!_isNativeAvailable) return;
 
-  try {
-    // Unsubscribe from events
-    if (activeEventListenerId && sdkInstance) {
-      try {
-        await sdkInstance.removeEventListener(activeEventListenerId);
-      } catch (e) {
-        console.warn('⚠️ [BreezSparkService] Error removing listener during disconnect:', e);
+  _disconnectPromise = (async () => {
+    try {
+      // Unsubscribe from events
+      if (activeEventListenerId && sdkInstance) {
+        try {
+          await sdkInstance.removeEventListener(activeEventListenerId);
+        } catch (e) {
+          console.warn('⚠️ [BreezSparkService] Error removing listener during disconnect:', e);
+        }
+        activeEventListenerId = null;
       }
-      activeEventListenerId = null;
-    }
 
-    if (sdkInstance) {
-      // Spark SDK uses sdkInstance.disconnect(), not BreezSDK.disconnect()
-      await sdkInstance.disconnect();
-      sdkInstance = null;
-      _isInitialized = false;
-      console.log('✅ [BreezSparkService] Breez SDK disconnected');
+      if (sdkInstance) {
+        // Spark SDK uses sdkInstance.disconnect(), not BreezSDK.disconnect()
+        await sdkInstance.disconnect();
+        sdkInstance = null;
+        _isInitialized = false;
+        console.log('✅ [BreezSparkService] Breez SDK disconnected');
+      }
+    } catch (error) {
+      console.error('❌ [BreezSparkService] Failed to disconnect SDK:', error);
     }
-  } catch (error) {
-    console.error('❌ [BreezSparkService] Failed to disconnect SDK:', error);
-  }
+  })();
+
+  await _disconnectPromise;
+  _disconnectPromise = null;
+}
+
+/**
+ * Start disconnecting SDK without waiting — caller can await disconnectSDK() later.
+ * Marks SDK as uninitialized immediately to prevent stale refreshes.
+ */
+export function beginDisconnectSDK(): void {
+  if (!_isNativeAvailable || !sdkInstance) return;
+  _isInitialized = false; // Mark as disconnected immediately
+  disconnectSDK(); // Fire and forget — sets _disconnectPromise
 }
 
 /**
@@ -1583,6 +1607,7 @@ export const BreezSparkService = {
   isNativeAvailable,
   initializeSDK,
   disconnectSDK,
+  beginDisconnectSDK,
   isSDKInitialized,
   getBalance,
   prepareSendPayment,
