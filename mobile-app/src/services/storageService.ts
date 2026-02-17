@@ -461,9 +461,10 @@ class StorageService {
       validatePayloadIntegrity(masterKey.encryptedMnemonic.timestamp);
 
       // Decrypt mnemonic
+      console.log('🔐 [StorageService] Decrypting mnemonic, version:', masterKey.encryptedMnemonic.version, 'dataLen:', masterKey.encryptedMnemonic.data?.length, 'ivLen:', masterKey.encryptedMnemonic.iv?.length, 'saltLen:', masterKey.encryptedMnemonic.salt?.length);
       const mnemonic = await decryptData(masterKey.encryptedMnemonic, pin);
       const wordCount = mnemonic.trim().split(/\s+/).length;
-      console.log('🔐 [StorageService] Decrypted mnemonic wordCount:', wordCount, 'version:', masterKey.encryptedMnemonic.version);
+      console.log('🔐 [StorageService] Decrypted mnemonic wordCount:', wordCount, 'version:', masterKey.encryptedMnemonic.version, 'firstChars:', mnemonic.substring(0, 20) + '...');
 
       // Validate word count BEFORE caching — wrong PIN can produce garbage
       if (wordCount !== 12 && wordCount !== 15 && wordCount !== 18 && wordCount !== 21 && wordCount !== 24) {
