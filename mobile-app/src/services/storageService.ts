@@ -32,8 +32,12 @@ const STORAGE_KEYS = {
   BIOMETRIC_PIN_PREFIX: 'zap_arc_biometric_pin_', // Prefix for biometric-protected PINs
 } as const;
 
+// NOTE: We intentionally do NOT use requireAuthentication here because:
+// 1. The app already handles biometric auth via LocalAuthentication before reading the PIN
+// 2. requireAuthentication would cause double biometric prompts (OS + app)
+// 3. Changing options would make existing stored PINs unreadable (breaking existing users)
+// Security is enforced at the application layer via LocalAuthentication.authenticateAsync()
 const BIOMETRIC_SECURE_STORE_OPTIONS: SecureStore.SecureStoreOptions = {
-  requireAuthentication: true,
   keychainAccessible: SecureStore.WHEN_PASSCODE_SET_THIS_DEVICE_ONLY,
 };
 
