@@ -24,12 +24,13 @@ import {
   getSecondaryTextColor,
   BRAND_COLOR,
 } from '../../../utils/theme-helpers';
+import { WALLET_PIN_LENGTH } from '../constants/security';
 
 // =============================================================================
 // Constants
 // =============================================================================
 
-const PIN_LENGTH = 6;
+const PIN_LENGTH = WALLET_PIN_LENGTH;
 const KEYPAD = [
   ['1', '2', '3'],
   ['4', '5', '6'],

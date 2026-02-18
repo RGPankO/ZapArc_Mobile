@@ -356,8 +356,9 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
 
   const changePin = useCallback(
     async (_oldPin: string, _newPin: string): Promise<boolean> => {
-      // TODO: Implement PIN change in storageService
-      // Would need to re-encrypt the mnemonic with new PIN
+      // TODO(security): Implement atomic PIN rotation in storageService.
+      // Must decrypt with old PIN, re-encrypt with new PIN, verify round-trip,
+      // and only then commit to avoid lockout/data-loss windows.
       console.log('🔵 [useWalletAuth] Change PIN (not implemented)');
       return false;
     },

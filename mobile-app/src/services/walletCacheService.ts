@@ -79,6 +79,8 @@ export function emitWalletSwitch(event: WalletSwitchEvent): void {
 // =============================================================================
 
 const CACHE_KEY_PREFIX = '@wallet_cache:';
+const BALANCE_CACHE_KEY_PREFIX = '@wallet_balance_cache:';
+const TX_CACHE_KEY_PREFIX = '@wallet_tx_cache:';
 const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes - consider data stale after this
 
 // =============================================================================
@@ -90,6 +92,14 @@ const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes - consider data stale after 
  */
 function getCacheKey(masterKeyId: string, subWalletIndex: number): string {
   return `${CACHE_KEY_PREFIX}${masterKeyId}:${subWalletIndex}`;
+}
+
+function getBalanceCacheKey(masterKeyId: string, subWalletIndex: number): string {
+  return `${BALANCE_CACHE_KEY_PREFIX}${masterKeyId}:${subWalletIndex}`;
+}
+
+function getTransactionsCacheKey(masterKeyId: string, subWalletIndex: number): string {
+  return `${TX_CACHE_KEY_PREFIX}${masterKeyId}:${subWalletIndex}`;
 }
 
 /**
@@ -107,15 +117,25 @@ export async function getCachedBalance(
   subWalletIndex: number
 ): Promise<{ balance: number; isStale: boolean } | null> {
   try {
+    const balanceKey = getBalanceCacheKey(masterKeyId, subWalletIndex);
+    const cachedBalance = await AsyncStorage.getItem(balanceKey);
+
+    if (cachedBalance) {
+      const balance: CachedBalance = JSON.parse(cachedBalance);
+      return {
+        balance: balance.balanceSat,
+        isStale: isStale(balance.timestamp),
+      };
+    }
+
+    // Backward compatibility with legacy combined key
     const key = getCacheKey(masterKeyId, subWalletIndex);
     const cached = await AsyncStorage.getItem(key);
-    
     if (!cached) return null;
-    
+
     const walletCache: WalletCache = JSON.parse(cached);
-    
     if (!walletCache.balance) return null;
-    
+
     return {
       balance: walletCache.balance.balanceSat,
       isStale: isStale(walletCache.balance.timestamp),
@@ -135,22 +155,14 @@ export async function cacheBalance(
   balanceSat: number
 ): Promise<void> {
   try {
-    const key = getCacheKey(masterKeyId, subWalletIndex);
-    
-    // Get existing cache or create new
-    let walletCache: WalletCache = {};
-    const existing = await AsyncStorage.getItem(key);
-    if (existing) {
-      walletCache = JSON.parse(existing);
-    }
-    
-    // Update balance
-    walletCache.balance = {
-      balanceSat,
-      timestamp: Date.now(),
-    };
-    
-    await AsyncStorage.setItem(key, JSON.stringify(walletCache));
+    const balanceKey = getBalanceCacheKey(masterKeyId, subWalletIndex);
+    await AsyncStorage.setItem(
+      balanceKey,
+      JSON.stringify({
+        balanceSat,
+        timestamp: Date.now(),
+      } satisfies CachedBalance)
+    );
   } catch (err) {
     console.error('❌ [WalletCache] Failed to cache balance:', err);
   }
@@ -164,15 +176,27 @@ export async function getCachedTransactions(
   subWalletIndex: number
 ): Promise<{ transactions: Transaction[]; isStale: boolean } | null> {
   try {
+    const txKey = getTransactionsCacheKey(masterKeyId, subWalletIndex);
+    const cachedTransactions = await AsyncStorage.getItem(txKey);
+
+    if (cachedTransactions) {
+      const txs: CachedTransactions = JSON.parse(cachedTransactions);
+      return {
+        transactions: txs.transactions,
+        isStale: isStale(txs.timestamp),
+      };
+    }
+
+    // Backward compatibility with legacy combined key
     const key = getCacheKey(masterKeyId, subWalletIndex);
     const cached = await AsyncStorage.getItem(key);
-    
+
     if (!cached) return null;
-    
+
     const walletCache: WalletCache = JSON.parse(cached);
-    
+
     if (!walletCache.transactions) return null;
-    
+
     return {
       transactions: walletCache.transactions.transactions,
       isStale: isStale(walletCache.transactions.timestamp),
@@ -192,22 +216,14 @@ export async function cacheTransactions(
   transactions: Transaction[]
 ): Promise<void> {
   try {
-    const key = getCacheKey(masterKeyId, subWalletIndex);
-    
-    // Get existing cache or create new
-    let walletCache: WalletCache = {};
-    const existing = await AsyncStorage.getItem(key);
-    if (existing) {
-      walletCache = JSON.parse(existing);
-    }
-    
-    // Update transactions
-    walletCache.transactions = {
-      transactions,
-      timestamp: Date.now(),
-    };
-    
-    await AsyncStorage.setItem(key, JSON.stringify(walletCache));
+    const txKey = getTransactionsCacheKey(masterKeyId, subWalletIndex);
+    await AsyncStorage.setItem(
+      txKey,
+      JSON.stringify({
+        transactions,
+        timestamp: Date.now(),
+      } satisfies CachedTransactions)
+    );
   } catch (err) {
     console.error('❌ [WalletCache] Failed to cache transactions:', err);
   }
@@ -222,7 +238,9 @@ export async function clearWalletCache(
 ): Promise<void> {
   try {
     const key = getCacheKey(masterKeyId, subWalletIndex);
-    await AsyncStorage.removeItem(key);
+    const balanceKey = getBalanceCacheKey(masterKeyId, subWalletIndex);
+    const txKey = getTransactionsCacheKey(masterKeyId, subWalletIndex);
+    await AsyncStorage.multiRemove([key, balanceKey, txKey]);
   } catch (err) {
     console.error('❌ [WalletCache] Failed to clear cache:', err);
   }
@@ -234,7 +252,7 @@ export async function clearWalletCache(
 export async function clearAllCaches(): Promise<void> {
   try {
     const keys = await AsyncStorage.getAllKeys();
-    const cacheKeys = keys.filter((key) => key.startsWith(CACHE_KEY_PREFIX));
+    const cacheKeys = keys.filter((key) => key.startsWith(CACHE_KEY_PREFIX) || key.startsWith(BALANCE_CACHE_KEY_PREFIX) || key.startsWith(TX_CACHE_KEY_PREFIX));
     await AsyncStorage.multiRemove(cacheKeys);
   } catch (err) {
     console.error('❌ [WalletCache] Failed to clear all caches:', err);

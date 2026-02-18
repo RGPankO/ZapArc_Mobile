@@ -15,7 +15,6 @@ import {
   encryptData,
   decryptData,
   generateUUID,
-  verifyPin,
   validatePayloadIntegrity,
 } from './crypto';
 
@@ -33,11 +32,33 @@ const STORAGE_KEYS = {
   BIOMETRIC_PIN_PREFIX: 'zap_arc_biometric_pin_', // Prefix for biometric-protected PINs
 } as const;
 
+const BIOMETRIC_SECURE_STORE_OPTIONS: SecureStore.SecureStoreOptions = {
+  requireAuthentication: true,
+  keychainAccessible: SecureStore.WHEN_PASSCODE_SET_THIS_DEVICE_ONLY,
+};
+
 // =============================================================================
 // Storage Service Class
 // =============================================================================
 
 class StorageService {
+  private _storageMutex: Promise<void> = Promise.resolve();
+
+  private async withStorageLock<T>(fn: () => Promise<T>): Promise<T> {
+    let release: () => void = () => {};
+    const next = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const prev = this._storageMutex;
+    this._storageMutex = next;
+    await prev;
+    try {
+      return await fn();
+    } finally {
+      release();
+    }
+  }
+
   // ========================================
   // Wallet Existence and Status
   // ========================================
@@ -143,11 +164,24 @@ class StorageService {
    * Save multi-wallet storage data
    */
   async saveMultiWalletStorage(storage: MultiWalletStorage): Promise<void> {
-    if (__DEV__) console.log('🔵 [StorageService] SAVE_MULTI_WALLET_STORAGE', {
-      masterKeyCount: storage.masterKeys.length,
-      activeMasterKeyId: storage.activeMasterKeyId,
-      version: storage.version,
-    });
+    return this.withStorageLock(() => this.saveMultiWalletStorageUnlocked(storage));
+  }
+
+  private async saveMultiWalletStorageUnlocked(storage: MultiWalletStorage): Promise<void> {
+    if (__DEV__) {
+      console.log('🔵 [StorageService] SAVE_MULTI_WALLET_STORAGE', {
+        masterKeyCount: storage.masterKeys.length,
+        activeMasterKeyId: storage.activeMasterKeyId,
+        version: storage.version,
+      });
+    }
+
+    const previousValues = await Promise.all([
+      SecureStore.getItemAsync(STORAGE_KEYS.MULTI_WALLET_DATA),
+      SecureStore.getItemAsync(STORAGE_KEYS.WALLET_VERSION),
+      SecureStore.getItemAsync(STORAGE_KEYS.ACTIVE_MASTER_KEY_ID),
+      SecureStore.getItemAsync(STORAGE_KEYS.ACTIVE_SUB_WALLET_INDEX),
+    ]);
 
     try {
       const serialized = JSON.stringify(storage);
@@ -160,13 +194,14 @@ class StorageService {
         );
       }
 
+      // Canonical source of truth first
       await SecureStore.setItemAsync(STORAGE_KEYS.MULTI_WALLET_DATA, serialized);
       await SecureStore.setItemAsync(
         STORAGE_KEYS.WALLET_VERSION,
         storage.version.toString()
       );
 
-      // Update active wallet tracking
+      // Derived keys
       await SecureStore.setItemAsync(
         STORAGE_KEYS.ACTIVE_MASTER_KEY_ID,
         storage.activeMasterKeyId
@@ -179,6 +214,25 @@ class StorageService {
       if (__DEV__) console.log('✅ [StorageService] SAVE_MULTI_WALLET_STORAGE SUCCESS');
     } catch (error) {
       console.error('❌ [StorageService] SAVE_MULTI_WALLET_STORAGE FAILED', error);
+
+      const [prevData, prevVersion, prevActiveKey, prevActiveSubWallet] = previousValues;
+      const restoreKey = async (key: string, value: string | null): Promise<void> => {
+        if (value === null) {
+          await SecureStore.deleteItemAsync(key);
+        } else {
+          await SecureStore.setItemAsync(key, value);
+        }
+      };
+
+      try {
+        await restoreKey(STORAGE_KEYS.MULTI_WALLET_DATA, prevData);
+        await restoreKey(STORAGE_KEYS.WALLET_VERSION, prevVersion);
+        await restoreKey(STORAGE_KEYS.ACTIVE_MASTER_KEY_ID, prevActiveKey);
+        await restoreKey(STORAGE_KEYS.ACTIVE_SUB_WALLET_INDEX, prevActiveSubWallet);
+      } catch (restoreError) {
+        console.error('❌ [StorageService] Failed to restore storage after partial write', restoreError);
+      }
+
       throw error;
     }
   }
@@ -434,10 +488,14 @@ class StorageService {
   /**
    * Decrypt and get the mnemonic for a master key
    */
-  async getMasterKeyMnemonic(masterKeyId: string, pin: string): Promise<string | null> {
+  async getMasterKeyMnemonic(
+    masterKeyId: string,
+    pin: string,
+    useCache = true
+  ): Promise<string | null> {
     // Return cached mnemonic if available (avoids slow PBKDF2)
     const cached = this._mnemonicCache.get(masterKeyId);
-    if (cached) {
+    if (useCache && cached) {
       if (__DEV__) console.log('⚡ [StorageService] GET_MASTER_KEY_MNEMONIC from cache, words:', cached.trim().split(/\s+/).length);
       return cached;
     }
@@ -462,7 +520,7 @@ class StorageService {
 
       // Decrypt mnemonic
       const encVersion = masterKey.encryptedMnemonic.version || 1;
-      console.log('🔐 [StorageService] Decrypting mnemonic, version:', encVersion, 'dataLen:', masterKey.encryptedMnemonic.data?.length, 'ivLen:', masterKey.encryptedMnemonic.iv?.length, 'saltLen:', masterKey.encryptedMnemonic.salt?.length);
+      if (__DEV__) console.log('🔐 [StorageService] Decrypting mnemonic, version:', encVersion);
       
       let mnemonic: string;
       try {
@@ -475,7 +533,7 @@ class StorageService {
       }
 
       const wordCount = mnemonic.trim().split(/\s+/).length;
-      console.log('🔐 [StorageService] Decrypted wordCount:', wordCount, 'version:', encVersion);
+      if (__DEV__) console.log('🔐 [StorageService] Decrypted wordCount:', wordCount, 'version:', encVersion);
 
       // Validate word count — wrong PIN on some crypto implementations
       // may return garbage instead of throwing
@@ -500,19 +558,21 @@ class StorageService {
       // Only migrate if version is outdated
       if (encVersion < 3) {
         try {
-          console.log('🔄 [StorageService] Migrating encryption from V' + encVersion + ' to V3');
+          if (__DEV__) console.log('🔄 [StorageService] Migrating encryption from V' + encVersion + ' to V3');
           const newEncrypted = await encryptData(normalizedMnemonic, pin);
           // Verify round-trip before saving
           const verifyMnemonic = await decryptData(newEncrypted, pin);
           if (verifyMnemonic.trim() === normalizedMnemonic) {
-            // Re-load storage to avoid race conditions with concurrent saves
-            const freshStorage = await this.loadMultiWalletStorage();
-            const freshKey = freshStorage?.masterKeys.find((mk) => mk.id === masterKeyId);
-            if (freshKey) {
-              freshKey.encryptedMnemonic = newEncrypted;
-              await this.saveMultiWalletStorage(freshStorage!);
-              console.log('✅ [StorageService] Encryption migration V' + encVersion + ' → V3 complete');
-            }
+            await this.withStorageLock(async () => {
+              // Re-load storage and save under a lock to avoid concurrent write races
+              const freshStorage = await this.loadMultiWalletStorage();
+              const freshKey = freshStorage?.masterKeys.find((mk) => mk.id === masterKeyId);
+              if (freshStorage && freshKey) {
+                freshKey.encryptedMnemonic = newEncrypted;
+                await this.saveMultiWalletStorageUnlocked(freshStorage);
+                if (__DEV__) console.log('✅ [StorageService] Encryption migration V' + encVersion + ' → V3 complete');
+              }
+            });
           } else {
             console.warn('⚠️ [StorageService] Migration round-trip mismatch — keeping original encryption');
           }
@@ -561,6 +621,7 @@ class StorageService {
       }
 
       await this.saveMultiWalletStorage(storage);
+      this._mnemonicCache.delete(masterKeyId);
       if (__DEV__) console.log('✅ [StorageService] DELETE_MASTER_KEY SUCCESS');
     } catch (error) {
       console.error('❌ [StorageService] DELETE_MASTER_KEY FAILED', error);
@@ -575,19 +636,8 @@ class StorageService {
     if (__DEV__) console.log('🔵 [StorageService] VERIFY_MASTER_KEY_PIN', { masterKeyId });
 
     try {
-      // If we have a cached (validated) mnemonic for this key, PIN was already verified
-      const cached = this._mnemonicCache.get(masterKeyId);
-      if (cached && bip39.validateMnemonic(cached.trim().toLowerCase().replace(/[\s\r\n]+/g, ' '))) {
-        if (__DEV__) console.log('⚡ [StorageService] VERIFY_MASTER_KEY_PIN from cache (BIP39 valid)');
-        return true;
-      }
-      // Clear invalid cache entry
-      if (cached) {
-        this._mnemonicCache.delete(masterKeyId);
-      }
-
-      // Try to decrypt — if it works, PIN is valid (also populates cache)
-      const mnemonic = await this.getMasterKeyMnemonic(masterKeyId, pin);
+      // Always perform a real decrypt for auth decisions.
+      const mnemonic = await this.getMasterKeyMnemonic(masterKeyId, pin, false);
       const isValid = mnemonic !== null;
       if (__DEV__) console.log('✅ [StorageService] VERIFY_MASTER_KEY_PIN', { isValid });
       return isValid;
@@ -944,6 +994,7 @@ class StorageService {
       await SecureStore.deleteItemAsync(STORAGE_KEYS.LAST_ACTIVITY);
       await SecureStore.deleteItemAsync(STORAGE_KEYS.ACTIVE_MASTER_KEY_ID);
       await SecureStore.deleteItemAsync(STORAGE_KEYS.ACTIVE_SUB_WALLET_INDEX);
+      this.clearMnemonicCache();
 
       if (__DEV__) console.log('✅ [StorageService] DELETE_ALL_WALLETS SUCCESS');
     } catch (error) {
@@ -1002,7 +1053,7 @@ class StorageService {
       const key = `${STORAGE_KEYS.BIOMETRIC_PIN_PREFIX}${masterKeyId}`;
       // Store in SecureStore (encrypted at rest)
       // Authentication is checked via LocalAuthentication before retrieving
-      await SecureStore.setItemAsync(key, pin);
+      await SecureStore.setItemAsync(key, pin, BIOMETRIC_SECURE_STORE_OPTIONS);
       if (__DEV__) console.log('✅ [StorageService] Biometric PIN stored for master key:', masterKeyId);
     } catch (error) {
       console.error('❌ [StorageService] Failed to store biometric PIN:', error);
@@ -1011,15 +1062,14 @@ class StorageService {
   }
 
   /**
-   * Retrieve PIN for biometric unlock
-   * Note: Authentication happens before calling this method via LocalAuthentication.authenticateAsync
-   * The PIN is stored in secure storage but retrieved without additional auth prompt
+   * Retrieve PIN for biometric unlock.
+   * SecureStore enforces OS-level authentication on access.
    */
   async getBiometricPin(masterKeyId: string): Promise<string | null> {
     try {
       const key = `${STORAGE_KEYS.BIOMETRIC_PIN_PREFIX}${masterKeyId}`;
       // Don't require authentication here - user already authenticated via LocalAuthentication
-      const pin = await SecureStore.getItemAsync(key);
+      const pin = await SecureStore.getItemAsync(key, BIOMETRIC_SECURE_STORE_OPTIONS);
 
       if (pin) {
         if (__DEV__) console.log('✅ [StorageService] Biometric PIN retrieved for master key:', masterKeyId);
@@ -1054,7 +1104,7 @@ class StorageService {
   async hasBiometricPin(masterKeyId: string): Promise<boolean> {
     try {
       const key = `${STORAGE_KEYS.BIOMETRIC_PIN_PREFIX}${masterKeyId}`;
-      const pin = await SecureStore.getItemAsync(key);
+      const pin = await SecureStore.getItemAsync(key, BIOMETRIC_SECURE_STORE_OPTIONS);
       return pin !== null;
     } catch (error) {
       console.error('❌ [StorageService] Failed to check biometric PIN:', error);

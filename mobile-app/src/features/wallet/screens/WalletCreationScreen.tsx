@@ -28,6 +28,7 @@ import { useWallet } from '../../../hooks/useWallet';
 import { useSettings } from '../../../hooks/useSettings';
 import { useAppTheme } from '../../../contexts/ThemeContext';
 import { getGradientColors, BRAND_COLOR } from '../../../utils/theme-helpers';
+import { WALLET_PIN_LENGTH } from '../constants/security';
 
 // =============================================================================
 // Types
@@ -277,7 +278,7 @@ export function WalletCreationScreen(): React.JSX.Element {
   // ========================================
 
   const pinValid = useMemo(() => {
-    return pin.length >= 6 && pin === confirmPin;
+    return pin.length === WALLET_PIN_LENGTH && pin === confirmPin;
   }, [pin, confirmPin]);
 
   const handleCreateWallet = useCallback(async () => {
@@ -297,20 +298,7 @@ export function WalletCreationScreen(): React.JSX.Element {
 
       // Use custom name or default to "Main Wallet"
       const nickname = walletName.trim() || undefined;
-      // Race against a timeout — don't let SDK init block the UI forever
-      const timeoutPromise = new Promise<string>((_, reject) =>
-        setTimeout(() => reject(new Error('__timeout__')), 15000)
-      );
-      try {
-        await Promise.race([createMasterKey(pin, nickname, mnemonic), timeoutPromise]);
-      } catch (raceErr) {
-        // If it timed out, the wallet was likely created — SDK init is just slow
-        if (raceErr instanceof Error && raceErr.message === '__timeout__') {
-          console.warn('⚠️ [WalletCreation] createMasterKey timed out (SDK init slow), proceeding');
-        } else {
-          throw raceErr;
-        }
-      }
+      await createMasterKey(pin, nickname, mnemonic);
       setCurrentStep('complete');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create wallet');
@@ -623,17 +611,17 @@ export function WalletCreationScreen(): React.JSX.Element {
           value={pin}
           onChangeText={(text) => {
             setPin(text.replace(/[^0-9]/g, ''));
-            if (text.length === 6) {
+            if (text.length === WALLET_PIN_LENGTH) {
               Keyboard.dismiss();
             }
           }}
           secureTextEntry
           keyboardType="numeric"
-          maxLength={6}
+          maxLength={WALLET_PIN_LENGTH}
           style={styles.pinInput}
         />
-        {pin.length > 0 && pin.length < 6 && (
-          <Text style={styles.pinHint}>{6 - pin.length} more digit{6 - pin.length !== 1 ? 's' : ''} needed</Text>
+        {pin.length > 0 && pin.length < WALLET_PIN_LENGTH && (
+          <Text style={styles.pinHint}>{WALLET_PIN_LENGTH - pin.length} more digit{WALLET_PIN_LENGTH - pin.length !== 1 ? 's' : ''} needed</Text>
         )}
 
         <StyledTextInput
@@ -642,21 +630,21 @@ export function WalletCreationScreen(): React.JSX.Element {
           value={confirmPin}
           onChangeText={(text) => {
             setConfirmPin(text.replace(/[^0-9]/g, ''));
-            if (text.length === 6) {
+            if (text.length === WALLET_PIN_LENGTH) {
               Keyboard.dismiss();
             }
           }}
           secureTextEntry
           keyboardType="numeric"
-          maxLength={6}
+          maxLength={WALLET_PIN_LENGTH}
           style={styles.pinInput}
         />
       </View>
 
-      {pin.length > 0 && pin.length < 6 && confirmPin.length === 0 && (
+      {pin.length > 0 && pin.length < WALLET_PIN_LENGTH && confirmPin.length === 0 && (
         <Text style={styles.pinMismatch}>PIN must be exactly 6 digits</Text>
       )}
-      {pin.length >= 6 && confirmPin.length >= 6 && pin !== confirmPin && (
+      {pin.length >= WALLET_PIN_LENGTH && confirmPin.length >= WALLET_PIN_LENGTH && pin !== confirmPin && (
         <Text style={styles.pinMismatch}>PINs do not match</Text>
       )}
 

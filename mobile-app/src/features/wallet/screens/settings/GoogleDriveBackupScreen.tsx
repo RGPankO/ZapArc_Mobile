@@ -27,6 +27,7 @@ import { useWallet } from '../../../../hooks/useWallet';
 import { storageService, settingsService } from '../../../../services';
 import { useAppTheme } from '../../../../contexts/ThemeContext';
 import { generateMasterKeyNickname } from '../../../../utils/mnemonic';
+import { WALLET_PIN_LENGTH } from '../../constants/security';
 import { useLanguage } from '../../../../hooks/useLanguage';
 import {
   getGradientColors,
@@ -234,6 +235,27 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
     }
   };
 
+  const authenticateSensitiveSeedAccess = useCallback(async (): Promise<boolean> => {
+    try {
+      const biometricAvailable = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+      if (!biometricAvailable || !isEnrolled) {
+        return true;
+      }
+
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: t('cloudBackup.authenticateToBackup'),
+        fallbackLabel: t('settings.usePin'),
+      });
+
+      return result.success;
+    } catch (error) {
+      console.warn('[GoogleDriveBackup] Sensitive auth error:', error);
+      return false;
+    }
+  }, [t]);
+
   // ==========================================================================
   // Backup Operations
   // ==========================================================================
@@ -298,6 +320,12 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
       // This is intentional: we only back up the master seed, NOT individual sub-wallet
       // mnemonics. Sub-wallets are derived from the master seed using BIP-85, so
       // restoring the master seed allows regenerating all sub-wallets.
+      const sensitiveAuthOk = await authenticateSensitiveSeedAccess();
+      if (!sensitiveAuthOk) {
+        Alert.alert(t('common.error'), t('cloudBackup.authenticateToBackup'));
+        return;
+      }
+
       const pin = await storageService.getBiometricPin(targetKey.id);
       if (!pin) {
         Alert.alert(t('common.error'), 'PIN not available');
@@ -376,8 +404,8 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
   const handleConfirmImport = async (): Promise<void> => {
     if (!restoredMnemonic) return;
 
-    if (restorePin.length < 4) {
-      Alert.alert(t('common.error'), 'PIN must be at least 4 digits');
+    if (restorePin.length !== WALLET_PIN_LENGTH) {
+      Alert.alert(t('common.error'), `PIN must be exactly ${WALLET_PIN_LENGTH} digits`);
       return;
     }
 
@@ -630,7 +658,7 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
             onChangeText={setRestorePin}
             secureTextEntry
             keyboardType="number-pad"
-            maxLength={6}
+            maxLength={WALLET_PIN_LENGTH}
             style={styles.input}
           />
 
@@ -640,7 +668,7 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
             onChangeText={setConfirmRestorePin}
             secureTextEntry
             keyboardType="number-pad"
-            maxLength={6}
+            maxLength={WALLET_PIN_LENGTH}
             style={styles.input}
           />
 
@@ -662,7 +690,7 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
               mode="contained"
               onPress={handleConfirmImport}
               loading={isImporting}
-              disabled={isImporting || restorePin.length < 4 || !confirmRestorePin}
+              disabled={isImporting || restorePin.length !== WALLET_PIN_LENGTH || !confirmRestorePin}
               style={[styles.modalButton, { backgroundColor: BRAND_COLOR }]}
               labelStyle={{ color: '#1a1a2e' }}
             >
