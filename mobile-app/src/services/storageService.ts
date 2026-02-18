@@ -470,6 +470,19 @@ class StorageService {
         if (__DEV__) console.log('✅ [StorageService] Post-storage mnemonic round-trip validation passed');
       }
 
+      // Compute and save seed fingerprint for cloud backup matching
+      // This lets us show "Backed up" for wallets imported via 12 words
+      // that already have a matching cloud backup
+      try {
+        const { googleDriveBackupService } = require('./googleDriveBackupService');
+        const fingerprint = await googleDriveBackupService.getSeedFingerprint(normalizedMnemonic);
+        await googleDriveBackupService.saveLocalFingerprint(masterKeyId, fingerprint);
+        if (__DEV__) console.log('✅ [StorageService] Seed fingerprint saved for backup matching');
+      } catch (fpError) {
+        // Non-critical — don't fail wallet creation if fingerprint save fails
+        if (__DEV__) console.warn('⚠️ [StorageService] Failed to save seed fingerprint:', fpError);
+      }
+
       if (__DEV__) console.log('✅ [StorageService] CREATE_MASTER_KEY SUCCESS', { masterKeyId });
       return masterKeyId;
     } catch (error) {
