@@ -1073,7 +1073,7 @@ class StorageService {
     try {
       const key = `${STORAGE_KEYS.BIOMETRIC_PIN_PREFIX}${masterKeyId}`;
       // Don't require authentication here - user already authenticated via LocalAuthentication
-      const pin = await SecureStore.getItemAsync(key, BIOMETRIC_SECURE_STORE_OPTIONS);
+      const pin = await SecureStore.getItemAsync(key); // No options — compatible with PINs stored before hardening
 
       if (pin) {
         if (__DEV__) console.log('✅ [StorageService] Biometric PIN retrieved for master key:', masterKeyId);
@@ -1108,7 +1108,7 @@ class StorageService {
   async hasBiometricPin(masterKeyId: string): Promise<boolean> {
     try {
       const key = `${STORAGE_KEYS.BIOMETRIC_PIN_PREFIX}${masterKeyId}`;
-      const pin = await SecureStore.getItemAsync(key, BIOMETRIC_SECURE_STORE_OPTIONS);
+      const pin = await SecureStore.getItemAsync(key); // No options — compatible with PINs stored before hardening
       return pin !== null;
     } catch (error) {
       console.error('❌ [StorageService] Failed to check biometric PIN:', error);
