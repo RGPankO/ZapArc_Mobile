@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 1024px;
+  height: 500px;
+  overflow: hidden;
+  font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+  background: #171740;
+}
+.container {
+  width: 1024px;
+  height: 500px;
+  min-height: 500px;
+  background: #171740;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ambient glow effects — centered, doesn't touch edges */
+.container::before {
+  content: '';
+  position: absolute;
+  top: 50px; left: 100px; right: 100px; bottom: 50px;
+  background-image: 
+    radial-gradient(circle at 30% 50%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 70% 40%, rgba(139, 92, 246, 0.06) 0%, transparent 40%);
+}
+
+/* Icon canvas */
+.icon-area {
+  position: relative;
+  z-index: 2;
+  margin-right: 60px;
+}
+canvas {
+  display: block;
+  border-radius: 28px;
+  box-shadow: 
+    0 20px 60px rgba(59, 130, 246, 0.25),
+    0 0 80px rgba(59, 130, 246, 0.1);
+}
+
+/* Text content */
+.content {
+  position: relative;
+  z-index: 2;
+}
+.app-name {
+  font-size: 56px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  margin-bottom: 12px;
+}
+.app-name .zap {
+  color: #ffffff;
+}
+.app-name .arc {
+  color: #f7931a;
+}
+.tagline {
+  font-size: 22px;
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  margin-bottom: 28px;
+}
+.features {
+  display: flex;
+  gap: 20px;
+}
+.feature {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 14px;
+  font-weight: 500;
+}
+.feature-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+/* Decorative particles */
+.particle {
+  position: absolute;
+  color: rgba(59, 130, 246, 0.15);
+  z-index: 1;
+}
+.p1 { top: 35px; left: 70px; font-size: 18px; transform: rotate(-15deg); }
+.p2 { top: 70px; right: 100px; font-size: 12px; opacity: 0.5; transform: rotate(25deg); }
+.p3 { bottom: 50px; right: 180px; font-size: 22px; opacity: 0.3; transform: rotate(-30deg); }
+.p4 { bottom: 35px; left: 280px; font-size: 10px; opacity: 0.35; transform: rotate(10deg); }
+.p5 { top: 120px; left: 420px; font-size: 8px; opacity: 0.2; transform: rotate(-5deg); }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="particle p1">⚡</div>
+  <div class="particle p2">⚡</div>
+  <div class="particle p3">⚡</div>
+  <div class="particle p4">⚡</div>
+  <div class="particle p5">⚡</div>
+  
+  <div class="icon-area">
+    <canvas id="c" width="140" height="140"></canvas>
+  </div>
+  
+  <div class="content">
+    <div class="app-name"><span class="zap">Zap</span><span class="arc">Arc</span></div>
+    <div class="tagline">Bitcoin. Lightning fast.</div>
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">⚡</div>
+        Lightning
+      </div>
+      <div class="feature">
+        <div class="feature-icon">⛓️</div>
+        On-chain
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔐</div>
+        Self-custody
+      </div>
+      <div class="feature">
+        <div class="feature-icon">👛</div>
+        Multi-wallet
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ZapArc icon — from assets/icons/zap-arc-icon.html, scaled to 140px
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+const W = 140;
+const S = W / 512; // scale factor
+
+ctx.beginPath();
+ctx.roundRect(0, 0, W, W, 24);
+ctx.clip();
+
+const bg = ctx.createRadialGradient(256*S, 200*S, 50*S, 256*S, 300*S, 400*S);
+bg.addColorStop(0, '#1a1a4a');
+bg.addColorStop(0.6, '#0d0d2b');
+bg.addColorStop(1, '#050510');
+ctx.fillStyle = bg;
+ctx.fillRect(0, 0, W, W);
+
+for (let i = 0; i < 4; i++) {
+  const r = (90 + i * 45) * S;
+  const alpha = 0.25 - i * 0.05;
+  ctx.strokeStyle = `rgba(88, 86, 214, ${alpha})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(256*S, 256*S, r, -Math.PI * 0.7 - i * 0.1, Math.PI * 0.2 + i * 0.1);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(256*S, 256*S, r, Math.PI * 0.3 - i * 0.1, Math.PI * 1.2 + i * 0.1);
+  ctx.stroke();
+}
+
+const glow = ctx.createRadialGradient(256*S, 230*S, 20*S, 256*S, 260*S, 200*S);
+glow.addColorStop(0, 'rgba(0, 140, 255, 0.4)');
+glow.addColorStop(0.4, 'rgba(60, 60, 220, 0.15)');
+glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+ctx.fillStyle = glow;
+ctx.fillRect(0, 0, W, W);
+
+ctx.beginPath();
+ctx.moveTo(290*S, 65*S);
+ctx.lineTo(195*S, 235*S);
+ctx.lineTo(265*S, 225*S);
+ctx.lineTo(218*S, 445*S);
+ctx.lineTo(320*S, 265*S);
+ctx.lineTo(248*S, 278*S);
+ctx.closePath();
+
+const boltGrad = ctx.createLinearGradient(220*S, 65*S, 280*S, 445*S);
+boltGrad.addColorStop(0, '#00CCFF');
+boltGrad.addColorStop(0.3, '#007AFF');
+boltGrad.addColorStop(0.7, '#5856D6');
+boltGrad.addColorStop(1, '#7B61FF');
+ctx.fillStyle = boltGrad;
+ctx.shadowColor = '#007AFF';
+ctx.shadowBlur = 15;
+ctx.fill();
+ctx.shadowBlur = 8;
+ctx.fill();
+ctx.shadowBlur = 0;
+
+ctx.beginPath();
+ctx.moveTo(290*S, 65*S);
+ctx.lineTo(195*S, 235*S);
+ctx.lineTo(265*S, 225*S);
+ctx.lineTo(240*S, 310*S);
+ctx.lineTo(248*S, 278*S);
+ctx.closePath();
+const highlight = ctx.createLinearGradient(200*S, 65*S, 280*S, 300*S);
+highlight.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
+highlight.addColorStop(0.6, 'rgba(255, 255, 255, 0.05)');
+highlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
+ctx.fillStyle = highlight;
+ctx.fill();
+
+const topGlow = ctx.createRadialGradient(280*S, 90*S, 2*S, 280*S, 90*S, 40*S);
+topGlow.addColorStop(0, 'rgba(200, 240, 255, 0.6)');
+topGlow.addColorStop(1, 'rgba(200, 240, 255, 0)');
+ctx.fillStyle = topGlow;
+ctx.fillRect(240*S, 50*S, 80*S, 80*S);
+</script>
+</body>
+</html>

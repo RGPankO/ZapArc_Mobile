@@ -51,7 +51,8 @@ export function TransactionHistoryScreen(): React.JSX.Element {
   // Filtered transactions
   const filteredTransactions = useMemo(() => {
     if (filter === 'all') return transactions;
-    return transactions.filter((tx) => tx.type === filter.replace('ed', '') as 'send' | 'receive');
+    const typeMap: Record<string, string> = { received: 'receive', sent: 'send' };
+    return transactions.filter((tx) => tx.type === typeMap[filter]);
   }, [transactions, filter]);
 
   // Group transactions by date

@@ -2,7 +2,7 @@
 // Configure biometric authentication (fingerprint/Face ID)
 
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
 import { Text, Switch, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -43,18 +43,26 @@ export function SecuritySettingsScreen(): React.JSX.Element {
         if (compatible) {
           const types =
             await LocalAuthentication.supportedAuthenticationTypesAsync();
-          if (
-            types.includes(
-              LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION
-            )
-          ) {
-            setBiometricType('Face ID');
-          } else if (
-            types.includes(
-              LocalAuthentication.AuthenticationType.FINGERPRINT
-            )
-          ) {
-            setBiometricType('Fingerprint');
+          const hasFace = types.includes(
+            LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION
+          );
+          const hasFingerprint = types.includes(
+            LocalAuthentication.AuthenticationType.FINGERPRINT
+          );
+
+          if (Platform.OS === 'ios') {
+            // iOS: Face ID or Touch ID — one or the other
+            setBiometricType(hasFace ? 'Face ID' : 'Fingerprint');
+          } else {
+            // Android: often supports both — use generic "Biometric"
+            // unless only one type is available
+            if (hasFace && hasFingerprint) {
+              setBiometricType('Biometric');
+            } else if (hasFace) {
+              setBiometricType('Face ID');
+            } else if (hasFingerprint) {
+              setBiometricType('Fingerprint');
+            }
           }
         }
       } catch (err) {
@@ -151,7 +159,7 @@ export function SecuritySettingsScreen(): React.JSX.Element {
                   style={styles.sectionIcon}
                 />
                 <Text style={[styles.sectionTitle, { color: primaryText }]}>
-                  {biometricType === 'Fingerprint' ? t('settings.fingerprintUnlock') : t('settings.faceIdUnlock')}
+                  {biometricType === 'Fingerprint' ? t('settings.fingerprintUnlock') : biometricType === 'Biometric' ? t('settings.biometricUnlock') : t('settings.faceIdUnlock')}
                 </Text>
               </View>
 
