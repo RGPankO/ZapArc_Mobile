@@ -512,7 +512,7 @@ class GoogleDriveBackupService {
   async restoreBackup(
     backupId: string,
     password: string
-  ): Promise<{ success: boolean; mnemonic?: string; error?: string }> {
+  ): Promise<{ success: boolean; mnemonic?: string; walletName?: string; error?: string }> {
     try {
       console.log('📥 [GoogleDrive] Restoring backup...');
 
@@ -559,7 +559,7 @@ class GoogleDriveBackupService {
       }
 
       console.log('✅ [GoogleDrive] Backup restored successfully');
-      return { success: true, mnemonic };
+      return { success: true, mnemonic, walletName: backupData.walletName };
     } catch (error) {
       console.error('❌ [GoogleDrive] Restore backup failed:', error);
       return {

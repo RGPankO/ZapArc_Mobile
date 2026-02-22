@@ -79,6 +79,7 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
 
   // Restore flow: PIN setup after decryption
   const [restoredMnemonic, setRestoredMnemonic] = useState<string | null>(null);
+  const [restoredWalletName, setRestoredWalletName] = useState<string | null>(null);
   const [showPinModal, setShowPinModal] = useState(false);
   const [restorePin, setRestorePin] = useState('');
   const [confirmRestorePin, setConfirmRestorePin] = useState('');
@@ -388,6 +389,7 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
         setShowPasswordModal(false);
         setPassword('');
         setRestoredMnemonic(result.mnemonic);
+        setRestoredWalletName(result.walletName || null);
         setRestorePin('');
         setConfirmRestorePin('');
         setShowPinModal(true);
@@ -426,7 +428,7 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
 
     setIsImporting(true);
     try {
-      const nickname = generateMasterKeyNickname(masterKeys.length + 1);
+      const nickname = restoredWalletName || generateMasterKeyNickname(masterKeys.length + 1);
       console.log('🔄 [Restore] Importing wallet...', { nickname });
       const masterKeyId = await importMasterKey(restoredMnemonic, restorePin, nickname);
       console.log('✅ [Restore] Wallet imported:', masterKeyId);
