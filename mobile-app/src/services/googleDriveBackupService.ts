@@ -537,7 +537,26 @@ class GoogleDriveBackupService {
       }
 
       // Decrypt the mnemonic
-      const mnemonic = await decryptMnemonic(backupData, password);
+      let mnemonic: string;
+      try {
+        mnemonic = await decryptMnemonic(backupData, password);
+      } catch (decryptError) {
+        console.error('❌ [GoogleDrive] Decryption failed:', decryptError);
+        return {
+          success: false,
+          error: 'Incorrect password. Please try again.',
+        };
+      }
+
+      // Validate the decrypted mnemonic is actually valid BIP39
+      const words = mnemonic.trim().split(/\s+/);
+      if (![12, 15, 18, 21, 24].includes(words.length) || words.some(w => !/^[a-z]+$/.test(w))) {
+        console.error('❌ [GoogleDrive] Decrypted data is not a valid mnemonic');
+        return {
+          success: false,
+          error: 'Incorrect password. Please try again.',
+        };
+      }
 
       console.log('✅ [GoogleDrive] Backup restored successfully');
       return { success: true, mnemonic };
