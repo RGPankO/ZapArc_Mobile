@@ -251,7 +251,15 @@ export async function decryptMnemonic(
       decipher.final(),
     ]);
 
-    return decrypted.toString('utf8');
+    const mnemonic = decrypted.toString('utf8');
+
+    // Validate that decrypted result looks like a mnemonic (BIP39 words)
+    const words = mnemonic.trim().split(/\s+/);
+    if (![12, 15, 18, 21, 24].includes(words.length) || words.some(w => !/^[a-z]+$/.test(w))) {
+      throw new Error('Decryption produced invalid data. Wrong password.');
+    }
+
+    return mnemonic;
   } catch (error) {
     console.error('❌ [BackupEncryption] Decryption failed:', error);
     throw new Error('Failed to decrypt backup. Please check your password.');

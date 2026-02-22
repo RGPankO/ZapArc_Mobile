@@ -392,10 +392,20 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
         setConfirmRestorePin('');
         setShowPinModal(true);
       } else {
-        Alert.alert(t('common.error'), result.error || 'Failed to restore backup');
+        const errorMsg = result.error || 'Failed to restore backup';
+        const isPasswordError = errorMsg.toLowerCase().includes('password') || errorMsg.toLowerCase().includes('decrypt');
+        Alert.alert(
+          t('common.error'),
+          isPasswordError ? 'Incorrect password. Please try again.' : errorMsg
+        );
       }
     } catch (error) {
-      Alert.alert(t('common.error'), 'Failed to restore backup');
+      const msg = error instanceof Error ? error.message : 'Failed to restore backup';
+      const isPasswordError = msg.toLowerCase().includes('password') || msg.toLowerCase().includes('decrypt');
+      Alert.alert(
+        t('common.error'),
+        isPasswordError ? 'Incorrect password. Please try again.' : msg
+      );
     } finally {
       setIsProcessing(false);
     }
