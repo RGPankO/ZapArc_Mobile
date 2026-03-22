@@ -265,38 +265,33 @@ export async function initializeSDK(
             projectId ? { projectId } : undefined
         );
         if (pushTokenData.data) {
-            const registrationPromises: Promise<unknown>[] = [];
+            const identifiers: string[] = [];
 
-            // Register with Lightning Address (unique per wallet)
+            // Lightning Address identifier (wallet-specific)
             const lnAddress = await getLightningAddress();
             if (lnAddress?.lightningAddress) {
-                registrationPromises.push(
-                    NotificationTriggerService.registerDevice(
-                        lnAddress.lightningAddress,
-                        pushTokenData.data,
-                        walletNickname
-                    ).then(() => {
-                        console.log('✅ [BreezSparkService] Registered with Lightning Address:', lnAddress.lightningAddress);
-                    })
-                );
+                identifiers.push(lnAddress.lightningAddress);
+                console.log('✅ [BreezSparkService] Notification identifier (ln address):', lnAddress.lightningAddress);
             }
 
-            // Also register with nodeId (for invoice-based payments)
-            const nodeId = await getNodeId();
-            if (nodeId) {
-                registrationPromises.push(
-                    NotificationTriggerService.registerDevice(
-                        nodeId,
-                        pushTokenData.data,
-                        walletNickname
-                    ).then(() => {
-                        console.log('✅ [BreezSparkService] Registered with nodeId:', nodeId.substring(0, 16) + '...');
-                    })
+            if (identifiers.length > 0) {
+                // Preferred: one-shot sync so stale subscriptions are removed server-side
+                const syncResult = await NotificationTriggerService.syncSubscriptions(
+                    pushTokenData.data,
+                    identifiers,
+                    walletNickname
                 );
-            }
 
-            // Wait for all registrations
-            await Promise.allSettled(registrationPromises);
+                // Fallback for older backend without syncSubscriptions endpoint
+                if (!syncResult.success) {
+                    console.warn('⚠️ [BreezSparkService] syncSubscriptions failed, falling back to registerDevice:', syncResult.error);
+                    await Promise.allSettled(
+                        identifiers.map((id) =>
+                            NotificationTriggerService.registerDevice(id, pushTokenData.data, walletNickname)
+                        )
+                    );
+                }
+            }
         }
     } catch (e) {
         console.warn('⚠️ [BreezSparkService] Notification registration warning:', e);
@@ -736,15 +731,13 @@ export async function payInvoice(
                  }
               }
 
-              if (recipientIdentifier) {
+              if (recipientIdentifier && identifierType === 'lightningAddress') {
                    if (__DEV__) {
-                     console.log(`🔔 [BreezSparkService] Triggering notification (${identifierType})`);
+                     console.log('🔔 [BreezSparkService] Triggering notification (lightningAddress)');
                    }
                    // Send async without awaiting so we don't block the UI
                    NotificationTriggerService.sendTransactionNotification(
-                       identifierType === 'lightningAddress'
-                         ? { lightningAddress: recipientIdentifier }
-                         : { pubKey: recipientIdentifier },
+                       { lightningAddress: recipientIdentifier },
                        _amountSat || 0
                    )
                    .then(() => {
@@ -754,7 +747,7 @@ export async function payInvoice(
                    })
                    .catch(e => console.warn('🔔 [BreezSparkService] Trigger failed:', e));
               } else {
-                  console.warn('⚠️ [BreezSparkService] Could not find recipient identifier');
+                  console.warn('⚠️ [BreezSparkService] Skipping remote notification trigger (no unique lightning address identifier)');
               }
           } catch (err) {
               console.warn('⚠️ [BreezSparkService] Failed to parse payment request for notification:', err);
@@ -1518,15 +1511,13 @@ export async function sendPayment(
           }
         }
 
-        if (recipientIdentifier) {
+        if (recipientIdentifier && identifierType === 'lightningAddress') {
           if (__DEV__) {
-            console.log(`🔔 [BreezSparkService] Triggering notification (${identifierType})`);
+            console.log('🔔 [BreezSparkService] Triggering notification (lightningAddress)');
           }
           // Send async without awaiting so we don't block the UI
           NotificationTriggerService.sendTransactionNotification(
-            identifierType === 'lightningAddress'
-              ? { lightningAddress: recipientIdentifier }
-              : { pubKey: recipientIdentifier },
+            { lightningAddress: recipientIdentifier },
             amountSat || 0
           )
           .then(() => {
@@ -1536,7 +1527,7 @@ export async function sendPayment(
           })
           .catch(e => console.warn('🔔 [BreezSparkService] Notification failed:', e));
         } else {
-          console.warn('⚠️ [BreezSparkService] Could not find recipient identifier for notification');
+          console.warn('⚠️ [BreezSparkService] Skipping remote notification trigger (no unique lightning address identifier)');
         }
       } catch (err) {
         console.warn('⚠️ [BreezSparkService] Failed to trigger notification:', err);

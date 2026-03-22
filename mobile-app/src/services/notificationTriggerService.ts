@@ -7,6 +7,7 @@ import { Platform } from 'react-native';
 const BASE_URL = 'https://europe-west3-investave-1337.cloudfunctions.net';
 const NOTIFICATION_ENDPOINT = `${BASE_URL}/sendTransactionNotification`;
 const REGISTER_ENDPOINT = `${BASE_URL}/registerDevice`;
+const SYNC_SUBSCRIPTIONS_ENDPOINT = `${BASE_URL}/syncSubscriptions`;
 
 // Deduplication: track recent registrations to prevent spam
 const recentRegistrations = new Map<string, number>();
@@ -99,16 +100,64 @@ export const NotificationTriggerService = {
   },
 
   /**
+   * Sync all wallet identifiers for this device token in one shot.
+   * Backend should replace existing mappings for this token.
+   */
+  async syncSubscriptions(
+    pushToken: string,
+    identifiers: string[],
+    walletNickname?: string
+  ): Promise<NotificationResponse> {
+    try {
+      const uniqueIdentifiers = Array.from(new Set(identifiers.map(i => i.trim()).filter(Boolean)));
+      if (!pushToken || uniqueIdentifiers.length === 0) {
+        return { success: false, error: 'Missing push token or identifiers' };
+      }
+
+      console.log(`🔄 [Notification] Syncing subscriptions (${uniqueIdentifiers.length})`);
+
+      const response = await fetch(SYNC_SUBSCRIPTIONS_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          expoPushToken: pushToken,
+          identifiers: uniqueIdentifiers,
+          platform: Platform.OS,
+          walletNickname,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`⚠️ [Notification] Sync subscriptions failed (${response.status}): ${errorText}`);
+        return { success: false, error: `HTTP ${response.status}: ${errorText}` };
+      }
+
+      const result = await response.json();
+      console.log('✅ [Notification] Subscriptions synced:', result);
+      return result;
+    } catch (error) {
+      console.warn('⚠️ [Notification] syncSubscriptions network error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown network error',
+      };
+    }
+  },
+
+  /**
    * Triggers a push notification to the recipient device.
    * Can use direct token, recipient PubKey, or Lightning Address for lookup.
    */
   async sendTransactionNotification(
-    recipient: { pushToken?: string; pubKey?: string; lightningAddress?: string },
+    recipient: { pushToken?: string; lightningAddress?: string },
     amountSats: number
   ): Promise<NotificationResponse> {
     try {
-      if (!recipient.pushToken && !recipient.pubKey && !recipient.lightningAddress) {
-        return { success: false, error: 'Must provide pushToken, pubKey, or lightningAddress' };
+      if (!recipient.pushToken && !recipient.lightningAddress) {
+        return { success: false, error: 'Must provide pushToken or lightningAddress' };
       }
 
       if (__DEV__) {
@@ -122,7 +171,6 @@ export const NotificationTriggerService = {
         },
         body: JSON.stringify({
           expoPushToken: recipient.pushToken,
-          recipientPubKey: recipient.pubKey,
           recipientLightningAddress: recipient.lightningAddress,
           amount: amountSats,
         }),

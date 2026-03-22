@@ -14,6 +14,7 @@ import type {
   ExpoPushMessage,
   BreezWebhookRequest,
   RegisterPushTokenRequest,
+  SyncSubscriptionsRequest,
 } from './types.js';
 
 // Initialize Firebase Admin
@@ -23,6 +24,11 @@ const db = getFirestore();
 /**
  * Formats the push notification message
  */
+function normalizeIdentifier(identifier: string): string {
+  const trimmed = identifier.trim();
+  return trimmed.includes('@') ? trimmed.toLowerCase() : trimmed;
+}
+
 function formatPushMessage(
   expoPushToken: string,
   amount: number,
@@ -121,9 +127,7 @@ export const registerDevice = onRequest(
 
       // Normalize the key (Lightning Address should be lowercase)
       // This handles both node IDs (hex pubkeys) and Lightning Addresses (user@domain)
-      const normalizedKey = pubKey.includes('@')
-        ? pubKey.toLowerCase().trim()
-        : pubKey;
+      const normalizedKey = normalizeIdentifier(pubKey);
 
       // Store in Firestore
       // Collection: 'users' -> Document: <pubKey or lightningAddress>
@@ -145,6 +149,98 @@ export const registerDevice = onRequest(
       response.status(500).json({
         success: false,
         error: 'Internal server error during registration',
+      });
+    }
+  }
+);
+
+/**
+ * Sync subscriptions for one expo push token (replace-all semantics).
+ * Removes stale identifier -> token mappings that are no longer active on device.
+ */
+export const syncSubscriptions = onRequest(
+  { cors: true, region: 'europe-west3' },
+  async (request, response) => {
+    try {
+      if (request.method !== 'POST') {
+        response.status(405).json({
+          success: false,
+          error: 'Method not allowed. Use POST.',
+        });
+        return;
+      }
+
+      const body = request.body as Partial<SyncSubscriptionsRequest>;
+      const { expoPushToken, identifiers, platform, walletNickname } = body;
+
+      if (!expoPushToken || !Array.isArray(identifiers)) {
+        response.status(400).json({
+          success: false,
+          error: 'Missing required fields: expoPushToken, identifiers[]',
+        });
+        return;
+      }
+
+      const normalizedIdentifiers = Array.from(
+        new Set(
+          identifiers
+            .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+            .map(normalizeIdentifier)
+        )
+      );
+
+      if (normalizedIdentifiers.length === 0) {
+        response.status(400).json({
+          success: false,
+          error: 'identifiers must contain at least one valid identifier',
+        });
+        return;
+      }
+
+      // 1) Find all existing docs currently mapped to this token
+      const existingSnap = await db.collection('users')
+        .where('expoPushToken', '==', expoPushToken)
+        .get();
+
+      const existingIds = existingSnap.docs.map(d => d.id);
+      const keepSet = new Set(normalizedIdentifiers);
+
+      // 2) Remove stale mappings for this token
+      const staleIds = existingIds.filter(id => !keepSet.has(id));
+      await Promise.all(
+        staleIds.map((id) => db.collection('users').doc(id).delete())
+      );
+
+      // 3) Upsert all desired mappings
+      await Promise.all(
+        normalizedIdentifiers.map((id) =>
+          db.collection('users').doc(id).set(
+            {
+              expoPushToken,
+              platform: platform || 'unknown',
+              walletNickname: walletNickname || undefined,
+              updatedAt: new Date(),
+            },
+            { merge: true }
+          )
+        )
+      );
+
+      console.log('✅ syncSubscriptions complete', {
+        tokenPrefix: expoPushToken.substring(0, 20),
+        kept: normalizedIdentifiers.length,
+        removed: staleIds.length,
+      });
+
+      response.status(200).json({
+        success: true,
+        message: 'Subscriptions synced successfully',
+      });
+    } catch (error) {
+      console.error('❌ syncSubscriptions failed:', error);
+      response.status(500).json({
+        success: false,
+        error: 'Internal server error during subscription sync',
       });
     }
   }
@@ -175,15 +271,17 @@ export const sendTransactionNotification = onRequest(
         response.status(400).json({ success: false, error: 'Amount is required' });
         return;
       }
-
-      let tokensToSend: string[] = [];
-
-      // 1. If direct token provided, use it
-      if (directToken) {
-        tokensToSend.push(directToken);
+      if (!directToken && !recipientLightningAddress) {
+        response.status(400).json({
+          success: false,
+          error: 'Provide expoPushToken or recipientLightningAddress',
+        });
+        return;
       }
-      
-      // 2. If recipientPubKey provided, look it up in Firestore
+      if (recipientPubKey && !recipientLightningAddress && !directToken) {
+        console.warn('⚠️ recipientPubKey-only routing is disabled to prevent cross-wallet notifications');
+      }
+
       // Store token + nickname pairs for personalized messages
       interface TokenInfo {
         token: string;
@@ -191,28 +289,12 @@ export const sendTransactionNotification = onRequest(
       }
       let tokenInfos: TokenInfo[] = [];
 
+      // 1. If direct token provided, use it
       if (directToken) {
         tokenInfos.push({ token: directToken });
       }
 
-      if (recipientPubKey) {
-        const userDoc = await db.collection('users').doc(recipientPubKey).get();
-        if (userDoc.exists) {
-          const userData = userDoc.data();
-          if (userData?.expoPushToken) {
-            tokenInfos.push({
-              token: userData.expoPushToken,
-              walletNickname: userData.walletNickname
-            });
-          } else {
-            console.log(`⚠️ User ${recipientPubKey} found but no token.`);
-          }
-        } else {
-          console.log(`⚠️ User ${recipientPubKey} not found in registry.`);
-        }
-      }
-
-      // 3. If recipientLightningAddress provided, look it up in Firestore
+      // 2. If recipientLightningAddress provided, look it up in Firestore
       // Lightning Address is unique per wallet (unlike nodeId for Breez Spark users)
       if (recipientLightningAddress) {
         // Normalize Lightning Address (lowercase, trim)
@@ -238,7 +320,7 @@ export const sendTransactionNotification = onRequest(
       if (tokenInfos.length === 0) {
          response.status(404).json({
           success: false,
-          error: 'No valid recipient token found. Provide expoPushToken or specify valid recipientPubKey.',
+          error: 'No valid recipient token found. Provide expoPushToken or valid recipientLightningAddress.',
         } satisfies TransactionNotificationResponse);
         return;
       }

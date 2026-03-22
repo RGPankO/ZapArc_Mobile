@@ -45,6 +45,21 @@ export interface RegisterPushTokenRequest {
 }
 
 /**
+ * Request interface for syncing all subscriptions for a device token.
+ * Server should treat this as replace-all for this expoPushToken.
+ */
+export interface SyncSubscriptionsRequest {
+  /** Expo push token */
+  expoPushToken: string;
+  /** Full set of identifiers that should remain subscribed for this token */
+  identifiers: string[];
+  /** Platform (android/ios) - optional */
+  platform?: string;
+  /** Wallet nickname - optional */
+  walletNickname?: string;
+}
+
+/**
  * Response interface for notification API
  */
 export interface TransactionNotificationResponse {
