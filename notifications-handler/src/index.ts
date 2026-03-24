@@ -21,6 +21,12 @@ import type {
 initializeApp();
 const db = getFirestore();
 
+// Deduplication: track recently notified recipients to prevent double pushes
+// when both the sender and the NDS webhook fire for the same payment.
+// Key: normalized recipient identifier, Value: timestamp
+const recentNotifications = new Map<string, number>();
+const DEDUP_WINDOW_MS = 30_000; // 30 seconds
+
 /**
  * Formats the push notification message
  */
@@ -333,6 +339,25 @@ export const sendTransactionNotification = onRequest(
         return true;
       });
 
+      // Dedup check: skip if this recipient was recently notified (e.g. by NDS webhook)
+      const now = Date.now();
+      tokenInfos = tokenInfos.filter(info => {
+        const lastNotified = recentNotifications.get(info.token);
+        if (lastNotified && (now - lastNotified) < DEDUP_WINDOW_MS) {
+          console.log(`⏭️ Skipping duplicate notification for token ${info.token.substring(0, 20)}... (notified ${Math.round((now - lastNotified) / 1000)}s ago)`);
+          return false;
+        }
+        return true;
+      });
+
+      if (tokenInfos.length === 0) {
+        response.status(200).json({
+          success: true,
+          message: 'Notification already sent recently (deduplicated)',
+        } satisfies TransactionNotificationResponse);
+        return;
+      }
+
       // Send to all found tokens with personalized messages
       const results = await Promise.all(
         tokenInfos.map(info => {
@@ -340,6 +365,11 @@ export const sendTransactionNotification = onRequest(
           return sendPushNotification(message);
         })
       );
+
+      // Track sent notifications for dedup
+      for (const info of tokenInfos) {
+        recentNotifications.set(info.token, now);
+      }
 
       // Check if ANY succeeded
       const anySuccess = results.some(r => r.success);
@@ -485,6 +515,18 @@ export const notify = onRequest(
         },
       };
 
+      // Dedup check: skip if this token was recently notified (e.g. by sender-triggered push)
+      const now = Date.now();
+      const lastNotified = recentNotifications.get(token);
+      if (lastNotified && (now - lastNotified) < DEDUP_WINDOW_MS) {
+        console.log(`[NDS] ⏭️ Skipping duplicate — token notified ${Math.round((now - lastNotified) / 1000)}s ago`);
+        response.status(200).json({
+          success: true,
+          message: 'Notification already sent recently (deduplicated)',
+        });
+        return;
+      }
+
       const sendResult = await sendPushNotification(message);
 
       if (!sendResult.success) {
@@ -495,6 +537,9 @@ export const notify = onRequest(
         });
         return;
       }
+
+      // Track for dedup
+      recentNotifications.set(token, now);
 
       console.log('[NDS] Push notification sent successfully');
       response.status(200).json({
