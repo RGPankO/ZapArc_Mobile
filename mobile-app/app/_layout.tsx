@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '../src/lib/queryClient';
 import { initializeDeepLinking } from '../src/utils/deepLinking';
+import { syncAllFromCache } from '../src/services/notificationSubscriptionService';
 import { ThemeProvider } from '../src/contexts/ThemeContext';
 import { LanguageProvider } from '../src/contexts/LanguageContext';
 import { FeedbackProvider } from '../src/features/wallet/components/FeedbackComponents';
@@ -12,6 +13,12 @@ export default function RootLayout(): React.JSX.Element {
   useEffect(() => {
     // Initialize deep linking when the app starts
     initializeDeepLinking();
+
+    // Sync push notification subscriptions from cached lightning addresses.
+    // This registers all wallets with the backend in one shot, no SDK init needed.
+    syncAllFromCache().catch((e) =>
+      console.warn('⚠️ [Layout] Notification sync failed:', e)
+    );
   }, []);
 
   return (

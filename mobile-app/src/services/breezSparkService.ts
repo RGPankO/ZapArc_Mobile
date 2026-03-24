@@ -5,8 +5,8 @@
 // - Development builds (npx expo run:android)
 // - Production builds
 import { BREEZ_API_KEY, BREEZ_STORAGE_DIR } from '../config';
-import * as Notifications from 'expo-notifications';
-import Constants from 'expo-constants';
+// expo-notifications and expo-constants imports removed —
+// push token handling moved to notificationSubscriptionService.ts
 // Note: Local notifications disabled - FCM push handles payment notifications
 // import { sendPaymentReceivedNotification } from './notificationService';
 import { NotificationTriggerService } from './notificationTriggerService';
@@ -182,7 +182,8 @@ function generateWalletStorageId(mnemonic: string): string {
 export async function initializeSDK(
   mnemonic: string,
   apiKey?: string,
-  walletNickname?: string
+  walletNickname?: string,
+  walletIdentity?: { masterKeyId: string; subWalletIndex: number },
 ): Promise<boolean> {
   const walletId = generateWalletStorageId(mnemonic);
 
@@ -251,43 +252,26 @@ export async function initializeSDK(
 
     console.log('✅ [BreezSparkService] SDK initialized');
 
-    // Register for notifications with BOTH Lightning Address and nodeId
-    // Lightning Address is unique per wallet (for LN Address payments)
-    // nodeId is needed for invoice payments (may be LSP pubkey for Spark)
+    // Cache lightning address for push notification registration.
+    // The actual sync with backend happens via syncAllFromCache (at startup or on cache change).
+    // This avoids needing to init the SDK for every wallet just to register notifications.
     try {
-        // Get project ID (required for iOS push tokens)
-        const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-        if (!projectId) {
-            console.warn('⚠️ [BreezSparkService] No project ID found - push notifications may not work on iOS');
-        }
-
-        const pushTokenData = await Notifications.getExpoPushTokenAsync(
-            projectId ? { projectId } : undefined
-        );
-        if (pushTokenData.data) {
-            const identifiers: string[] = [];
-
-            // Lightning Address identifier (wallet-specific)
-            const lnAddress = await getLightningAddress();
-            if (lnAddress?.lightningAddress) {
-                identifiers.push(lnAddress.lightningAddress);
-                console.log('✅ [BreezSparkService] Notification identifier (ln address):', lnAddress.lightningAddress);
-            }
-
-            if (identifiers.length > 0) {
-                const syncResult = await NotificationTriggerService.syncSubscriptions(
-                    pushTokenData.data,
-                    identifiers,
-                    walletNickname
-                );
-
-                if (!syncResult.success) {
-                    console.warn('⚠️ [BreezSparkService] syncSubscriptions failed:', syncResult.error);
-                }
-            }
+        const lnAddress = await getLightningAddress();
+        if (lnAddress?.lightningAddress && walletIdentity) {
+            const { cacheWalletAddress } = require('./notificationSubscriptionService');
+            await cacheWalletAddress(
+                walletIdentity.masterKeyId,
+                walletIdentity.subWalletIndex,
+                lnAddress.lightningAddress,
+                walletNickname,
+            );
+        } else if (lnAddress?.lightningAddress) {
+            // Caller didn't pass walletIdentity — fall back to direct sync
+            // (e.g. temp SDK connections for activity checks)
+            console.log('ℹ️ [BreezSparkService] No walletIdentity — skipping address cache');
         }
     } catch (e) {
-        console.warn('⚠️ [BreezSparkService] Notification registration warning:', e);
+        console.warn('⚠️ [BreezSparkService] Notification cache warning:', e);
     }
 
     return true;

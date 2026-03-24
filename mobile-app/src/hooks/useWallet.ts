@@ -252,7 +252,7 @@ export function useWallet(): WalletState & WalletActions {
         let sdkInitialized = false;
         try {
           const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, 0);
-          await BreezSparkService.initializeSDK(derivedMnemonic, undefined, 'Main Wallet');
+          await BreezSparkService.initializeSDK(derivedMnemonic, undefined, 'Main Wallet', { masterKeyId, subWalletIndex: 0 });
           sdkInitialized = true;
           console.log('✅ [useWallet] Breez SDK initialized for new wallet');
         } catch (sdkError) {
@@ -321,7 +321,7 @@ export function useWallet(): WalletState & WalletActions {
         let sdkInitialized = false;
         try {
           const derivedMnemonic = deriveSubWalletMnemonic(normalizedMnemonic, 0);
-          await BreezSparkService.initializeSDK(derivedMnemonic, undefined, 'Main Wallet');
+          await BreezSparkService.initializeSDK(derivedMnemonic, undefined, 'Main Wallet', { masterKeyId, subWalletIndex: 0 });
           sdkInitialized = true;
           console.log('✅ [useWallet] Breez SDK initialized for imported wallet');
         } catch (sdkError) {
@@ -387,6 +387,11 @@ export function useWallet(): WalletState & WalletActions {
         setError(null);
 
         await storageService.archiveSubWallet(masterKeyId, index);
+
+        // Clear cached lightning address so pushes stop routing to this wallet
+        const { clearWalletAddress } = require('../services/notificationSubscriptionService');
+        await clearWalletAddress(masterKeyId, index).catch(() => {});
+
         await loadWalletData();
 
         console.log('✅ [useWallet] Sub-wallet archived:', index);
@@ -471,7 +476,7 @@ export function useWallet(): WalletState & WalletActions {
               await BreezSparkService.disconnectSDK();
               const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, subWalletIndex);
               const walletInfo = await storageService.getActiveWalletInfo();
-              await BreezSparkService.initializeSDK(derivedMnemonic, undefined, walletInfo?.subWalletNickname);
+              await BreezSparkService.initializeSDK(derivedMnemonic, undefined, walletInfo?.subWalletNickname, { masterKeyId, subWalletIndex });
               setIsConnected(true);
               console.log('✅ [useWallet] Breez SDK reconnected for switched wallet');
 
@@ -530,6 +535,10 @@ export function useWallet(): WalletState & WalletActions {
         }
 
         await storageService.deleteMasterKey(masterKeyId);
+
+        // Clear all cached lightning addresses for this master key
+        const { clearMasterKeyAddresses } = require('../services/notificationSubscriptionService');
+        await clearMasterKeyAddresses(masterKeyId).catch(() => {});
 
         // Reload data to see changes
         const storageData = await storageService.loadMultiWalletStorage();
@@ -1125,7 +1134,7 @@ export function useWallet(): WalletState & WalletActions {
             if (orgMnemonic) {
               const orgDerived = deriveSubWalletMnemonic(orgMnemonic, originalWallet.subWalletIndex);
               await BreezSparkService.disconnectSDK().catch(() => {});
-              await BreezSparkService.initializeSDK(orgDerived, undefined, originalWallet.subWalletNickname);
+              await BreezSparkService.initializeSDK(orgDerived, undefined, originalWallet.subWalletNickname, { masterKeyId: originalWallet.masterKeyId, subWalletIndex: originalWallet.subWalletIndex });
               console.log('✅ [useWallet] Restored original wallet connection');
             }
           } catch (restoreError) {

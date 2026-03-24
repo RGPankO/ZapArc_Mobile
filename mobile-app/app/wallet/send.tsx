@@ -38,6 +38,7 @@ type SendTab = 'lightning' | 'onchain';
 
 interface OnchainFeeQuote {
   feeSats: number;
+  satPerVbyte?: number;
   estimatedConfirmationTime?: string;
 }
 
@@ -224,17 +225,21 @@ export default function SendScreen() {
           const feeQuote = methodInner?.feeQuote || method?.feeQuote;
           if (feeQuote?.speedFast || feeQuote?.speedMedium || feeQuote?.speedSlow) {
             const extractFee = (q: any) => Number(q?.userFeeSat ?? q?.feeSats ?? 0);
+            const extractSatPerVbyte = (q: any) => Number(q?.satPerVbyte ?? q?.sat_per_vbyte ?? 0) || undefined;
             setOnchainFeeQuotes({
               fast: {
                 feeSats: extractFee(feeQuote.speedFast),
+                satPerVbyte: extractSatPerVbyte(feeQuote.speedFast),
                 estimatedConfirmationTime: feeQuote.speedFast?.estimatedConfirmationTime,
               },
               medium: {
                 feeSats: extractFee(feeQuote.speedMedium),
+                satPerVbyte: extractSatPerVbyte(feeQuote.speedMedium),
                 estimatedConfirmationTime: feeQuote.speedMedium?.estimatedConfirmationTime,
               },
               slow: {
                 feeSats: extractFee(feeQuote.speedSlow),
+                satPerVbyte: extractSatPerVbyte(feeQuote.speedSlow),
                 estimatedConfirmationTime: feeQuote.speedSlow?.estimatedConfirmationTime,
               },
             });
@@ -366,17 +371,21 @@ export default function SendScreen() {
           const feeQuote = methodInner?.feeQuote || method?.feeQuote;
           if (feeQuote?.speedFast || feeQuote?.speedMedium || feeQuote?.speedSlow) {
             const extractFee = (q: any) => Number(q?.userFeeSat ?? q?.feeSats ?? 0);
+            const extractSatPerVbyte = (q: any) => Number(q?.satPerVbyte ?? q?.sat_per_vbyte ?? 0) || undefined;
             extractedFeeQuotes = {
               fast: {
                 feeSats: extractFee(feeQuote.speedFast),
+                satPerVbyte: extractSatPerVbyte(feeQuote.speedFast),
                 estimatedConfirmationTime: feeQuote.speedFast?.estimatedConfirmationTime,
               },
               medium: {
                 feeSats: extractFee(feeQuote.speedMedium),
+                satPerVbyte: extractSatPerVbyte(feeQuote.speedMedium),
                 estimatedConfirmationTime: feeQuote.speedMedium?.estimatedConfirmationTime,
               },
               slow: {
                 feeSats: extractFee(feeQuote.speedSlow),
+                satPerVbyte: extractSatPerVbyte(feeQuote.speedSlow),
                 estimatedConfirmationTime: feeQuote.speedSlow?.estimatedConfirmationTime,
               },
             };
@@ -508,22 +517,30 @@ export default function SendScreen() {
         label: t('send.speedFast'),
         time: formatEstimatedTime(onchainFeeQuotes?.fast?.estimatedConfirmationTime, '10'),
         fee: Number(onchainFeeQuotes?.fast?.feeSats || 0),
+        satPerVbyte: onchainFeeQuotes?.fast?.satPerVbyte,
       },
       {
         key: 'medium' as ConfirmationSpeed,
         label: t('send.speedMedium'),
         time: formatEstimatedTime(onchainFeeQuotes?.medium?.estimatedConfirmationTime, '30'),
         fee: Number(onchainFeeQuotes?.medium?.feeSats || 0),
+        satPerVbyte: onchainFeeQuotes?.medium?.satPerVbyte,
       },
       {
         key: 'slow' as ConfirmationSpeed,
         label: t('send.speedSlow'),
         time: formatEstimatedTime(onchainFeeQuotes?.slow?.estimatedConfirmationTime, '60'),
         fee: Number(onchainFeeQuotes?.slow?.feeSats || 0),
+        satPerVbyte: onchainFeeQuotes?.slow?.satPerVbyte,
       },
     ],
     [onchainFeeQuotes, formatEstimatedTime]
   );
+
+  const selectedOnchainQuote = useMemo(() => {
+    if (!onchainFeeQuotes) return undefined;
+    return onchainFeeQuotes[selectedSpeed];
+  }, [onchainFeeQuotes, selectedSpeed]);
 
   if (step === 'scanning') {
     return (
@@ -614,7 +631,7 @@ export default function SendScreen() {
                           {option.time}
                         </Text>
                         <Text style={[styles.speedOptionFee, { color: primaryTextColor }]}>
-                          {option.fee.toLocaleString()} sats
+                          {option.fee.toLocaleString()} sats{option.satPerVbyte ? ` (${option.satPerVbyte} sat/vB)` : ''}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -906,7 +923,11 @@ export default function SendScreen() {
                         <Text style={[styles.speedCardTime, { color: secondaryTextColor }]}>{option.time}</Text>
                       </View>
                       <Text style={[styles.speedCardFee, { color: onchainFeeQuotes ? primaryTextColor : secondaryTextColor }]}>
-                        {isFetchingFees ? '...' : onchainFeeQuotes ? `${option.fee.toLocaleString()} sats` : '—'}
+                        {isFetchingFees
+                          ? '...'
+                          : onchainFeeQuotes
+                            ? `${option.fee.toLocaleString()} sats${option.satPerVbyte ? ` (${option.satPerVbyte} sat/vB)` : ''}`
+                            : '-'}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -915,8 +936,12 @@ export default function SendScreen() {
 
               <View style={styles.onchainFeeRow}>
                 <Text style={[styles.onchainFeeLabel, { color: secondaryTextColor }]}>{t('send.networkFee')}</Text>
-                <Text style={[styles.onchainFeeValue, { color: primaryTextColor }]}>
-                  {isFetchingFees ? '...' : onchainFeeQuotes ? `${getOnchainFeeQuote(selectedSpeed, onchainFeeQuotes).toLocaleString()} sats` : '—'}
+                <Text style={[styles.onchainFeeValue, { color: primaryTextColor }]}> 
+                  {isFetchingFees
+                    ? '...'
+                    : onchainFeeQuotes
+                      ? `${getOnchainFeeQuote(selectedSpeed, onchainFeeQuotes).toLocaleString()} sats${selectedOnchainQuote?.satPerVbyte ? ` (${selectedOnchainQuote.satPerVbyte} sat/vB)` : ''}`
+                      : '-'}
                 </Text>
               </View>
             </>

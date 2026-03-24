@@ -215,7 +215,12 @@ export function HomeScreen(): React.JSX.Element {
     const method = tx.method || (tx.txid ? 'onchain' : 'lightning');
     const amount = tx.amount ?? 0;
     const timestamp = typeof tx.timestamp === 'number' && tx.timestamp > 0 ? tx.timestamp : Date.now();
-    const date = new Date(timestamp).toLocaleDateString();
+    const dateObj = new Date(timestamp);
+    const date = dateObj.toLocaleDateString();
+    const time = dateObj.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
     const formattedTx = formatTx(amount, isReceived);
 
     return (
@@ -233,7 +238,7 @@ export function HomeScreen(): React.JSX.Element {
           <Text style={[styles.transactionDescription, { color: primaryTextColor }]} numberOfLines={1}>
             {tx.description || (isReceived ? t('wallet.received') : t('wallet.sent'))}
           </Text>
-          <Text style={[styles.transactionDate, { color: secondaryTextColor }]}>{date}</Text>
+          <Text style={[styles.transactionDate, { color: secondaryTextColor }]}>{`${date} · ${time}`}</Text>
         </View>
         <View style={styles.transactionAmountContainer}>
           <Text

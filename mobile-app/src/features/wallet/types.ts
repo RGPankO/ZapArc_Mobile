@@ -32,6 +32,7 @@ export interface SubWalletEntry {
   archivedAt?: number; // Timestamp when sub-wallet was archived (undefined = active)
   hasActivity?: boolean; // True if this sub-wallet has transactions or balance
   hasTransactionHistory?: boolean; // Tracks if wallet has any transactions (for creation logic)
+  cachedLightningAddress?: string; // Cached lightning address for push notification registration (avoids SDK init per wallet)
 }
 
 // =============================================================================

@@ -227,7 +227,7 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
                   const subWalletIndex = walletInfo?.subWalletIndex ?? 0;
                   const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, subWalletIndex);
 
-                  await BreezSparkService.initializeSDK(derivedMnemonic, undefined, walletInfo?.subWalletNickname);
+                  await BreezSparkService.initializeSDK(derivedMnemonic, undefined, walletInfo?.subWalletNickname, walletInfo ? { masterKeyId: walletInfo.masterKeyId, subWalletIndex: walletInfo.subWalletIndex } : undefined);
 
                   // Cache the PIN in session for subsequent unlocks
                   sessionPinRef.current = pin;
@@ -314,7 +314,7 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
               const subWalletIndex = walletInfo?.subWalletIndex ?? 0;
               const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, subWalletIndex);
 
-              await BreezSparkService.initializeSDK(derivedMnemonic, undefined, walletInfo?.subWalletNickname);
+              await BreezSparkService.initializeSDK(derivedMnemonic, undefined, walletInfo?.subWalletNickname, walletInfo ? { masterKeyId: walletInfo.masterKeyId, subWalletIndex: walletInfo.subWalletIndex } : undefined);
               console.log('✅ [useWalletAuth] Breez SDK initialized (background)');
             }
           } catch (bgError) {
@@ -428,7 +428,7 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
           const mnemonic = await storageService.getMasterKeyMnemonic(masterKeyId, pin);
           if (mnemonic) {
             const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, subWalletIndex);
-            await BreezSparkService.initializeSDK(derivedMnemonic, undefined, nickname);
+            await BreezSparkService.initializeSDK(derivedMnemonic, undefined, nickname, { masterKeyId, subWalletIndex });
             console.log('✅ [useWalletAuth] SDK reinitialized for new wallet');
           }
         } catch (sdkError) {
@@ -487,7 +487,7 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
             if (mnemonic) {
               const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, subWalletIndex);
               await BreezSparkService.disconnectSDK();
-              await BreezSparkService.initializeSDK(derivedMnemonic, undefined, walletInfo?.subWalletNickname);
+              await BreezSparkService.initializeSDK(derivedMnemonic, undefined, walletInfo?.subWalletNickname, walletInfo ? { masterKeyId: walletInfo.masterKeyId, subWalletIndex: walletInfo.subWalletIndex } : undefined);
               console.log('✅ [useWalletAuth] SDK reinitialized for sub-wallet:', subWalletIndex);
             }
           } else {

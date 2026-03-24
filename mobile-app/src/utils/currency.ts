@@ -2,6 +2,7 @@
 // Handles sat to fiat conversion with exchange rate caching
 
 import type { CurrencyCode, PrimaryDenomination, FiatCurrency } from '../features/settings/types';
+import { t } from '../services/i18nService';
 
 // =============================================================================
 // Types
@@ -216,7 +217,7 @@ export function formatAmount(
     case 'btc': {
       const btc = satsToBtc(safeSats);
       const secondary = rates && rates.usd > 0
-        ? `about ${formatFiat(satsToFiat(safeSats, rates, 'usd'), 'usd')}`
+        ? `${t('settings.approximate')} ${formatFiat(satsToFiat(safeSats, rates, 'usd'), 'usd')}`
         : null;
       const secondaryCompact = rates && rates.usd > 0
         ? formatFiatCompact(satsToFiat(safeSats, rates, 'usd'), 'usd')
@@ -263,7 +264,7 @@ export function formatAmount(
     case 'sats':
     default: {
       const secondary = rates && rates.usd > 0
-        ? `about ${formatFiat(satsToFiat(safeSats, rates, 'usd'), 'usd')}`
+        ? `${t('settings.approximate')} ${formatFiat(satsToFiat(safeSats, rates, 'usd'), 'usd')}`
         : null;
       const secondaryCompact = rates && rates.usd > 0
         ? formatFiatCompact(satsToFiat(safeSats, rates, 'usd'), 'usd')
@@ -342,7 +343,7 @@ export function formatAmountWithSettings(
 
   if (rates && rates[secondaryFiatCurrency] > 0) {
     const fiatAmount = satsToFiat(safeSats, rates, secondaryFiatCurrency);
-    secondary = `about ${formatFiat(fiatAmount, secondaryFiatCurrency)}`;
+    secondary = `${t('settings.approximate')} ${formatFiat(fiatAmount, secondaryFiatCurrency)}`;
     secondaryCompact = formatFiatCompact(fiatAmount, secondaryFiatCurrency);
   }
 
