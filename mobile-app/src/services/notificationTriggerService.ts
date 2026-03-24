@@ -6,7 +6,7 @@ import { Platform } from 'react-native';
 // URL of the deployed Cloud Function
 const BASE_URL = 'https://europe-west3-investave-1337.cloudfunctions.net';
 const NOTIFICATION_ENDPOINT = `${BASE_URL}/sendTransactionNotification`;
-const REGISTER_ENDPOINT = `${BASE_URL}/registerDevice`;
+// registerDevice endpoint removed — syncSubscriptions handles all registration
 const SYNC_SUBSCRIPTIONS_ENDPOINT = `${BASE_URL}/syncSubscriptions`;
 
 // Deduplication: track recent registrations to prevent spam

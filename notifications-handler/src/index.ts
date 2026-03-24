@@ -13,7 +13,7 @@ import type {
   TransactionNotificationResponse,
   ExpoPushMessage,
   BreezWebhookRequest,
-  RegisterPushTokenRequest,
+
   SyncSubscriptionsRequest,
 } from './types.js';
 
@@ -105,60 +105,8 @@ async function sendPushNotification(
   }
 }
 
-/**
- * Registers a user's push token mapped to their Public Key (Node ID)
- */
-export const registerDevice = onRequest(
-  { cors: true, region: 'europe-west3' },
-  async (request, response) => {
-    try {
-      if (request.method !== 'POST') {
-        response.status(405).json({
-          success: false,
-          error: 'Method not allowed. Use POST.',
-        });
-        return;
-      }
-
-      const body = request.body as Partial<RegisterPushTokenRequest>;
-      const { pubKey, expoPushToken, platform, walletNickname } = body;
-
-      if (!pubKey || !expoPushToken) {
-        response.status(400).json({
-          success: false,
-          error: 'Missing required fields: pubKey, expoPushToken',
-        });
-        return;
-      }
-
-      // Normalize the key (Lightning Address should be lowercase)
-      // This handles both node IDs (hex pubkeys) and Lightning Addresses (user@domain)
-      const normalizedKey = normalizeIdentifier(pubKey);
-
-      // Store in Firestore
-      // Collection: 'users' -> Document: <pubKey or lightningAddress>
-      await db.collection('users').doc(normalizedKey).set({
-        expoPushToken,
-        platform: platform || 'unknown',
-        walletNickname: walletNickname || undefined,
-        updatedAt: new Date(),
-      }, { merge: true });
-
-      console.log(`✅ Registered token for user ${normalizedKey.substring(0, 20)}...`);
-
-      response.status(200).json({
-        success: true,
-        message: 'Device registered successfully',
-      });
-    } catch (error) {
-      console.error('❌ Registration failed:', error);
-      response.status(500).json({
-        success: false,
-        error: 'Internal server error during registration',
-      });
-    }
-  }
-);
+// registerDevice removed — syncSubscriptions handles all registration
+// (single and multi-wallet, with stale mapping cleanup)
 
 /**
  * Sync subscriptions for one expo push token (replace-all semantics).

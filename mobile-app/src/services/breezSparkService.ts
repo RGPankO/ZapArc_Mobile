@@ -275,21 +275,14 @@ export async function initializeSDK(
             }
 
             if (identifiers.length > 0) {
-                // Preferred: one-shot sync so stale subscriptions are removed server-side
                 const syncResult = await NotificationTriggerService.syncSubscriptions(
                     pushTokenData.data,
                     identifiers,
                     walletNickname
                 );
 
-                // Fallback for older backend without syncSubscriptions endpoint
                 if (!syncResult.success) {
-                    console.warn('⚠️ [BreezSparkService] syncSubscriptions failed, falling back to registerDevice:', syncResult.error);
-                    await Promise.allSettled(
-                        identifiers.map((id) =>
-                            NotificationTriggerService.registerDevice(id, pushTokenData.data, walletNickname)
-                        )
-                    );
+                    console.warn('⚠️ [BreezSparkService] syncSubscriptions failed:', syncResult.error);
                 }
             }
         }
@@ -1378,12 +1371,20 @@ export async function sendOnchainPayment(
   }
 
   try {
+    // RN Spark bridge expects enum-like string values: Fast | Medium | Slow
+    const speedEnum =
+      confirmationSpeed === 'fast'
+        ? 'Fast'
+        : confirmationSpeed === 'slow'
+          ? 'Slow'
+          : 'Medium';
+
     const response = await sdkInstance.sendPayment({
       prepareResponse,
       idempotencyKey,
       options: {
         type: 'bitcoinAddress',
-        confirmationSpeed,
+        confirmationSpeed: speedEnum,
       },
     });
 
