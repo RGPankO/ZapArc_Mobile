@@ -465,7 +465,23 @@ export default function SendScreen() {
     try {
       setIsPreparing(true);
 
-      const parsedRequest = await BreezSparkService.parsePaymentRequest(paymentInput.trim());
+      // Strip BIP21/lightning: URI scheme before passing to SDK
+      let resolvedInput = paymentInput.trim();
+      const bip21Parsed = parseBIP21(resolvedInput);
+      if (bip21Parsed) {
+        // If lightning param exists and we're on lightning tab, use it
+        if (bip21Parsed.lightning && activeTab === 'lightning') {
+          resolvedInput = bip21Parsed.lightning;
+        } else {
+          resolvedInput = bip21Parsed.address;
+        }
+        // Apply amount from BIP21 if not already set
+        if (bip21Parsed.amountSats && !amount) {
+          setAmount(bip21Parsed.amountSats.toString());
+        }
+      }
+
+      const parsedRequest = await BreezSparkService.parsePaymentRequest(resolvedInput);
       const isOnchainFlow = activeTab === 'onchain';
 
       if (!parsedRequest.isValid) {
@@ -517,7 +533,7 @@ export default function SendScreen() {
         return;
       }
 
-      const prepared = await BreezSparkService.prepareSendPayment(paymentInput.trim(), paymentAmount);
+      const prepared = await BreezSparkService.prepareSendPayment(resolvedInput, paymentAmount);
       console.log('🔍 [Send] prepared response:', JSON.stringify(prepared, (_, v) => typeof v === 'bigint' ? v.toString() : v));
       setPrepareResponse(prepared);
 
@@ -583,7 +599,7 @@ export default function SendScreen() {
       }
 
       const paymentPreview: PaymentPreview = {
-        recipient: paymentInput.trim(),
+        recipient: resolvedInput,
         amount: paymentAmount,
         fee: feeAmount,
         total: totalAmount,
