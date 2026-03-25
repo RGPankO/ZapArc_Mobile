@@ -116,7 +116,9 @@ type ConfirmationSpeed = 'fast' | 'medium' | 'slow';
 type SendTab = 'lightning' | 'onchain';
 
 interface OnchainFeeQuote {
-  feeSats: number;
+  feeSats: number;        // total fee (service + L1)
+  serviceFee: number;     // Spark service fee (userFeeSat)
+  l1Fee: number;          // L1 broadcast fee (l1BroadcastFeeSat)
   satPerVbyte?: number;
   estimatedConfirmationTime?: string;
 }
@@ -373,22 +375,17 @@ export default function SendScreen() {
               if (l1Fee > 0) return Math.round(l1Fee / 140);
               return undefined;
             };
+            const buildQuote = (q: any): OnchainFeeQuote => ({
+              feeSats: extractFee(q),
+              serviceFee: extractServiceFee(q),
+              l1Fee: extractL1Fee(q),
+              satPerVbyte: extractSatPerVbyte(q),
+              estimatedConfirmationTime: q?.estimatedConfirmationTime,
+            });
             setOnchainFeeQuotes({
-              fast: {
-                feeSats: extractFee(feeQuote.speedFast),
-                satPerVbyte: extractSatPerVbyte(feeQuote.speedFast),
-                estimatedConfirmationTime: feeQuote.speedFast?.estimatedConfirmationTime,
-              },
-              medium: {
-                feeSats: extractFee(feeQuote.speedMedium),
-                satPerVbyte: extractSatPerVbyte(feeQuote.speedMedium),
-                estimatedConfirmationTime: feeQuote.speedMedium?.estimatedConfirmationTime,
-              },
-              slow: {
-                feeSats: extractFee(feeQuote.speedSlow),
-                satPerVbyte: extractSatPerVbyte(feeQuote.speedSlow),
-                estimatedConfirmationTime: feeQuote.speedSlow?.estimatedConfirmationTime,
-              },
+              fast: buildQuote(feeQuote.speedFast),
+              medium: buildQuote(feeQuote.speedMedium),
+              slow: buildQuote(feeQuote.speedSlow),
             });
           }
         }
@@ -594,22 +591,17 @@ export default function SendScreen() {
               if (l1Fee > 0) return Math.round(l1Fee / 140);
               return undefined;
             };
+            const buildQuote2 = (q: any): OnchainFeeQuote => ({
+              feeSats: extractFee(q),
+              serviceFee: extractService(q),
+              l1Fee: extractL1(q),
+              satPerVbyte: extractSatPerVbyte(q),
+              estimatedConfirmationTime: q?.estimatedConfirmationTime,
+            });
             extractedFeeQuotes = {
-              fast: {
-                feeSats: extractFee(feeQuote.speedFast),
-                satPerVbyte: extractSatPerVbyte(feeQuote.speedFast),
-                estimatedConfirmationTime: feeQuote.speedFast?.estimatedConfirmationTime,
-              },
-              medium: {
-                feeSats: extractFee(feeQuote.speedMedium),
-                satPerVbyte: extractSatPerVbyte(feeQuote.speedMedium),
-                estimatedConfirmationTime: feeQuote.speedMedium?.estimatedConfirmationTime,
-              },
-              slow: {
-                feeSats: extractFee(feeQuote.speedSlow),
-                satPerVbyte: extractSatPerVbyte(feeQuote.speedSlow),
-                estimatedConfirmationTime: feeQuote.speedSlow?.estimatedConfirmationTime,
-              },
+              fast: buildQuote2(feeQuote.speedFast),
+              medium: buildQuote2(feeQuote.speedMedium),
+              slow: buildQuote2(feeQuote.speedSlow),
             };
             feeAmount = getOnchainFeeQuote(selectedSpeed, extractedFeeQuotes);
           } else {
@@ -751,29 +743,22 @@ export default function SendScreen() {
   );
 
   const speedOptions = useMemo(
-    () => [
-      {
-        key: 'fast' as ConfirmationSpeed,
-        label: t('send.speedFast'),
-        time: formatEstimatedTime(onchainFeeQuotes?.fast?.estimatedConfirmationTime, '10'),
-        fee: Number(onchainFeeQuotes?.fast?.feeSats || 0),
-        satPerVbyte: onchainFeeQuotes?.fast?.satPerVbyte,
-      },
-      {
-        key: 'medium' as ConfirmationSpeed,
-        label: t('send.speedMedium'),
-        time: formatEstimatedTime(onchainFeeQuotes?.medium?.estimatedConfirmationTime, '30'),
-        fee: Number(onchainFeeQuotes?.medium?.feeSats || 0),
-        satPerVbyte: onchainFeeQuotes?.medium?.satPerVbyte,
-      },
-      {
-        key: 'slow' as ConfirmationSpeed,
-        label: t('send.speedSlow'),
-        time: formatEstimatedTime(onchainFeeQuotes?.slow?.estimatedConfirmationTime, '60'),
-        fee: Number(onchainFeeQuotes?.slow?.feeSats || 0),
-        satPerVbyte: onchainFeeQuotes?.slow?.satPerVbyte,
-      },
-    ],
+    () => {
+      const buildOption = (key: ConfirmationSpeed, labelKey: string, defaultTime: string, quote?: OnchainFeeQuote) => ({
+        key,
+        label: t(labelKey),
+        time: formatEstimatedTime(quote?.estimatedConfirmationTime, defaultTime),
+        fee: Number(quote?.feeSats || 0),
+        serviceFee: Number(quote?.serviceFee || 0),
+        l1Fee: Number(quote?.l1Fee || 0),
+        satPerVbyte: quote?.satPerVbyte,
+      });
+      return [
+        buildOption('fast', 'send.speedFast', '10', onchainFeeQuotes?.fast),
+        buildOption('medium', 'send.speedMedium', '30', onchainFeeQuotes?.medium),
+        buildOption('slow', 'send.speedSlow', '60', onchainFeeQuotes?.slow),
+      ];
+    },
     [onchainFeeQuotes, formatEstimatedTime]
   );
 
@@ -871,7 +856,13 @@ export default function SendScreen() {
                           {option.time}
                         </Text>
                         <Text style={[styles.speedOptionFee, { color: primaryTextColor }]}>
-                          {option.fee.toLocaleString()} sats{option.satPerVbyte ? ` (${option.satPerVbyte} sat/vB)` : ''}
+                          {option.fee.toLocaleString()} sats
+                        </Text>
+                        <Text style={[styles.speedOptionSubtitle, { color: secondaryTextColor, fontSize: 10 }]}>
+                          {option.satPerVbyte ? `${option.satPerVbyte} sat/vB` : ''}
+                          {option.l1Fee > 0 && option.serviceFee > 0
+                            ? ` · L1: ${option.l1Fee.toLocaleString()} + Service: ${option.serviceFee.toLocaleString()}`
+                            : ''}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -897,9 +888,17 @@ export default function SendScreen() {
 
               <View style={styles.previewRow}>
                 <Text style={[styles.previewLabel, { color: secondaryTextColor }]}>{t('wallet.fee')}:</Text>
-                <Text style={[styles.previewFee, { color: secondaryTextColor }]}>
-                  {preview.fee.toLocaleString()} sats{isOnchainPreview && selectedOnchainQuote?.satPerVbyte ? ` (${selectedOnchainQuote.satPerVbyte} sat/vB)` : ''}
-                </Text>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={[styles.previewFee, { color: secondaryTextColor }]}>
+                    {preview.fee.toLocaleString()} sats
+                  </Text>
+                  {isOnchainPreview && selectedOnchainQuote && (selectedOnchainQuote.l1Fee > 0 || selectedOnchainQuote.serviceFee > 0) && (
+                    <Text style={{ color: secondaryTextColor, fontSize: 11, marginTop: 2 }}>
+                      L1: {selectedOnchainQuote.l1Fee.toLocaleString()} · Service: {selectedOnchainQuote.serviceFee.toLocaleString()}
+                      {selectedOnchainQuote.satPerVbyte ? ` · ${selectedOnchainQuote.satPerVbyte} sat/vB` : ''}
+                    </Text>
+                  )}
+                </View>
               </View>
 
               <View style={[styles.previewRow, styles.previewTotal]}>
@@ -1158,17 +1157,27 @@ export default function SendScreen() {
                         },
                       ]}
                     >
-                      <View>
+                      <View style={{ flex: 1 }}>
                         <Text style={[styles.speedCardTitle, { color: primaryTextColor }]}>{option.label}</Text>
                         <Text style={[styles.speedCardTime, { color: secondaryTextColor }]}>{option.time}</Text>
                       </View>
-                      <Text style={[styles.speedCardFee, { color: onchainFeeQuotes ? primaryTextColor : secondaryTextColor }]}>
-                        {isFetchingFees
-                          ? '...'
-                          : onchainFeeQuotes
-                            ? `${option.fee.toLocaleString()} sats${option.satPerVbyte ? ` (${option.satPerVbyte} sat/vB)` : ''}`
-                            : '-'}
-                      </Text>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={[styles.speedCardFee, { color: onchainFeeQuotes ? primaryTextColor : secondaryTextColor }]}>
+                          {isFetchingFees
+                            ? '...'
+                            : onchainFeeQuotes
+                              ? `${option.fee.toLocaleString()} sats`
+                              : '-'}
+                        </Text>
+                        {!isFetchingFees && onchainFeeQuotes && (
+                          <Text style={[styles.speedCardTime, { color: secondaryTextColor, fontSize: 11 }]}>
+                            {option.satPerVbyte ? `${option.satPerVbyte} sat/vB` : ''}
+                            {option.l1Fee > 0 && option.serviceFee > 0
+                              ? ` · L1: ${option.l1Fee.toLocaleString()} + Service: ${option.serviceFee.toLocaleString()}`
+                              : ''}
+                          </Text>
+                        )}
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
@@ -1176,13 +1185,21 @@ export default function SendScreen() {
 
               <View style={styles.onchainFeeRow}>
                 <Text style={[styles.onchainFeeLabel, { color: secondaryTextColor }]}>{t('send.networkFee')}</Text>
-                <Text style={[styles.onchainFeeValue, { color: primaryTextColor }]}> 
-                  {isFetchingFees
-                    ? '...'
-                    : onchainFeeQuotes
-                      ? `${getOnchainFeeQuote(selectedSpeed, onchainFeeQuotes).toLocaleString()} sats${selectedOnchainQuote?.satPerVbyte ? ` (${selectedOnchainQuote.satPerVbyte} sat/vB)` : ''}`
-                      : '-'}
-                </Text>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={[styles.onchainFeeValue, { color: primaryTextColor }]}> 
+                    {isFetchingFees
+                      ? '...'
+                      : onchainFeeQuotes
+                        ? `${getOnchainFeeQuote(selectedSpeed, onchainFeeQuotes).toLocaleString()} sats`
+                        : '-'}
+                  </Text>
+                  {!isFetchingFees && selectedOnchainQuote && (
+                    <Text style={{ color: secondaryTextColor, fontSize: 11, marginTop: 2 }}>
+                      {selectedOnchainQuote.satPerVbyte ? `${selectedOnchainQuote.satPerVbyte} sat/vB · ` : ''}
+                      L1: {selectedOnchainQuote.l1Fee.toLocaleString()} + Service: {selectedOnchainQuote.serviceFee.toLocaleString()}
+                    </Text>
+                  )}
+                </View>
               </View>
             </>
           )}
