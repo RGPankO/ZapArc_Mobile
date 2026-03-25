@@ -360,8 +360,10 @@ export default function SendScreen() {
           const feeQuote = methodInner?.feeQuote || method?.feeQuote;
           console.log('🔍 [Send] feeQuote:', JSON.stringify(feeQuote, (_, v) => typeof v === 'bigint' ? v.toString() : v));
           if (feeQuote?.speedFast || feeQuote?.speedMedium || feeQuote?.speedSlow) {
-            const extractFee = (q: any) => Number(q?.userFeeSat ?? q?.feeSats ?? 0);
             const extractL1Fee = (q: any) => Number(q?.l1BroadcastFeeSat ?? 0);
+            const extractServiceFee = (q: any) => Number(q?.userFeeSat ?? q?.feeSats ?? 0);
+            // Total fee = service fee (userFeeSat) + L1 broadcast fee (l1BroadcastFeeSat)
+            const extractFee = (q: any) => extractServiceFee(q) + extractL1Fee(q);
             const extractSatPerVbyte = (q: any) => {
               // Try direct field first, then estimate from l1BroadcastFeeSat
               const direct = Number(q?.satPerVbyte ?? q?.sat_per_vbyte ?? 0);
@@ -581,8 +583,17 @@ export default function SendScreen() {
         } else if (method.tag === 'BitcoinAddress' || method.type === 'bitcoinAddress') {
           const feeQuote = methodInner?.feeQuote || method?.feeQuote;
           if (feeQuote?.speedFast || feeQuote?.speedMedium || feeQuote?.speedSlow) {
-            const extractFee = (q: any) => Number(q?.userFeeSat ?? q?.feeSats ?? 0);
-            const extractSatPerVbyte = (q: any) => Number(q?.satPerVbyte ?? q?.sat_per_vbyte ?? 0) || undefined;
+            const extractL1 = (q: any) => Number(q?.l1BroadcastFeeSat ?? 0);
+            const extractService = (q: any) => Number(q?.userFeeSat ?? q?.feeSats ?? 0);
+            // Total fee = service fee + L1 broadcast fee
+            const extractFee = (q: any) => extractService(q) + extractL1(q);
+            const extractSatPerVbyte = (q: any) => {
+              const direct = Number(q?.satPerVbyte ?? q?.sat_per_vbyte ?? 0);
+              if (direct > 0) return direct;
+              const l1Fee = extractL1(q);
+              if (l1Fee > 0) return Math.round(l1Fee / 140);
+              return undefined;
+            };
             extractedFeeQuotes = {
               fast: {
                 feeSats: extractFee(feeQuote.speedFast),
