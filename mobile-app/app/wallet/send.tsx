@@ -553,6 +553,16 @@ export default function SendScreen() {
         }
       }
 
+      // Minimum on-chain send to avoid dust issues on the receiving end
+      const MIN_ONCHAIN_SATS = 1000;
+      if (isOnchainFlow && paymentAmount < MIN_ONCHAIN_SATS) {
+        Alert.alert(
+          t('common.error'),
+          `Minimum on-chain send is ${MIN_ONCHAIN_SATS.toLocaleString()} sats. Smaller amounts may be unspendable due to network fees.`
+        );
+        return;
+      }
+
       if (paymentAmount > balance) {
         Alert.alert(
           t('send.insufficientBalance'),
