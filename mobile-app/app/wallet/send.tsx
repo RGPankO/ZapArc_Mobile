@@ -856,13 +856,7 @@ export default function SendScreen() {
                           {option.time}
                         </Text>
                         <Text style={[styles.speedOptionFee, { color: primaryTextColor }]}>
-                          {option.fee.toLocaleString()} sats
-                        </Text>
-                        <Text style={[styles.speedOptionSubtitle, { color: secondaryTextColor, fontSize: 10 }]}>
-                          {option.satPerVbyte ? `${option.satPerVbyte} sat/vB` : ''}
-                          {option.l1Fee > 0 && option.serviceFee > 0
-                            ? ` · L1: ${option.l1Fee.toLocaleString()} + Service: ${option.serviceFee.toLocaleString()}`
-                            : ''}
+                          {option.fee.toLocaleString()} sats{option.satPerVbyte ? ` (${option.satPerVbyte} sat/vB)` : ''}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -888,17 +882,9 @@ export default function SendScreen() {
 
               <View style={styles.previewRow}>
                 <Text style={[styles.previewLabel, { color: secondaryTextColor }]}>{t('wallet.fee')}:</Text>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[styles.previewFee, { color: secondaryTextColor }]}>
-                    {preview.fee.toLocaleString()} sats
-                  </Text>
-                  {isOnchainPreview && selectedOnchainQuote && (selectedOnchainQuote.l1Fee > 0 || selectedOnchainQuote.serviceFee > 0) && (
-                    <Text style={{ color: secondaryTextColor, fontSize: 11, marginTop: 2 }}>
-                      L1: {selectedOnchainQuote.l1Fee.toLocaleString()} · Service: {selectedOnchainQuote.serviceFee.toLocaleString()}
-                      {selectedOnchainQuote.satPerVbyte ? ` · ${selectedOnchainQuote.satPerVbyte} sat/vB` : ''}
-                    </Text>
-                  )}
-                </View>
+                <Text style={[styles.previewFee, { color: secondaryTextColor }]}>
+                  {preview.fee.toLocaleString()} sats{isOnchainPreview && selectedOnchainQuote?.satPerVbyte ? ` (${selectedOnchainQuote.satPerVbyte} sat/vB)` : ''}
+                </Text>
               </View>
 
               <View style={[styles.previewRow, styles.previewTotal]}>
@@ -1161,23 +1147,13 @@ export default function SendScreen() {
                         <Text style={[styles.speedCardTitle, { color: primaryTextColor }]}>{option.label}</Text>
                         <Text style={[styles.speedCardTime, { color: secondaryTextColor }]}>{option.time}</Text>
                       </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={[styles.speedCardFee, { color: onchainFeeQuotes ? primaryTextColor : secondaryTextColor }]}>
-                          {isFetchingFees
-                            ? '...'
-                            : onchainFeeQuotes
-                              ? `${option.fee.toLocaleString()} sats`
-                              : '-'}
-                        </Text>
-                        {!isFetchingFees && onchainFeeQuotes && (
-                          <Text style={[styles.speedCardTime, { color: secondaryTextColor, fontSize: 11 }]}>
-                            {option.satPerVbyte ? `${option.satPerVbyte} sat/vB` : ''}
-                            {option.l1Fee > 0 && option.serviceFee > 0
-                              ? ` · L1: ${option.l1Fee.toLocaleString()} + Service: ${option.serviceFee.toLocaleString()}`
-                              : ''}
-                          </Text>
-                        )}
-                      </View>
+                      <Text style={[styles.speedCardFee, { color: onchainFeeQuotes ? primaryTextColor : secondaryTextColor }]}>
+                        {isFetchingFees
+                          ? '...'
+                          : onchainFeeQuotes
+                            ? `${option.fee.toLocaleString()} sats${option.satPerVbyte ? ` (${option.satPerVbyte} sat/vB)` : ''}`
+                            : '-'}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -1193,12 +1169,6 @@ export default function SendScreen() {
                         ? `${getOnchainFeeQuote(selectedSpeed, onchainFeeQuotes).toLocaleString()} sats`
                         : '-'}
                   </Text>
-                  {!isFetchingFees && selectedOnchainQuote && (
-                    <Text style={{ color: secondaryTextColor, fontSize: 11, marginTop: 2 }}>
-                      {selectedOnchainQuote.satPerVbyte ? `${selectedOnchainQuote.satPerVbyte} sat/vB · ` : ''}
-                      L1: {selectedOnchainQuote.l1Fee.toLocaleString()} + Service: {selectedOnchainQuote.serviceFee.toLocaleString()}
-                    </Text>
-                  )}
                 </View>
               </View>
             </>
