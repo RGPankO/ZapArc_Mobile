@@ -342,12 +342,14 @@ export default function SendScreen() {
       setAddressError(null);
     }
 
-    if (!trimmedAddress || !satsAmount || satsAmount <= 0) {
+    if (!trimmedAddress || !isValidBitcoinAddress(trimmedAddress) || !satsAmount || satsAmount <= 0) {
       setOnchainFeeQuotes(null);
       return;
     }
 
     const timeoutId = setTimeout(async () => {
+      // Double-check address is still valid (could have been cleared by tab switch)
+      if (!trimmedAddress || !isValidBitcoinAddress(trimmedAddress) || satsAmount <= 0) return;
       try {
         setIsFetchingFees(true);
         const prepared = await BreezSparkService.prepareSendPayment(trimmedAddress, satsAmount);
@@ -390,7 +392,7 @@ export default function SendScreen() {
           }
         }
       } catch (error) {
-        console.error('❌ [Send] auto-fee estimation failed:', error);
+        console.warn('⚠️ [Send] auto-fee estimation failed:', error);
         setOnchainFeeQuotes(null);
       } finally {
         setIsFetchingFees(false);
