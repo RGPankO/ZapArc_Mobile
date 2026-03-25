@@ -642,6 +642,9 @@ export default function SendScreen() {
       }
 
       Alert.alert(t('send.paymentError'), errorMessage);
+      // Clear any stale prepare state from previous attempts
+      setPreview(null);
+      setPrepareResponse(null);
     } finally {
       setIsPreparing(false);
     }
@@ -668,13 +671,19 @@ export default function SendScreen() {
         const errorMsg = result.error || 'Unknown error occurred';
         const details = result.errorDetails ? `\n\nDetails:\n${result.errorDetails}` : '';
         Alert.alert(t('send.paymentFailed'), `${errorMsg}${details}`);
+        // Clear stale prepare state so next send attempt doesn't reuse it
         setStep('input');
+        setPreview(null);
+        setPrepareResponse(null);
       }
     } catch (error) {
       console.error('Failed to send payment:', error);
       const msg = error instanceof Error ? error.message : String(error);
       Alert.alert(t('common.error'), msg);
+      // Clear stale prepare state on error too
       setStep('input');
+      setPreview(null);
+      setPrepareResponse(null);
     } finally {
       setIsSending(false);
     }
