@@ -32,6 +32,85 @@ function isValidBitcoinAddress(address: string): boolean {
   return false;
 }
 
+/**
+ * Parse BIP21 bitcoin: URIs and lightning: URIs
+ * Examples:
+ *   bitcoin:bc1q...?amount=0.00115262
+ *   bitcoin:bc1q...?amount=0.001&label=Donation
+ *   lightning:lnbc500u1...
+ *   BITCOIN:BC1Q...?amount=0.5 (case-insensitive scheme)
+ *
+ * Returns { address, amountSats?, label?, lightning? } or null if not a URI
+ */
+function parseBIP21(input: string): {
+  address: string;
+  amountSats?: number;
+  label?: string;
+  message?: string;
+  lightning?: string;
+} | null {
+  const trimmed = input.trim();
+  const lower = trimmed.toLowerCase();
+
+  // Check for bitcoin: or lightning: scheme
+  if (!lower.startsWith('bitcoin:') && !lower.startsWith('lightning:')) {
+    return null;
+  }
+
+  // Handle lightning: URIs
+  if (lower.startsWith('lightning:')) {
+    const invoice = trimmed.substring('lightning:'.length);
+    return { address: invoice };
+  }
+
+  // Parse bitcoin: URI
+  const withoutScheme = trimmed.substring('bitcoin:'.length);
+  const questionIndex = withoutScheme.indexOf('?');
+
+  let address: string;
+  let params: URLSearchParams;
+
+  if (questionIndex === -1) {
+    address = withoutScheme;
+    params = new URLSearchParams();
+  } else {
+    address = withoutScheme.substring(0, questionIndex);
+    params = new URLSearchParams(withoutScheme.substring(questionIndex + 1));
+  }
+
+  if (!address) return null;
+
+  const result: {
+    address: string;
+    amountSats?: number;
+    label?: string;
+    message?: string;
+    lightning?: string;
+  } = { address };
+
+  // Parse amount (BIP21 amount is in BTC)
+  const amountBtc = params.get('amount');
+  if (amountBtc) {
+    const btcValue = parseFloat(amountBtc);
+    if (!isNaN(btcValue) && btcValue > 0) {
+      result.amountSats = Math.round(btcValue * 100_000_000);
+    }
+  }
+
+  // Parse optional label/message
+  const label = params.get('label');
+  if (label) result.label = label;
+
+  const message = params.get('message');
+  if (message) result.message = message;
+
+  // Parse lightning param (some wallets include a lightning invoice in the URI)
+  const lightning = params.get('lightning');
+  if (lightning) result.lightning = lightning;
+
+  return result;
+}
+
 type SendStep = 'input' | 'preview' | 'onchain-preview' | 'scanning';
 type ConfirmationSpeed = 'fast' | 'medium' | 'slow';
 type SendTab = 'lightning' | 'onchain';
@@ -170,12 +249,47 @@ export default function SendScreen() {
   }, []);
 
   useEffect(() => {
-    if (activeTab !== 'lightning') return;
-
     const trimmedInput = paymentInput.trim();
     if (!trimmedInput) return;
 
     const timeoutId = setTimeout(async () => {
+      // Check for BIP21 / lightning: URI pasted into input
+      const bip21 = parseBIP21(trimmedInput);
+      if (bip21) {
+        // If lightning param exists and we're on lightning tab, use it
+        if (bip21.lightning && activeTab === 'lightning') {
+          setPaymentInput(bip21.lightning);
+          try {
+            const parsed = await BreezSparkService.parsePaymentRequest(bip21.lightning);
+            if (parsed.isValid && parsed.type === 'bolt11' && parsed.amountSat !== undefined) {
+              setAmount(parsed.amountSat.toString());
+            }
+          } catch (e) { /* ignore */ }
+          return;
+        }
+
+        // Bitcoin address — auto-switch to on-chain
+        if (isValidBitcoinAddress(bip21.address)) {
+          setActiveTab('onchain');
+          setPaymentInput(bip21.address);
+          if (bip21.amountSats) {
+            setAmount(bip21.amountSats.toString());
+            setInputCurrency('sats');
+          }
+          if (bip21.label || bip21.message) {
+            setComment(bip21.label || bip21.message || '');
+          }
+          return;
+        }
+
+        // lightning: URI
+        if (trimmedInput.toLowerCase().startsWith('lightning:')) {
+          setPaymentInput(bip21.address);
+        }
+      }
+
+      // Standard Lightning parsing
+      if (activeTab !== 'lightning') return;
       try {
         const parsed = await BreezSparkService.parsePaymentRequest(trimmedInput);
         if (parsed.isValid && parsed.type === 'bolt11' && parsed.amountSat !== undefined) {
@@ -277,6 +391,54 @@ export default function SendScreen() {
       if (scanned) return;
       setScanned(true);
 
+      // Try BIP21 / lightning: URI parsing first
+      const bip21 = parseBIP21(data);
+      if (bip21) {
+        // If it has a lightning param and we're on lightning tab, prefer that
+        if (bip21.lightning && activeTab === 'lightning') {
+          setPaymentInput(bip21.lightning);
+          setStep('input');
+          try {
+            const parsed = await BreezSparkService.parsePaymentRequest(bip21.lightning);
+            if (parsed.isValid && parsed.type === 'bolt11' && parsed.amountSat !== undefined) {
+              setAmount(parsed.amountSat.toString());
+            }
+          } catch (error) {
+            console.error('Failed to parse lightning param from BIP21:', error);
+          }
+          return;
+        }
+
+        // Bitcoin address — switch to on-chain tab if not already
+        if (isValidBitcoinAddress(bip21.address)) {
+          setActiveTab('onchain');
+          setPaymentInput(bip21.address);
+          if (bip21.amountSats) {
+            setAmount(bip21.amountSats.toString());
+            setInputCurrency('sats');
+          }
+          if (bip21.label || bip21.message) {
+            setComment(bip21.label || bip21.message || '');
+          }
+          setStep('input');
+          return;
+        }
+
+        // lightning: URI (not bitcoin:)
+        setPaymentInput(bip21.address);
+        setStep('input');
+        try {
+          const parsed = await BreezSparkService.parsePaymentRequest(bip21.address);
+          if (parsed.isValid && parsed.type === 'bolt11' && parsed.amountSat !== undefined) {
+            setAmount(parsed.amountSat.toString());
+          }
+        } catch (error) {
+          console.error('Failed to parse lightning URI:', error);
+        }
+        return;
+      }
+
+      // Not a URI — handle as raw input
       setPaymentInput(data);
       setStep('input');
 
