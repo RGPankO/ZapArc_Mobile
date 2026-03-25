@@ -990,14 +990,15 @@ export async function listPayments(): Promise<TransactionInfo[]> {
 
       let mappedStatus = mapPaymentStatus(payment.status);
 
-      // On-chain sends/receives: if SDK says "completed" but it's recent (< 1 hour),
-      // show as "pending" since L1 confirmation takes time.
-      // The Spark SDK marks the internal transfer as completed immediately,
-      // but the actual on-chain tx may still be unconfirmed.
-      if (isOnchain && mappedStatus === 'completed' && timestamp) {
-        const ageMs = Date.now() - timestamp;
-        const ONE_HOUR = 60 * 60 * 1000;
-        if (ageMs < ONE_HOUR) {
+      // On-chain sends: SDK marks as "completed" immediately (Spark transfer done),
+      // but the actual L1 tx may still be unconfirmed. Show as "pending" for sends
+      // since we can't verify confirmations from SDK.
+      // For on-chain receives (deposits), the claim flow handles status separately.
+      if (isOnchain && type === 'send' && mappedStatus === 'completed') {
+        // Check if tx is recent (< 2 hours) - after that assume it's confirmed
+        const ageMs = timestamp ? Date.now() - timestamp : 0;
+        const TWO_HOURS = 2 * 60 * 60 * 1000;
+        if (ageMs < TWO_HOURS || ageMs === 0) {
           mappedStatus = 'pending';
         }
       }
