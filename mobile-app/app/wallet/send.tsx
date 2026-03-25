@@ -309,7 +309,26 @@ export default function SendScreen() {
   useEffect(() => {
     if (activeTab !== 'onchain') return;
 
-    const trimmedAddress = paymentInput.trim();
+    // Strip BIP21 URI if present
+    let trimmedAddress = paymentInput.trim();
+    const bip21Check = parseBIP21(trimmedAddress);
+    if (bip21Check) {
+      trimmedAddress = bip21Check.address;
+      // If BIP21 has amount and our amount field is empty, apply it
+      if (bip21Check.amountSats && !amount) {
+        setAmount(bip21Check.amountSats.toString());
+        setInputCurrency('sats');
+        // Also update the input field to show just the address
+        setPaymentInput(trimmedAddress);
+        return; // Let the next effect cycle pick up the new values
+      }
+      // Update input to stripped address
+      if (paymentInput.trim() !== trimmedAddress) {
+        setPaymentInput(trimmedAddress);
+        return;
+      }
+    }
+
     const satsAmount = Math.floor(Number(amount));
 
     // Validate address format
