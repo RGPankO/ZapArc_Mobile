@@ -354,11 +354,23 @@ export default function SendScreen() {
 
         const method = prepared.paymentMethod;
         const methodInner = method?.inner || method;
+        console.log('🔍 [Send] paymentMethod tag:', method?.tag, 'keys:', method ? Object.keys(method) : 'null');
+        console.log('🔍 [Send] methodInner keys:', methodInner ? Object.keys(methodInner) : 'null');
         if (method?.tag === 'BitcoinAddress' || method?.type === 'bitcoinAddress') {
           const feeQuote = methodInner?.feeQuote || method?.feeQuote;
+          console.log('🔍 [Send] feeQuote:', JSON.stringify(feeQuote, (_, v) => typeof v === 'bigint' ? v.toString() : v));
           if (feeQuote?.speedFast || feeQuote?.speedMedium || feeQuote?.speedSlow) {
             const extractFee = (q: any) => Number(q?.userFeeSat ?? q?.feeSats ?? 0);
-            const extractSatPerVbyte = (q: any) => Number(q?.satPerVbyte ?? q?.sat_per_vbyte ?? 0) || undefined;
+            const extractL1Fee = (q: any) => Number(q?.l1BroadcastFeeSat ?? 0);
+            const extractSatPerVbyte = (q: any) => {
+              // Try direct field first, then estimate from l1BroadcastFeeSat
+              const direct = Number(q?.satPerVbyte ?? q?.sat_per_vbyte ?? 0);
+              if (direct > 0) return direct;
+              // Estimate: typical P2WPKH tx is ~141 vBytes, P2TR ~111 vBytes; use ~140 as approximation
+              const l1Fee = extractL1Fee(q);
+              if (l1Fee > 0) return Math.round(l1Fee / 140);
+              return undefined;
+            };
             setOnchainFeeQuotes({
               fast: {
                 feeSats: extractFee(feeQuote.speedFast),
@@ -875,7 +887,7 @@ export default function SendScreen() {
               <View style={styles.previewRow}>
                 <Text style={[styles.previewLabel, { color: secondaryTextColor }]}>{t('wallet.fee')}:</Text>
                 <Text style={[styles.previewFee, { color: secondaryTextColor }]}>
-                  {preview.fee.toLocaleString()} sats
+                  {preview.fee.toLocaleString()} sats{isOnchainPreview && selectedOnchainQuote?.satPerVbyte ? ` (${selectedOnchainQuote.satPerVbyte} sat/vB)` : ''}
                 </Text>
               </View>
 
