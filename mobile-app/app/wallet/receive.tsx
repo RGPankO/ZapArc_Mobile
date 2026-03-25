@@ -62,6 +62,12 @@ export default function ReceiveScreen() {
   const [isGeneratingOnchain, setIsGeneratingOnchain] = useState(false);
   const [onchainError, setOnchainError] = useState<string | null>(null);
   const [onchainClaimStatus, setOnchainClaimStatus] = useState<string | null>(null);
+  const [pendingDeposits, setPendingDeposits] = useState<Array<{
+    key: string;
+    txid: string;
+    amountSats: number;
+    status: 'claiming' | 'claimed' | 'too-small' | 'failed';
+  }>>([]);
 
   const [inputCurrency, setInputCurrency] = useState<InputCurrency>('sats');
   const [currencyMenuVisible, setCurrencyMenuVisible] = useState(false);
@@ -256,22 +262,50 @@ export default function ReceiveScreen() {
 
     let isCancelled = false;
 
+    const claimedKeys = new Set<string>();
+
     const checkDeposits = async (): Promise<void> => {
       try {
         const deposits = await BreezSparkService.listDeposits();
         if (!deposits.length || isCancelled) return;
 
-        const claimable = deposits.find((dep) => !dep.claimError);
-        if (!claimable) return;
+        for (const deposit of deposits) {
+          const key = `${deposit.txid}:${deposit.vout}`;
+          if (claimedKeys.has(key)) continue;
 
-        setOnchainClaimStatus('⏳ Deposit detected — claiming...');
-        await BreezSparkService.claimDeposit(claimable.txid, claimable.vout);
+          // Show as claiming
+          setPendingDeposits(prev => {
+            const existing = prev.find(d => d.key === key);
+            if (existing) return prev;
+            return [...prev, { key, txid: deposit.txid, amountSats: deposit.amountSats, status: 'claiming' }];
+          });
 
-        if (isCancelled) return;
+          try {
+            await BreezSparkService.claimDeposit(deposit.txid, deposit.vout);
+            claimedKeys.add(key);
+            if (isCancelled) return;
 
-        setOnchainClaimStatus('✅ Deposit claimed!');
-        await refreshBalance();
-        await refreshTransactions();
+            setPendingDeposits(prev => prev.map(d => d.key === key ? { ...d, status: 'claimed' } : d));
+            await refreshBalance();
+            await refreshTransactions();
+
+            // Remove claimed after 5s
+            setTimeout(() => {
+              if (!isCancelled) {
+                setPendingDeposits(prev => prev.filter(d => d.key !== key));
+              }
+            }, 5000);
+          } catch (claimError) {
+            claimedKeys.add(key);
+            if (isCancelled) return;
+            const errMsg = claimError instanceof Error ? claimError.message : String(claimError);
+            const isDust = errMsg.includes('dust') || errMsg.includes('less than');
+            setPendingDeposits(prev => prev.map(d =>
+              d.key === key ? { ...d, status: isDust ? 'too-small' : 'failed' } : d
+            ));
+            console.warn(`⚠️ [ReceiveScreen] Failed to claim ${key}:`, claimError);
+          }
+        }
       } catch (error) {
         if (!isCancelled) {
           console.warn('⚠️ [ReceiveScreen] Deposit polling/claim failed:', error);
@@ -576,8 +610,40 @@ export default function ReceiveScreen() {
                   )}
 
                   <Text style={[styles.onchainNote, { color: secondaryTextColor }]}>{t('deposit.onchainNote')}</Text>
-                  {onchainClaimStatus && (
-                    <Text style={[styles.claimStatusText, { color: secondaryTextColor }]}>{onchainClaimStatus}</Text>
+
+                  {pendingDeposits.length > 0 && (
+                    <View style={{ marginTop: 12 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: secondaryTextColor, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                        Pending Deposits
+                      </Text>
+                      {pendingDeposits.map((dep) => {
+                        const statusConfig = {
+                          claiming: { icon: '⏳', label: 'Claiming...', color: '#ffc107' },
+                          claimed: { icon: '✅', label: 'Claimed', color: '#4caf50' },
+                          'too-small': { icon: '⚠️', label: 'Too small to claim', color: secondaryTextColor },
+                          failed: { icon: '❌', label: 'Failed', color: '#f44336' },
+                        }[dep.status];
+                        const shortTxid = `${dep.txid.slice(0, 8)}…${dep.txid.slice(-6)}`;
+                        return (
+                          <View key={dep.key} style={{
+                            flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                            paddingVertical: 8, paddingHorizontal: 10, marginVertical: 2,
+                            borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.04)',
+                            borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+                          }}>
+                            <View>
+                              <Text style={{ color: primaryTextColor, fontSize: 13, fontWeight: '500' }}>
+                                {dep.amountSats.toLocaleString()} sats
+                              </Text>
+                              <Text style={{ color: secondaryTextColor, fontSize: 10 }}>{shortTxid}</Text>
+                            </View>
+                            <Text style={{ fontSize: 11, color: statusConfig.color }}>
+                              {statusConfig.icon} {statusConfig.label}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
                   )}
                 </>
               ) : null}
