@@ -142,8 +142,8 @@ export default function ReceiveScreen() {
   const [snackMsg, setSnackMsg] = useState('');
   const [snackVisible, setSnackVisible] = useState(false);
 
-  const showCopyToast = useCallback((label: string) => {
-    setSnackMsg(`${label} copied`);
+  const showCopyToast = useCallback((key: string) => {
+    setSnackMsg(t(key));
     setSnackVisible(true);
   }, []);
 
@@ -151,7 +151,7 @@ export default function ReceiveScreen() {
     if (!invoice) return;
     try {
       await Clipboard.setStringAsync(invoice);
-      showCopyToast('Invoice');
+      showCopyToast('deposit.invoiceCopied');
     } catch (error) {
       console.error('Failed to copy invoice:', error);
       Alert.alert(t('common.error'), t('deposit.copyFailed'));
@@ -231,7 +231,7 @@ export default function ReceiveScreen() {
     if (!addressInfo?.lightningAddress) return;
     try {
       await Clipboard.setStringAsync(addressInfo.lightningAddress);
-      showCopyToast('Lightning Address');
+      showCopyToast('deposit.lightningAddressCopied');
     } catch (error) {
       console.error('Failed to copy address:', error);
       Alert.alert(t('common.error'), t('deposit.copyFailed'));
@@ -288,7 +288,7 @@ export default function ReceiveScreen() {
     if (!onchainAddress) return;
     try {
       await Clipboard.setStringAsync(onchainAddress);
-      showCopyToast('Bitcoin Address');
+      showCopyToast('deposit.bitcoinAddressCopied');
     } catch (error) {
       console.error('Failed to copy on-chain address:', error);
       Alert.alert(t('common.error'), t('deposit.copyFailed'));
@@ -340,7 +340,7 @@ export default function ReceiveScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backButton}>← Back</Text>
+            <Text style={styles.backButton}>← {t('common.back')}</Text>
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: primaryTextColor }]}>{t('wallet.receive')}</Text>
           <View style={styles.headerSpacer} />
@@ -402,7 +402,7 @@ export default function ReceiveScreen() {
                     textColor="#1a1a2e"
                     style={styles.manageButton}
                   >
-                    Manage
+                    {t('send.manage')}
                   </Button>
                 </View>
               )}

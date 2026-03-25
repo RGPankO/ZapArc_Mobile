@@ -382,7 +382,7 @@ export default function SendScreen() {
       setScanned(false);
       setStep('scanning');
     } else {
-      Alert.alert('Permission Required', 'Camera permission is required to scan QR codes');
+      Alert.alert(t('send.permissionRequired'), t('send.cameraPermissionRequired'));
     }
   }, [permission, requestPermission]);
 
@@ -458,7 +458,7 @@ export default function SendScreen() {
 
   const handlePreviewPayment = useCallback(async () => {
     if (!paymentInput.trim()) {
-      Alert.alert('Error', t('send.enterDestination'));
+      Alert.alert(t('common.error'), t('send.enterDestination'));
       return;
     }
 
@@ -469,17 +469,17 @@ export default function SendScreen() {
       const isOnchainFlow = activeTab === 'onchain';
 
       if (!parsedRequest.isValid) {
-        Alert.alert('Invalid Payment Request', t('send.invalidPaymentRequest'));
+        Alert.alert(t('send.paymentError'), t('send.invalidPaymentRequest'));
         return;
       }
 
       if (isOnchainFlow && parsedRequest.type !== 'bitcoinAddress') {
-        Alert.alert('Invalid Bitcoin Address', t('send.invalidOnchainAddress'));
+        Alert.alert(t('send.invalidBitcoinAddress'), t('send.invalidOnchainAddress'));
         return;
       }
 
       if (!isOnchainFlow && parsedRequest.type === 'bitcoinAddress') {
-        Alert.alert('Lightning Only', t('send.invalidLightningDestination'));
+        Alert.alert(t('send.lightningOnly'), t('send.invalidLightningDestination'));
         return;
       }
 
@@ -487,7 +487,7 @@ export default function SendScreen() {
       if (isOnchainFlow) {
         const satsAmount = Math.floor(Number(amount));
         if (!satsAmount || satsAmount <= 0) {
-          Alert.alert('Error', t('send.amountRequiredOnchain'));
+          Alert.alert(t('common.error'), t('send.amountRequiredOnchain'));
           return;
         }
         paymentAmount = satsAmount;
@@ -496,21 +496,23 @@ export default function SendScreen() {
       } else {
         const parsedAmount = parseFloat(amount);
         if (!parsedAmount || parsedAmount <= 0) {
-          Alert.alert('Error', 'Please enter a valid amount');
+          Alert.alert(t('common.error'), t('send.invalidAmount'));
           return;
         }
         paymentAmount = convertToSats(parsedAmount, inputCurrency);
 
         if (!paymentAmount || paymentAmount <= 0) {
-          Alert.alert('Conversion Error', 'Could not convert amount. Please check exchange rates.');
+          Alert.alert(t('send.conversionError'), t('send.conversionErrorMessage'));
           return;
         }
       }
 
       if (paymentAmount > balance) {
         Alert.alert(
-          'Insufficient Balance',
-          `You have ${balance.toLocaleString()} sats but trying to send ${paymentAmount.toLocaleString()} sats`
+          t('send.insufficientBalance'),
+          t('send.insufficientBalanceMessage')
+            .replace('{{balance}}', balance.toLocaleString())
+            .replace('{{amount}}', paymentAmount.toLocaleString())
         );
         return;
       }
@@ -571,8 +573,11 @@ export default function SendScreen() {
 
       if (totalAmount > balance) {
         Alert.alert(
-          'Insufficient Balance',
-          `Total (${totalAmount.toLocaleString()} sats including ${feeAmount.toLocaleString()} sats fee) exceeds your balance of ${balance.toLocaleString()} sats`
+          t('send.insufficientBalance'),
+          t('send.insufficientBalanceWithFee')
+            .replace('{{total}}', totalAmount.toLocaleString())
+            .replace('{{fee}}', feeAmount.toLocaleString())
+            .replace('{{balance}}', balance.toLocaleString())
         );
         return;
       }
@@ -595,11 +600,11 @@ export default function SendScreen() {
         errorMessage = 'Could not reach the Lightning Address provider. Please check the address is correct (e.g., user@wallet.com).';
       }
 
-      Alert.alert('Payment Error', errorMessage);
+      Alert.alert(t('send.paymentError'), errorMessage);
     } finally {
       setIsPreparing(false);
     }
-  }, [paymentInput, amount, comment, balance, inputCurrency, convertToSats, getOnchainFeeQuote, selectedSpeed, activeTab]);
+  }, [paymentInput, amount, comment, balance, inputCurrency, convertToSats, getOnchainFeeQuote, selectedSpeed, activeTab, t]);
 
   const handleSendPayment = useCallback(async () => {
     if (!preview || !prepareResponse) {
@@ -619,17 +624,17 @@ export default function SendScreen() {
         await new Promise(resolve => setTimeout(resolve, 1000));
         router.navigate('/wallet/home');
       } else {
-        Alert.alert('Payment Failed', result.error || 'Unknown error occurred');
+        Alert.alert(t('send.paymentFailed'), result.error || 'Unknown error occurred');
         setStep('input');
       }
     } catch (error) {
       console.error('Failed to send payment:', error);
-      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to send payment');
+      Alert.alert(t('common.error'), error instanceof Error ? error.message : 'Failed to send payment');
       setStep('input');
     } finally {
       setIsSending(false);
     }
-  }, [preview, prepareResponse, refreshBalance, step, selectedSpeed, paymentInput]);
+  }, [preview, prepareResponse, refreshBalance, step, selectedSpeed, paymentInput, t]);
 
   const handleBackToInput = useCallback(() => {
     setStep('input');
@@ -650,14 +655,11 @@ export default function SendScreen() {
       const totalAmount = preview.amount + feeAmount;
       if (totalAmount > balance) {
         Alert.alert(
-          'Insufficient Balance',
-          'Total (' +
-            totalAmount.toLocaleString() +
-            ' sats including ' +
-            feeAmount.toLocaleString() +
-            ' sats fee) exceeds your balance of ' +
-            balance.toLocaleString() +
-            ' sats'
+          t('send.insufficientBalance'),
+          t('send.insufficientBalanceWithFee')
+            .replace('{{total}}', totalAmount.toLocaleString())
+            .replace('{{fee}}', feeAmount.toLocaleString())
+            .replace('{{balance}}', balance.toLocaleString())
         );
         return;
       }
@@ -710,9 +712,9 @@ export default function SendScreen() {
         <SafeAreaView style={styles.container}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => setStep('input')}>
-              <Text style={styles.backButton}>← Back</Text>
+              <Text style={styles.backButton}>← {t('common.back')}</Text>
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: primaryTextColor }]}>Scan QR Code</Text>
+            <Text style={[styles.headerTitle, { color: primaryTextColor }]}>{t('send.scanQrCode')}</Text>
             <View style={styles.headerSpacer} />
           </View>
 
@@ -759,14 +761,14 @@ export default function SendScreen() {
         <SafeAreaView style={styles.container}>
           <View style={styles.header}>
             <TouchableOpacity onPress={handleBackToInput}>
-              <Text style={styles.backButton}>← Back</Text>
+              <Text style={styles.backButton}>← {t('common.back')}</Text>
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: primaryTextColor }]}>{isOnchainPreview ? t('send.onchainTitle') : t('wallet.send')}</Text>
             <View style={styles.headerSpacer} />
           </View>
 
           <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-            <Text style={[styles.sectionTitle, { color: primaryTextColor }]}>Payment Preview</Text>
+            <Text style={[styles.sectionTitle, { color: primaryTextColor }]}>{t('send.paymentPreview')}</Text>
 
             {isOnchainPreview && (
               <View style={styles.onchainSelectorContainer}>
@@ -804,28 +806,28 @@ export default function SendScreen() {
 
             <View style={styles.previewContainer}>
               <View style={styles.previewRow}>
-                <Text style={[styles.previewLabel, { color: secondaryTextColor }]}>Recipient:</Text>
+                <Text style={[styles.previewLabel, { color: secondaryTextColor }]}>{t('send.recipient')}</Text>
                 <Text style={[styles.previewValue, { color: primaryTextColor }]} numberOfLines={1} ellipsizeMode="middle">
                   {preview.recipient}
                 </Text>
               </View>
 
               <View style={styles.previewRow}>
-                <Text style={[styles.previewLabel, { color: secondaryTextColor }]}>Amount:</Text>
+                <Text style={[styles.previewLabel, { color: secondaryTextColor }]}>{t('payments.amount')}:</Text>
                 <Text style={[styles.previewAmount, { color: primaryTextColor }]}>
                   {preview.amount.toLocaleString()} sats
                 </Text>
               </View>
 
               <View style={styles.previewRow}>
-                <Text style={[styles.previewLabel, { color: secondaryTextColor }]}>{`${isOnchainPreview ? t('send.networkFee') : 'Fee'}:`}</Text>
+                <Text style={[styles.previewLabel, { color: secondaryTextColor }]}>{t('wallet.fee')}:</Text>
                 <Text style={[styles.previewFee, { color: secondaryTextColor }]}>
                   {preview.fee.toLocaleString()} sats
                 </Text>
               </View>
 
               <View style={[styles.previewRow, styles.previewTotal]}>
-                <Text style={[styles.previewTotalLabel, { color: primaryTextColor }]}>Total:</Text>
+                <Text style={[styles.previewTotalLabel, { color: primaryTextColor }]}>{t('send.total')}</Text>
                 <Text style={styles.previewTotalAmount}>
                   {preview.total.toLocaleString()} sats
                 </Text>
@@ -833,7 +835,7 @@ export default function SendScreen() {
 
               {preview.description && (
                 <View style={styles.previewRow}>
-                  <Text style={[styles.previewLabel, { color: secondaryTextColor }]}>Description:</Text>
+                  <Text style={[styles.previewLabel, { color: secondaryTextColor }]}>{t('payments.description')}:</Text>
                   <Text style={[styles.previewValue, { color: primaryTextColor }]}>{preview.description}</Text>
                 </View>
               )}
@@ -847,7 +849,7 @@ export default function SendScreen() {
                 style={[styles.cancelButton, { borderColor: secondaryTextColor }]}
                 textColor={secondaryTextColor}
               >
-                Preview Payment
+                {t('common.cancel')}
               </Button>
 
               <Button
@@ -859,7 +861,7 @@ export default function SendScreen() {
                 buttonColor={BRAND_COLOR}
                 textColor="#1a1a2e"
               >
-                {isOnchainPreview ? t('send.sendOnchainCta') : 'Send Payment'}
+                {isOnchainPreview ? t('send.sendOnchainCta') : t('payments.sendPayment')}
               </Button>
             </View>
           </ScrollView>
@@ -875,7 +877,7 @@ export default function SendScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backButton}>← Back</Text>
+            <Text style={styles.backButton}>← {t('common.back')}</Text>
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: primaryTextColor }]}>{t('wallet.send')}</Text>
           <View style={styles.headerSpacer} />
@@ -910,7 +912,7 @@ export default function SendScreen() {
 
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           <View style={styles.balanceContainer}>
-            <Text style={[styles.balanceLabel, { color: secondaryTextColor }]}>Available Balance:</Text>
+            <Text style={[styles.balanceLabel, { color: secondaryTextColor }]}>{t('send.availableBalance')}</Text>
             <Text style={styles.balanceAmount}>{balance.toLocaleString()} sats</Text>
             {balanceDisplay.fiatDisplay && (
               <Text style={[styles.balanceFiat, { color: secondaryTextColor }]}>{balanceDisplay.fiatDisplay}</Text>
@@ -989,7 +991,7 @@ export default function SendScreen() {
             style={styles.scanButton}
             textColor={BRAND_COLOR}
           >
-            Scan QR Code
+            {t('send.scanQrCode')}
           </Button>
 
           <ContactSelectionModal
@@ -1002,11 +1004,11 @@ export default function SendScreen() {
 
           {isLightningTab ? (
             <>
-              <Text style={[styles.label, { color: primaryTextColor }]}>Amount (leave empty for invoice amount):</Text>
+              <Text style={[styles.label, { color: primaryTextColor }]}>{t('send.amountLabel')}</Text>
 
               <View style={styles.amountInputRow}>
                 <StyledTextInput
-                  label={`Amount in ${currencyLabels[inputCurrency]}`}
+                  label={t('send.amountInCurrency').replace('{{currency}}', currencyLabels[inputCurrency])}
                   value={amount}
                   onChangeText={setAmount}
                   keyboardType="decimal-pad"
@@ -1044,10 +1046,10 @@ export default function SendScreen() {
                 </View>
               )}
 
-              <Text style={[styles.label, { color: primaryTextColor }]}>Comment (optional):</Text>
+              <Text style={[styles.label, { color: primaryTextColor }]}>{t('send.commentLabel')}</Text>
 
               <StyledTextInput
-                placeholder="Payment description"
+                placeholder={t('send.paymentDescriptionPlaceholder')}
                 value={comment}
                 onChangeText={setComment}
                 style={styles.input}
@@ -1124,7 +1126,7 @@ export default function SendScreen() {
             buttonColor={BRAND_COLOR}
             textColor="#1a1a2e"
           >
-            {isLightningTab ? 'Preview Payment' : t('send.previewOnchainCta')}
+            {isLightningTab ? t('send.previewPayment') : t('send.previewOnchainCta')}
           </Button>
         </ScrollView>
       </SafeAreaView>

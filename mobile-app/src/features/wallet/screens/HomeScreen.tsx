@@ -276,10 +276,10 @@ export function HomeScreen(): React.JSX.Element {
             </View>
             <View>
               <Text style={[styles.walletName, { color: primaryTextColor }]} numberOfLines={1}>
-                {activeWalletInfo?.masterKeyNickname || 'Wallet'}
+                {activeWalletInfo?.masterKeyNickname || t('wallet.walletFallback')}
               </Text>
               <Text style={[styles.subWalletName, { color: secondaryTextColor }]} numberOfLines={1}>
-                {activeWalletInfo?.subWalletNickname || 'Main Wallet'}
+                {activeWalletInfo?.subWalletNickname || t('wallet.mainWalletFallback')}
               </Text>
             </View>
             <IconButton
@@ -488,7 +488,7 @@ export function HomeScreen(): React.JSX.Element {
             {/* Details */}
             <View style={styles.detailsContainer}>
               <DetailRow label={t('wallet.type')} value={isReceived ? t('wallet.received') : t('wallet.sent')} />
-              <DetailRow label="Method" value={method === 'onchain' ? 'On-chain' : 'Lightning'} />
+              <DetailRow label={t('wallet.method')} value={method === 'onchain' ? t('wallet.methodOnchain') : t('wallet.methodLightning')} />
               <DetailRow
                 label={t('wallet.date')}
                 value={date.toLocaleDateString('en-US', {
@@ -508,7 +508,7 @@ export function HomeScreen(): React.JSX.Element {
                 <>
                   <DetailRow label="TXID" value={`${tx.txid.slice(0, 16)}...`} />
                   <TouchableOpacity onPress={() => Linking.openURL(`https://mempool.space/tx/${tx.txid}`)}>
-                    <Text style={styles.mempoolLink}>View on mempool.space</Text>
+                    <Text style={styles.mempoolLink}>{t('wallet.viewOnMempool')}</Text>
                   </TouchableOpacity>
                 </>
               )}
