@@ -192,6 +192,13 @@ export default function ReceiveScreen() {
       }
     }
 
+    // If SDK didn't provide a minimum, enforce our own based on dust limit + fees
+    // Dust limit is 546 sats; claim tx ~140 vBytes at ~5 sat/vB = ~700 sats fee
+    // So minimum safe deposit is ~1500 sats; use 2000 for safety
+    if (minimumSats === null || minimumSats < 2000) {
+      minimumSats = 2000;
+    }
+
     return { address, minimumSats };
   }, []);
 
