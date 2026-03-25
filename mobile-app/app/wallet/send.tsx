@@ -1138,6 +1138,11 @@ export default function SendScreen() {
                 keyboardType="number-pad"
                 style={styles.input}
               />
+              {amount.length > 0 && Number(amount) > 0 && Number(amount) < 1000 && (
+                <Text style={{ color: '#f44336', fontSize: 12, marginTop: -4, marginBottom: 4 }}>
+                  Minimum on-chain send: 1,000 sats
+                </Text>
+              )}
 
               <Text style={[styles.label, { color: primaryTextColor }]}>{t('send.confirmationSpeed')}</Text>
               <View style={styles.speedCardsColumn}>
@@ -1195,6 +1200,7 @@ export default function SendScreen() {
               !paymentInput.trim() ||
               (!isLightningTab && !amount.trim()) ||
               (!isLightningTab && !!addressError) ||
+              (!isLightningTab && Number(amount) > 0 && Number(amount) < 1000) ||
               (isLightningTab && inputCurrency !== 'sats' && isLoadingRates && amount !== '')
             }
             style={styles.previewButton}
