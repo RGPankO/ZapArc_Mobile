@@ -1355,21 +1355,24 @@ export async function sendOnchainPayment(
   }
 
   try {
-    // RN Spark bridge expects enum-like string values: Fast | Medium | Slow
-    const speedEnum =
+    // Import the SDK enum types for proper serialization
+    const { SendPaymentOptions, OnchainConfirmationSpeed } = require('@breeztech/breez-sdk-spark-react-native');
+
+    const speedEnumValue =
       confirmationSpeed === 'fast'
-        ? 'Fast'
+        ? OnchainConfirmationSpeed.Fast
         : confirmationSpeed === 'slow'
-          ? 'Slow'
-          : 'Medium';
+          ? OnchainConfirmationSpeed.Slow
+          : OnchainConfirmationSpeed.Medium;
+
+    const options = new SendPaymentOptions.BitcoinAddress({
+      confirmationSpeed: speedEnumValue,
+    });
 
     const response = await sdkInstance.sendPayment({
       prepareResponse,
       idempotencyKey,
-      options: {
-        type: 'bitcoinAddress',
-        confirmationSpeed: speedEnum,
-      },
+      options,
     });
 
     const paymentId = response.payment?.id;
