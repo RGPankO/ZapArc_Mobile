@@ -12,6 +12,82 @@ import { BREEZ_API_KEY, BREEZ_STORAGE_DIR } from '../config';
 import { NotificationTriggerService } from './notificationTriggerService';
 
 // =============================================================================
+// SDK Error Extraction Helper
+// =============================================================================
+
+/**
+ * Extract a human-readable error message from SDK errors.
+ * SDK errors may not be standard Error instances — they can be uniffi enum objects
+ * with properties like .message, .variant, .code, .inner, etc.
+ */
+function extractSdkErrorMessage(error: unknown, fallback = 'Payment failed'): string {
+  if (!error) return fallback;
+
+  // Standard Error
+  if (error instanceof Error) {
+    return error.message || fallback;
+  }
+
+  // SDK error objects with various shapes
+  if (typeof error === 'object') {
+    const e = error as Record<string, unknown>;
+
+    // Try common properties
+    const message = e.message || e.msg || e.description;
+    if (typeof message === 'string' && message.length > 0) return message;
+
+    // uniffi enum errors: { variant: 'SparkError', inner: { message: '...' } }
+    if (e.inner && typeof e.inner === 'object') {
+      const inner = e.inner as Record<string, unknown>;
+      if (typeof inner.message === 'string') {
+        const variant = typeof e.variant === 'string' ? `${e.variant}: ` : '';
+        return `${variant}${inner.message}`;
+      }
+    }
+
+    // { variant: 'SparkError' } without inner
+    if (typeof e.variant === 'string') {
+      const code = typeof e.code === 'string' ? ` (${e.code})` : '';
+      return `${e.variant}${code}`;
+    }
+
+    // toString fallback
+    const str = String(error);
+    if (str !== '[object Object]') return str;
+  }
+
+  if (typeof error === 'string') return error;
+
+  return fallback;
+}
+
+/**
+ * Extract full debug details from an SDK error for logging/display.
+ */
+function extractSdkErrorDetails(error: unknown): string {
+  if (!error) return 'No error details';
+
+  const parts: string[] = [];
+  const str = String(error);
+  if (str !== '[object Object]') parts.push(str);
+
+  if (error instanceof Error) {
+    if (error.stack) parts.push(`Stack: ${error.stack}`);
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    for (const key of Object.keys(error)) {
+      const val = (error as Record<string, unknown>)[key];
+      if (val !== undefined && val !== null) {
+        parts.push(`${key}: ${typeof val === 'object' ? JSON.stringify(val) : String(val)}`);
+      }
+    }
+  }
+
+  return parts.join('\n') || 'No error details';
+}
+
+// =============================================================================
 // Types
 // =============================================================================
 
@@ -25,6 +101,7 @@ export interface PaymentResult {
   success: boolean;
   paymentId?: string;
   error?: string;
+  errorDetails?: string;
 }
 
 export interface ReceivePaymentResult {
@@ -1389,9 +1466,11 @@ export async function sendOnchainPayment(
     };
   } catch (error) {
     console.error('Failed to send on-chain payment:', error);
+    console.error('On-chain payment error details:', extractSdkErrorDetails(error));
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Payment failed',
+      error: extractSdkErrorMessage(error, 'On-chain payment failed'),
+      errorDetails: extractSdkErrorDetails(error),
     };
   }
 }
@@ -1528,9 +1607,11 @@ export async function sendPayment(
     };
   } catch (error) {
     console.error('Failed to send payment:', error);
+    console.error('Send payment error details:', extractSdkErrorDetails(error));
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Payment failed',
+      error: extractSdkErrorMessage(error, 'Payment failed'),
+      errorDetails: extractSdkErrorDetails(error),
     };
   }
 }

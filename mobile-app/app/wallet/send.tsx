@@ -630,7 +630,13 @@ export default function SendScreen() {
     } catch (error) {
       console.error('Failed to prepare payment:', error);
 
-      let errorMessage = error instanceof Error ? error.message : 'Failed to prepare payment';
+      let errorMessage = error instanceof Error ? error.message : String(error);
+      // Try to extract from SDK error objects
+      if (errorMessage === '[object Object]' && typeof error === 'object' && error !== null) {
+        const e = error as Record<string, unknown>;
+        errorMessage = (e.message as string) || (e.variant as string) || JSON.stringify(error);
+      }
+
       if (errorMessage.includes('Network request failed') || errorMessage.includes('Failed to resolve')) {
         errorMessage = 'Could not reach the Lightning Address provider. Please check the address is correct (e.g., user@wallet.com).';
       }
@@ -659,12 +665,15 @@ export default function SendScreen() {
         await new Promise(resolve => setTimeout(resolve, 1000));
         router.navigate('/wallet/home');
       } else {
-        Alert.alert(t('send.paymentFailed'), result.error || 'Unknown error occurred');
+        const errorMsg = result.error || 'Unknown error occurred';
+        const details = result.errorDetails ? `\n\nDetails:\n${result.errorDetails}` : '';
+        Alert.alert(t('send.paymentFailed'), `${errorMsg}${details}`);
         setStep('input');
       }
     } catch (error) {
       console.error('Failed to send payment:', error);
-      Alert.alert(t('common.error'), error instanceof Error ? error.message : 'Failed to send payment');
+      const msg = error instanceof Error ? error.message : String(error);
+      Alert.alert(t('common.error'), msg);
       setStep('input');
     } finally {
       setIsSending(false);
