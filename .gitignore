@@ -243,3 +243,4 @@ mobile-app/android/
 mobile-app/ios/
 mobile-app/dev-build.apk  
 mobile-app/android/app/zaparc-release.keystore
+ZapArc-android-alpha-*.apk
