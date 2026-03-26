@@ -14,25 +14,36 @@ interface NotificationResponse {
   error?: string;
 }
 
-export const NotificationTriggerService = {
-  // registerDevice removed — use syncSubscriptions for all registration
+export interface WalletSubscription {
+  identityPubkey: string;
+  lightningAddress: string;
+}
 
+export const NotificationTriggerService = {
   /**
-   * Sync all wallet identifiers for this device token in one shot.
-   * Backend should replace existing mappings for this token.
+   * Sync all wallet subscriptions for this device token in one shot.
+   * Sends identity pubkeys + lightning addresses so backend can map both.
+   * Backend should replace existing mappings for this push token.
    */
   async syncSubscriptions(
     pushToken: string,
-    identifiers: string[],
+    wallets: WalletSubscription[],
     walletNickname?: string
   ): Promise<NotificationResponse> {
     try {
-      const uniqueIdentifiers = Array.from(new Set(identifiers.map(i => i.trim()).filter(Boolean)));
-      if (!pushToken || uniqueIdentifiers.length === 0) {
-        return { success: false, error: 'Missing push token or identifiers' };
+      if (!pushToken || wallets.length === 0) {
+        return { success: false, error: 'Missing push token or wallet subscriptions' };
       }
 
-      console.log(`🔄 [Notification] Syncing subscriptions (${uniqueIdentifiers.length})`);
+      // Deduplicate by pubkey
+      const seen = new Set<string>();
+      const uniqueWallets = wallets.filter(w => {
+        if (seen.has(w.identityPubkey)) return false;
+        seen.add(w.identityPubkey);
+        return true;
+      });
+
+      console.log(`🔄 [Notification] Syncing ${uniqueWallets.length} wallet subscriptions`);
 
       const response = await fetch(SYNC_SUBSCRIPTIONS_ENDPOINT, {
         method: 'POST',
@@ -41,7 +52,10 @@ export const NotificationTriggerService = {
         },
         body: JSON.stringify({
           expoPushToken: pushToken,
-          identifiers: uniqueIdentifiers,
+          // New format: structured wallet entries
+          wallets: uniqueWallets,
+          // Backwards compat: also send flat identifiers (lightning addresses)
+          identifiers: uniqueWallets.map(w => w.lightningAddress),
           platform: Platform.OS,
           walletNickname,
         }),
@@ -67,15 +81,15 @@ export const NotificationTriggerService = {
 
   /**
    * Triggers a push notification to the recipient device.
-   * Can use direct token, recipient PubKey, or Lightning Address for lookup.
+   * Can look up by pushToken, identityPubkey, or lightningAddress.
    */
   async sendTransactionNotification(
-    recipient: { pushToken?: string; lightningAddress?: string },
+    recipient: { pushToken?: string; lightningAddress?: string; identityPubkey?: string },
     amountSats: number
   ): Promise<NotificationResponse> {
     try {
-      if (!recipient.pushToken && !recipient.lightningAddress) {
-        return { success: false, error: 'Must provide pushToken or lightningAddress' };
+      if (!recipient.pushToken && !recipient.lightningAddress && !recipient.identityPubkey) {
+        return { success: false, error: 'Must provide pushToken, lightningAddress, or identityPubkey' };
       }
 
       if (__DEV__) {
@@ -90,6 +104,7 @@ export const NotificationTriggerService = {
         body: JSON.stringify({
           expoPushToken: recipient.pushToken,
           recipientLightningAddress: recipient.lightningAddress,
+          recipientPubkey: recipient.identityPubkey,
           amount: amountSats,
         }),
       });

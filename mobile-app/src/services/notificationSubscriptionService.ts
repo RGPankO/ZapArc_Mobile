@@ -26,7 +26,7 @@
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NotificationTriggerService } from './notificationTriggerService';
+import { NotificationTriggerService, WalletSubscription } from './notificationTriggerService';
 
 const CACHE_KEY = '@notification_addresses';
 // Legacy key mapping: masterKeyId:subWalletIndex → identityPubkey
@@ -259,7 +259,8 @@ export async function clearMasterKeyAddresses(
 }
 
 /**
- * Sync all cached lightning addresses with the backend in one shot.
+ * Sync all cached wallet subscriptions with the backend in one shot.
+ * Sends identityPubkey + lightningAddress pairs for each wallet.
  * Call this at app startup (no SDK needed) and after cache changes.
  */
 export async function syncAllFromCache(walletNickname?: string): Promise<void> {
@@ -270,20 +271,24 @@ export async function syncAllFromCache(walletNickname?: string): Promise<void> {
   }
 
   const cache = await readCache();
-  const addresses = Object.values(cache.addresses).filter(Boolean);
+  const entries = Object.entries(cache.addresses).filter(([_, addr]) => !!addr);
 
-  if (addresses.length === 0) {
-    console.log('ℹ️ [NotifSubs] No cached addresses to sync');
+  if (entries.length === 0) {
+    console.log('ℹ️ [NotifSubs] No cached wallets to sync');
     return;
   }
 
-  const uniqueAddresses = [...new Set(addresses)];
+  // Build structured wallet list from cache (key = identityPubkey, value = lightningAddress)
+  const wallets: WalletSubscription[] = entries.map(([key, address]) => ({
+    identityPubkey: key,
+    lightningAddress: address,
+  }));
 
-  console.log(`🔄 [NotifSubs] Syncing ${uniqueAddresses.length} cached addresses`);
+  console.log(`🔄 [NotifSubs] Syncing ${wallets.length} wallet subscriptions`);
 
   const result = await NotificationTriggerService.syncSubscriptions(
     pushToken,
-    uniqueAddresses,
+    wallets,
     walletNickname,
   );
 
