@@ -329,23 +329,25 @@ export async function initializeSDK(
 
     console.log('✅ [BreezSparkService] SDK initialized');
 
-    // Cache lightning address for push notification registration.
-    // The actual sync with backend happens via syncAllFromCache (at startup or on cache change).
-    // This avoids needing to init the SDK for every wallet just to register notifications.
+    // Cache lightning address + identity pubkey for push notification registration.
+    // identityPubkey is the stable, seed-derived unique identifier for this wallet.
     try {
-        const lnAddress = await getLightningAddress();
-        if (lnAddress?.lightningAddress && walletIdentity) {
+        const [lnAddress, info] = await Promise.all([
+            getLightningAddress(),
+            sdkInstance.getInfo({}),
+        ]);
+        const identityPubkey = info?.identityPubkey;
+        if (lnAddress?.lightningAddress && identityPubkey) {
             const { cacheWalletAddress } = require('./notificationSubscriptionService');
             await cacheWalletAddress(
-                walletIdentity.masterKeyId,
-                walletIdentity.subWalletIndex,
+                identityPubkey,
                 lnAddress.lightningAddress,
+                walletIdentity ? { masterKeyId: walletIdentity.masterKeyId, subWalletIndex: walletIdentity.subWalletIndex } : undefined,
                 walletNickname,
             );
+            console.log(`🔑 [BreezSparkService] Identity pubkey: ${identityPubkey.slice(0, 16)}…`);
         } else if (lnAddress?.lightningAddress) {
-            // Caller didn't pass walletIdentity — fall back to direct sync
-            // (e.g. temp SDK connections for activity checks)
-            console.log('ℹ️ [BreezSparkService] No walletIdentity — skipping address cache');
+            console.log('ℹ️ [BreezSparkService] No identityPubkey — skipping address cache');
         }
     } catch (e) {
         console.warn('⚠️ [BreezSparkService] Notification cache warning:', e);
@@ -988,20 +990,7 @@ export async function listPayments(): Promise<TransactionInfo[]> {
 
       const txid = payment.details?.inner?.txId || payment.details?.txId || payment.details?.txid || payment.txid;
 
-      let mappedStatus = mapPaymentStatus(payment.status);
-
-      // On-chain sends: SDK marks as "completed" immediately (Spark transfer done),
-      // but the actual L1 tx may still be unconfirmed. Show as "pending" for sends
-      // since we can't verify confirmations from SDK.
-      // For on-chain receives (deposits), the claim flow handles status separately.
-      if (isOnchain && type === 'send' && mappedStatus === 'completed') {
-        // Check if tx is recent (< 2 hours) - after that assume it's confirmed
-        const ageMs = timestamp ? Date.now() - timestamp : 0;
-        const TWO_HOURS = 2 * 60 * 60 * 1000;
-        if (ageMs < TWO_HOURS || ageMs === 0) {
-          mappedStatus = 'pending';
-        }
-      }
+      const mappedStatus = mapPaymentStatus(payment.status);
 
       return {
         id: payment.id,
