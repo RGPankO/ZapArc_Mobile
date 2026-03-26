@@ -45,14 +45,27 @@ export interface RegisterPushTokenRequest {
 }
 
 /**
+ * A wallet subscription entry with identity pubkey + lightning address.
+ * identityPubkey is deterministic (derived from seed), stable across devices.
+ */
+export interface WalletSubscription {
+  /** Identity public key (hex) — derived from wallet seed, unique per sub-wallet */
+  identityPubkey: string;
+  /** Lightning address for this wallet */
+  lightningAddress: string;
+}
+
+/**
  * Request interface for syncing all subscriptions for a device token.
  * Server should treat this as replace-all for this expoPushToken.
  */
 export interface SyncSubscriptionsRequest {
   /** Expo push token */
   expoPushToken: string;
-  /** Full set of identifiers that should remain subscribed for this token */
-  identifiers: string[];
+  /** Structured wallet entries (preferred, new format) */
+  wallets?: WalletSubscription[];
+  /** Flat lightning address identifiers (backwards compat) */
+  identifiers?: string[];
   /** Platform (android/ios) - optional */
   platform?: string;
   /** Wallet nickname - optional */

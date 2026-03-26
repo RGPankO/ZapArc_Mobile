@@ -13,8 +13,8 @@ import type {
   TransactionNotificationResponse,
   ExpoPushMessage,
   BreezWebhookRequest,
-
   SyncSubscriptionsRequest,
+  WalletSubscription,
 } from './types.js';
 
 // Initialize Firebase Admin
@@ -110,7 +110,16 @@ async function sendPushNotification(
 
 /**
  * Sync subscriptions for one expo push token (replace-all semantics).
- * Removes stale identifier -> token mappings that are no longer active on device.
+ * Accepts either structured `wallets` array (pubkey + address) or legacy `identifiers` (addresses only).
+ * Removes stale mappings that are no longer active on this device.
+ *
+ * Firestore structure (users collection):
+ *   doc id = normalizedIdentifier (lightning address)
+ *   fields: { expoPushToken, identityPubkey?, platform, walletNickname?, updatedAt }
+ *
+ * Also maintains a pubkey index (pubkeys collection):
+ *   doc id = identityPubkey
+ *   fields: { lightningAddress, expoPushToken, updatedAt }
  */
 export const syncSubscriptions = onRequest(
   { cors: true, region: 'europe-west3' },
@@ -125,31 +134,57 @@ export const syncSubscriptions = onRequest(
       }
 
       const body = request.body as Partial<SyncSubscriptionsRequest>;
-      const { expoPushToken, identifiers, platform, walletNickname } = body;
+      const { expoPushToken, wallets, identifiers, platform, walletNickname } = body;
 
-      if (!expoPushToken || !Array.isArray(identifiers)) {
+      if (!expoPushToken) {
         response.status(400).json({
           success: false,
-          error: 'Missing required fields: expoPushToken, identifiers[]',
+          error: 'Missing required field: expoPushToken',
         });
         return;
       }
 
-      const normalizedIdentifiers = Array.from(
-        new Set(
-          identifiers
-            .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
-            .map(normalizeIdentifier)
-        )
-      );
+      // Build normalized wallet list from either wallets[] or identifiers[]
+      interface ResolvedEntry {
+        lightningAddress: string;
+        identityPubkey?: string;
+      }
+      const entries: ResolvedEntry[] = [];
 
-      if (normalizedIdentifiers.length === 0) {
+      if (Array.isArray(wallets) && wallets.length > 0) {
+        // New format: structured wallet entries with pubkey
+        for (const w of wallets) {
+          if (w.lightningAddress && typeof w.lightningAddress === 'string') {
+            entries.push({
+              lightningAddress: normalizeIdentifier(w.lightningAddress),
+              identityPubkey: w.identityPubkey?.trim() || undefined,
+            });
+          }
+        }
+      } else if (Array.isArray(identifiers)) {
+        // Legacy format: flat lightning address strings
+        for (const id of identifiers) {
+          if (typeof id === 'string' && id.trim().length > 0) {
+            entries.push({ lightningAddress: normalizeIdentifier(id) });
+          }
+        }
+      }
+
+      if (entries.length === 0) {
         response.status(400).json({
           success: false,
-          error: 'identifiers must contain at least one valid identifier',
+          error: 'Must provide wallets[] or identifiers[] with at least one entry',
         });
         return;
       }
+
+      // Deduplicate by lightning address
+      const seen = new Set<string>();
+      const uniqueEntries = entries.filter(e => {
+        if (seen.has(e.lightningAddress)) return false;
+        seen.add(e.lightningAddress);
+        return true;
+      });
 
       // 1) Find all existing docs currently mapped to this token
       const existingSnap = await db.collection('users')
@@ -157,32 +192,54 @@ export const syncSubscriptions = onRequest(
         .get();
 
       const existingIds = existingSnap.docs.map(d => d.id);
-      const keepSet = new Set(normalizedIdentifiers);
+      const keepSet = new Set(uniqueEntries.map(e => e.lightningAddress));
 
-      // 2) Remove stale mappings for this token
+      // 2) Remove stale mappings for this token (users + pubkeys collections)
       const staleIds = existingIds.filter(id => !keepSet.has(id));
       await Promise.all(
-        staleIds.map((id) => db.collection('users').doc(id).delete())
+        staleIds.map(async (id) => {
+          const doc = await db.collection('users').doc(id).get();
+          const pubkey = doc.data()?.identityPubkey;
+          // Delete user doc
+          await db.collection('users').doc(id).delete();
+          // Delete pubkey index if it exists
+          if (pubkey) {
+            await db.collection('pubkeys').doc(pubkey).delete().catch(() => {});
+          }
+        })
       );
 
-      // 3) Upsert all desired mappings
+      // 3) Upsert all desired mappings (users + pubkeys)
       await Promise.all(
-        normalizedIdentifiers.map((id) =>
-          db.collection('users').doc(id).set(
-            {
+        uniqueEntries.map(async (entry) => {
+          // Upsert user doc (keyed by lightning address)
+          const userData: Record<string, unknown> = {
+            expoPushToken,
+            platform: platform || 'unknown',
+            walletNickname: walletNickname || undefined,
+            updatedAt: new Date(),
+          };
+          if (entry.identityPubkey) {
+            userData.identityPubkey = entry.identityPubkey;
+          }
+          await db.collection('users').doc(entry.lightningAddress).set(userData, { merge: true });
+
+          // Upsert pubkey index (keyed by identity pubkey)
+          if (entry.identityPubkey) {
+            await db.collection('pubkeys').doc(entry.identityPubkey).set({
+              lightningAddress: entry.lightningAddress,
               expoPushToken,
               platform: platform || 'unknown',
-              walletNickname: walletNickname || undefined,
               updatedAt: new Date(),
-            },
-            { merge: true }
-          )
-        )
+            }, { merge: true });
+          }
+        })
       );
 
       console.log('✅ syncSubscriptions complete', {
         tokenPrefix: expoPushToken.substring(0, 20),
-        kept: normalizedIdentifiers.length,
+        kept: uniqueEntries.length,
+        withPubkey: uniqueEntries.filter(e => e.identityPubkey).length,
         removed: staleIds.length,
       });
 
@@ -219,21 +276,22 @@ export const sendTransactionNotification = onRequest(
       // Parse request body
       const body = request.body as Partial<TransactionNotificationRequest>;
       const { expoPushToken: directToken, recipientPubKey, recipientLightningAddress, amount } = body;
+      const recipientPubkey = (body as Record<string, unknown>).recipientPubkey as string | undefined;
 
       // Validate inputs
       if (!amount) {
         response.status(400).json({ success: false, error: 'Amount is required' });
         return;
       }
-      if (!directToken && !recipientLightningAddress) {
+      if (!directToken && !recipientLightningAddress && !recipientPubkey) {
         response.status(400).json({
           success: false,
-          error: 'Provide expoPushToken or recipientLightningAddress',
+          error: 'Provide expoPushToken, recipientLightningAddress, or recipientPubkey',
         });
         return;
       }
-      if (recipientPubKey && !recipientLightningAddress && !directToken) {
-        console.warn('⚠️ recipientPubKey-only routing is disabled to prevent cross-wallet notifications');
+      if (recipientPubKey && !recipientLightningAddress && !directToken && !recipientPubkey) {
+        console.warn('⚠️ recipientPubKey (legacy) only routing is disabled to prevent cross-wallet notifications');
       }
 
       // Store token + nickname pairs for personalized messages
@@ -267,6 +325,23 @@ export const sendTransactionNotification = onRequest(
           }
         } else {
           console.log(`⚠️ Lightning Address ${normalizedAddress} not found in registry.`);
+        }
+      }
+
+      // 3. If recipientPubkey provided, look it up in the pubkeys collection
+      if (recipientPubkey && tokenInfos.length === 0) {
+        const pubkeyDoc = await db.collection('pubkeys').doc(recipientPubkey).get();
+        if (pubkeyDoc.exists) {
+          const pkData = pubkeyDoc.data();
+          if (pkData?.expoPushToken) {
+            tokenInfos.push({
+              token: pkData.expoPushToken,
+              walletNickname: undefined, // look up from users collection if needed
+            });
+            console.log(`✅ Found token for identityPubkey ${recipientPubkey.substring(0, 16)}…`);
+          }
+        } else {
+          console.log(`⚠️ identityPubkey ${recipientPubkey.substring(0, 16)}… not found in pubkeys registry`);
         }
       }
 
