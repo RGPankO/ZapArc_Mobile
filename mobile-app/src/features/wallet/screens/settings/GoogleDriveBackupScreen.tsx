@@ -42,8 +42,12 @@ import {
 } from '../../../../services/googleDriveBackupService';
 import {
   validatePasswordStrength,
+  validateBackupStructure,
+  decryptMnemonic,
   type PasswordStrength,
 } from '../../../../services/backupEncryption';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 
 // =============================================================================
 // Component
@@ -413,6 +417,74 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
     }
   };
 
+  // File-based restore flow state
+  const [fileBackupData, setFileBackupData] = useState<unknown>(null);
+
+  const handleRestoreFromFile = async (): Promise<void> => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/json',
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const fileUri = result.assets[0].uri;
+      const content = await FileSystem.readAsStringAsync(fileUri);
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        Alert.alert(t('common.error'), 'Invalid file format. Please select a valid backup JSON file.');
+        return;
+      }
+
+      if (!validateBackupStructure(parsed)) {
+        Alert.alert(t('common.error'), 'This file is not a valid ZapArc backup. Please select a backup file created by ZapArc.');
+        return;
+      }
+
+      // Store backup data and show password modal
+      setFileBackupData(parsed);
+      setModalMode('restore');
+      setSelectedBackup(null);
+      setPassword('');
+      setShowPasswordModal(true);
+    } catch (error) {
+      console.error('❌ [RestoreFromFile] Failed:', error);
+      Alert.alert(t('common.error'), 'Failed to read backup file.');
+    }
+  };
+
+  const handleConfirmFileRestore = async (): Promise<void> => {
+    if (!fileBackupData) return;
+
+    setIsProcessing(true);
+    try {
+      const mnemonic = await decryptMnemonic(fileBackupData as any, password);
+
+      setShowPasswordModal(false);
+      setPassword('');
+      setFileBackupData(null);
+      setRestoredMnemonic(mnemonic);
+      setRestoredWalletName((fileBackupData as any).walletName || null);
+      setRestorePin('');
+      setConfirmRestorePin('');
+      setShowPinModal(true);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to decrypt backup';
+      const isPasswordError = msg.toLowerCase().includes('password') || msg.toLowerCase().includes('decrypt');
+      Alert.alert(
+        t('common.error'),
+        isPasswordError ? 'Incorrect password. Please try again.' : msg
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleConfirmImport = async (): Promise<void> => {
     if (!restoredMnemonic) return;
 
@@ -529,6 +601,7 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
         setShowPasswordModal(false);
         setPassword('');
         setConfirmPassword('');
+        setFileBackupData(null);
       }}
     >
       <View style={styles.modalOverlay}>
@@ -612,6 +685,7 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
                 setShowPasswordModal(false);
                 setPassword('');
                 setConfirmPassword('');
+                setFileBackupData(null);
               }}
               style={styles.modalButton}
               textColor={secondaryText}
@@ -623,7 +697,9 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
               onPress={
                 modalMode === 'create'
                   ? handleConfirmCreateBackup
-                  : handleConfirmRestore
+                  : fileBackupData
+                    ? handleConfirmFileRestore
+                    : handleConfirmRestore
               }
               loading={isProcessing}
               disabled={
@@ -914,6 +990,25 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
                 })()}
               </>
             )}
+
+            {/* Restore from File */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: primaryText }]}>
+                Restore from File
+              </Text>
+              <Text style={[styles.sectionSubtitle, { color: secondaryText }]}>
+                Restore a wallet from a backup file saved on your device
+              </Text>
+              <Button
+                mode="outlined"
+                onPress={handleRestoreFromFile}
+                icon="file-upload"
+                style={[styles.actionButton, { borderColor: BRAND_COLOR }]}
+                textColor={BRAND_COLOR}
+              >
+                Choose Backup File
+              </Button>
+            </View>
 
             {/* Security Tips */}
             <View style={styles.tipsSection}>
