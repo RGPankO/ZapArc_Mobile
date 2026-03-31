@@ -28,6 +28,7 @@ import { storageService, settingsService } from '../../../../services';
 import { useAppTheme } from '../../../../contexts/ThemeContext';
 import { generateMasterKeyNickname } from '../../../../utils/mnemonic';
 import { WALLET_PIN_LENGTH } from '../../constants/security';
+import { promptNotificationsIfNeeded } from '../../utils/notificationPrompt';
 import { useLanguage } from '../../../../hooks/useLanguage';
 import {
   getGradientColors,
@@ -504,6 +505,9 @@ export function GoogleDriveBackupScreen(): React.JSX.Element {
       console.log('🔄 [Restore] Importing wallet...', { nickname });
       const masterKeyId = await importMasterKey(restoredMnemonic, restorePin, nickname);
       console.log('✅ [Restore] Wallet imported:', masterKeyId);
+
+      // Prompt for notification permission on wallet restore
+      await promptNotificationsIfNeeded();
 
       setShowPinModal(false);
       setRestoredMnemonic(null);
