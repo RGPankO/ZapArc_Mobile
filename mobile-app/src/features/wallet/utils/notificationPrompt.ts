@@ -36,6 +36,10 @@ export async function promptNotificationsIfNeeded(): Promise<void> {
       });
       console.log('✅ [NotificationPrompt] Permission granted');
     } else {
+      // Store explicit false so we never prompt again after denial
+      await settingsService.updateUserSettings({
+        notificationsEnabled: false,
+      });
       console.log('ℹ️ [NotificationPrompt] Permission denied/deferred');
     }
   } catch (err) {
