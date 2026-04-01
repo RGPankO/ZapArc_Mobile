@@ -22,7 +22,6 @@ The app uses **Breez SDK Spark** (`@breeztech/breez-sdk-spark-react-native`) for
 
 - Node.js 18+ (recommended: use nvm)
 - Expo CLI (`npm install -g expo-cli`)
-- EAS CLI (`npm install -g eas-cli`)
 - Android Studio (for Android builds)
 - Xcode (for iOS builds, macOS only)
 
@@ -69,9 +68,9 @@ export const BREEZ_API_KEY = 'your_spark_api_key_here';
 
 ## Step 3: Configure Expo Build
 
-The Breez SDK requires native modules, so it **cannot run in Expo Go**. You must use a development build.
+The Breez SDK requires native modules, so it **cannot run in Expo Go**. Use local native development builds.
 
-### 3.1 Configure app.json
+### 3.1 Configure app.json (local native build)
 
 Ensure these plugins are in your `app.json`:
 
@@ -100,45 +99,6 @@ Ensure these plugins are in your `app.json`:
 }
 ```
 
-### 3.2 Create EAS Build Configuration
-
-Create `eas.json` in the project root:
-
-```json
-{
-  "cli": {
-    "version": ">= 5.0.0"
-  },
-  "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleDebug"
-      },
-      "ios": {
-        "simulator": true
-      }
-    },
-    "preview": {
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      }
-    },
-    "production": {
-      "android": {
-        "buildType": "app-bundle"
-      }
-    }
-  },
-  "submit": {
-    "production": {}
-  }
-}
-```
-
 ---
 
 ## Step 4: Build the Development Client
@@ -153,16 +113,6 @@ npx expo prebuild --platform android
 npx expo run:android
 ```
 
-### Android (EAS Cloud Build)
-
-```bash
-# Login to EAS
-eas login
-
-# Build development client
-eas build --platform android --profile development
-```
-
 ### iOS (Local Build - macOS only)
 
 ```bash
@@ -171,12 +121,6 @@ npx expo prebuild --platform ios
 
 # Build development client
 npx expo run:ios
-```
-
-### iOS (EAS Cloud Build)
-
-```bash
-eas build --platform ios --profile development
 ```
 
 ---

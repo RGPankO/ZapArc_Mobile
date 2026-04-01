@@ -5,7 +5,7 @@ jest.mock('expo-notifications', () => ({
 }));
 
 jest.mock('expo-constants', () => ({
-  expoConfig: { extra: { eas: { projectId: 'test-project' } } },
+  expoConfig: { extra: { expoProjectId: 'test-project' } },
 }));
 
 jest.mock('../notificationTriggerService', () => ({

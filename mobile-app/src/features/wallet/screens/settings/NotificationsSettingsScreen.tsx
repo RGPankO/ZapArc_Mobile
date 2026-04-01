@@ -184,8 +184,8 @@ export function NotificationsSettingsScreen(): React.JSX.Element {
         return;
       }
 
-      // Get project ID from Constants (app.json extra.eas.projectId)
-      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+      // Get project ID from Constants (app.json extra.expoProjectId)
+      const projectId = Constants.expoConfig?.extra?.expoProjectId;
       console.log('🔔 [Test] Project ID:', projectId);
 
       if (!projectId) {

@@ -107,7 +107,7 @@ async function writePubkeyMap(pkMap: PubkeyMap): Promise<void> {
  */
 async function getPushToken(): Promise<string | null> {
   try {
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    const projectId = Constants.expoConfig?.extra?.expoProjectId;
     if (!projectId) {
       console.warn('⚠️ [NotifSubs] No project ID found');
       return null;
