@@ -293,7 +293,11 @@ export default function ReceiveScreen() {
               amountSats: deposit.amountSats,
               status: 'claiming',
               timestamp: Date.now(),
-              failureReason: deposit.claimError ? String(deposit.claimError) : undefined,
+              failureReason: deposit.claimError
+                ? (typeof deposit.claimError === 'object' && deposit.claimError !== null
+                    ? ((deposit.claimError as Record<string, unknown>).message as string) || JSON.stringify(deposit.claimError)
+                    : String(deposit.claimError))
+                : undefined,
             }];
           });
 
