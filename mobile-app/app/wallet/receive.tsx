@@ -614,7 +614,7 @@ export default function ReceiveScreen() {
                   {pendingDeposits.length > 0 && (
                     <View style={{ marginTop: 12 }}>
                       <Text style={{ fontSize: 12, fontWeight: '600', color: secondaryTextColor, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-                        Pending Deposits
+                        Pending Receives
                       </Text>
                       {pendingDeposits.map((dep) => {
                         const statusConfig = {
