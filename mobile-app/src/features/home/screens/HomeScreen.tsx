@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { InterstitialAd, useInterstitialAd } from '../../ads';
 import { useAuth } from '../../../hooks/useAuth';
+import { tokenService } from '../../../services/tokenService';
 
 export function HomeScreen(): React.JSX.Element {
   const interstitialAd = useInterstitialAd();
@@ -18,7 +19,6 @@ export function HomeScreen(): React.JSX.Element {
 
   const handleLogout = async (): Promise<void> => {
     try {
-      const { tokenService } = await import('../../../services/tokenService');
       await tokenService.clearAuth();
       await checkAuth();
     } catch (error) {

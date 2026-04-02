@@ -1359,6 +1359,9 @@ const styles = StyleSheet.create({
   },
   cancelButtonLabel: {
   },
+  confirmButtonLabel: {
+    color: BRAND_COLOR,
+  },
   deleteButtonLabel: {
     color: '#F44336',
   },

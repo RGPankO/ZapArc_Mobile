@@ -236,7 +236,7 @@ export async function decryptData(
   const iv = new Uint8Array(encryptedData.iv);
 
   // Try current iteration count first, then legacy 100k for old data
-  const iterationCounts = ITERATIONS === 100000 ? [ITERATIONS] : [ITERATIONS, 100000];
+  const iterationCounts = Array.from(new Set([ITERATIONS, 100000]));
 
   for (const iters of iterationCounts) {
     try {

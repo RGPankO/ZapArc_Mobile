@@ -10,13 +10,17 @@ export function EmailVerificationScreen(): React.JSX.Element {
   const [resendCooldown, setResendCooldown] = useState(0);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (resendCooldown > 0) {
       interval = setInterval(() => {
         setResendCooldown(prev => prev - 1);
       }, 1000);
     }
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
   }, [resendCooldown]);
 
   const handleResendEmail = async (): Promise<void> => {

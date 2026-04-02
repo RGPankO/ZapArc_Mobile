@@ -1,7 +1,7 @@
 // Error Handling Service
 // Centralized error handling with retry logic and user feedback
 
-import { Alert } from 'react-native';
+import { Alert, type AlertButton } from 'react-native';
 
 // =============================================================================
 // Types
@@ -315,7 +315,7 @@ class ErrorHandlingService {
       onDismiss?: () => void;
     } = {}
   ): void {
-    const buttons: Alert.ButtonInput[] = [];
+    const buttons: AlertButton[] = [];
 
     if (error.retryable && options.onRetry) {
       buttons.push({

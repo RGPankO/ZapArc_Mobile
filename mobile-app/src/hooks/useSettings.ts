@@ -46,7 +46,7 @@ export interface SettingsActions {
   setSharingPlatforms: (platforms: SocialPlatform[]) => Promise<void>;
 
   // Domain settings
-  getDomainStatus: (domain: string) => Promise<DomainStatus>;
+  getDomainStatus: (domain: string) => Promise<DomainStatus | null>;
   setDomainStatus: (domain: string, status: DomainStatus) => Promise<void>;
   removeDomainStatus: (domain: string) => Promise<void>;
 
@@ -225,7 +225,7 @@ export function useSettings(): SettingsState & SettingsActions {
   // ========================================
 
   const getDomainStatus = useCallback(
-    async (domain: string): Promise<DomainStatus> => {
+    async (domain: string): Promise<DomainStatus | null> => {
       return settingsService.getDomainStatus(domain);
     },
     []
@@ -342,7 +342,7 @@ export function useSettings(): SettingsState & SettingsActions {
     try {
       const exported = await settingsService.exportSettings();
       console.log('✅ [useSettings] Settings exported');
-      return exported;
+      return JSON.stringify(exported, null, 2);
     } catch (err) {
       console.error('❌ [useSettings] Export failed:', err);
       throw err;
@@ -351,12 +351,16 @@ export function useSettings(): SettingsState & SettingsActions {
 
   const importSettings = useCallback(async (json: string): Promise<boolean> => {
     try {
-      const success = await settingsService.importSettings(json);
-      if (success) {
-        await loadSettings();
-        console.log('✅ [useSettings] Settings imported');
-      }
-      return success;
+      const parsed = JSON.parse(json) as {
+        userSettings?: UserSettings;
+        domainSettings?: Record<string, DomainStatus>;
+        blacklist?: BlacklistData;
+      };
+
+      await settingsService.importSettings(parsed);
+      await loadSettings();
+      console.log('✅ [useSettings] Settings imported');
+      return true;
     } catch (err) {
       console.error('❌ [useSettings] Import failed:', err);
       return false;

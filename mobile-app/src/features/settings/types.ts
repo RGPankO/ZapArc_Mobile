@@ -36,6 +36,25 @@ export interface UserSettings {
 
   // Social Platform Settings
   preferredSharingPlatforms: SocialPlatform[];
+
+  // Receive Domain Trust Settings
+  trustedDomains?: TrustedDomain[];
+  autoTrustVerifiedDomains?: boolean;
+
+  // Legacy blacklist UI storage
+  blacklist?: SettingsBlacklistEntry[];
+}
+
+export interface TrustedDomain {
+  domain: string;
+  addedAt: number;
+}
+
+export interface SettingsBlacklistEntry {
+  value: string;
+  type: 'domain' | 'address';
+  reason?: string;
+  addedAt: number;
 }
 
 /**
@@ -150,6 +169,9 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   notificationsEnabled: true,
   notifyPaymentReceived: true,
   preferredSharingPlatforms: ['twitter', 'telegram'],
+  trustedDomains: [],
+  autoTrustVerifiedDomains: false,
+  blacklist: [],
 };
 
 export const AVAILABLE_LANGUAGES: LanguageOption[] = [
