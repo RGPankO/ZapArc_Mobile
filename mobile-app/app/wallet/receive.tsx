@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
-import { Text, Button, Menu, Snackbar } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Alert, TouchableOpacity, Modal, Linking } from 'react-native';
+import { Text, Button, Menu, Snackbar, IconButton, Divider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,6 +24,18 @@ import { t } from '../../src/services/i18nService';
 
 type ReceiveTab = 'lightning' | 'onchain';
 
+type PendingDepositStatus = 'claiming' | 'claimed' | 'too-small' | 'failed';
+
+interface PendingDepositItem {
+  key: string;
+  txid: string;
+  vout: number;
+  amountSats: number;
+  status: PendingDepositStatus;
+  timestamp: number;
+  failureReason?: string;
+}
+
 const currencyLabels: Record<InputCurrency, string> = {
   sats: 'sats',
   btc: 'BTC',
@@ -37,6 +49,7 @@ export default function ReceiveScreen() {
   const primaryTextColor = getPrimaryTextColor(themeMode);
   const secondaryTextColor = getSecondaryTextColor(themeMode);
   const inputBackgroundColor = getInputBackgroundColor(themeMode);
+  const iconColor = secondaryTextColor;
 
   const { secondaryFiatCurrency, convertToSats, formatSatsWithFiat, isLoadingRates } = useCurrency();
   const { addressInfo, isRegistered, isLoading: isLoadingAddress, refresh: refreshAddress } = useLightningAddress();
@@ -62,12 +75,8 @@ export default function ReceiveScreen() {
   const [isGeneratingOnchain, setIsGeneratingOnchain] = useState(false);
   const [onchainError, setOnchainError] = useState<string | null>(null);
   const [onchainClaimStatus, setOnchainClaimStatus] = useState<string | null>(null);
-  const [pendingDeposits, setPendingDeposits] = useState<Array<{
-    key: string;
-    txid: string;
-    amountSats: number;
-    status: 'claiming' | 'claimed' | 'too-small' | 'failed';
-  }>>([]);
+  const [pendingDeposits, setPendingDeposits] = useState<PendingDepositItem[]>([]);
+  const [selectedPendingDeposit, setSelectedPendingDeposit] = useState<PendingDepositItem | null>(null);
 
   const [inputCurrency, setInputCurrency] = useState<InputCurrency>('sats');
   const [currencyMenuVisible, setCurrencyMenuVisible] = useState(false);
@@ -277,7 +286,15 @@ export default function ReceiveScreen() {
           setPendingDeposits(prev => {
             const existing = prev.find(d => d.key === key);
             if (existing) return prev;
-            return [...prev, { key, txid: deposit.txid, amountSats: deposit.amountSats, status: 'claiming' }];
+            return [...prev, {
+              key,
+              txid: deposit.txid,
+              vout: deposit.vout,
+              amountSats: deposit.amountSats,
+              status: 'claiming',
+              timestamp: Date.now(),
+              failureReason: deposit.claimError ? String(deposit.claimError) : undefined,
+            }];
           });
 
           try {
@@ -285,7 +302,7 @@ export default function ReceiveScreen() {
             claimedKeys.add(key);
             if (isCancelled) return;
 
-            setPendingDeposits(prev => prev.map(d => d.key === key ? { ...d, status: 'claimed' } : d));
+            setPendingDeposits(prev => prev.map(d => d.key === key ? { ...d, status: 'claimed', failureReason: undefined } : d));
             await refreshBalance();
             await refreshTransactions();
 
@@ -301,7 +318,7 @@ export default function ReceiveScreen() {
             const errMsg = claimError instanceof Error ? claimError.message : String(claimError);
             const isDust = errMsg.includes('dust') || errMsg.includes('less than');
             setPendingDeposits(prev => prev.map(d =>
-              d.key === key ? { ...d, status: isDust ? 'too-small' : 'failed' } : d
+              d.key === key ? { ...d, status: isDust ? 'too-small' : 'failed', failureReason: errMsg } : d
             ));
             console.warn(`⚠️ [ReceiveScreen] Failed to claim ${key}:`, claimError);
           }
@@ -375,6 +392,124 @@ export default function ReceiveScreen() {
   }, [invoice, showSuccess]);
 
   const isLightningTab = activeTab === 'lightning';
+
+  const getPendingDepositStatusConfig = useCallback((status: PendingDepositStatus) => {
+    switch (status) {
+      case 'claiming':
+        return { icon: '\u23F3', label: t('wallet.statusPending'), color: '#ffc107' };
+      case 'claimed':
+        return { icon: '\u2713', label: t('wallet.statusCompleted'), color: '#4caf50' };
+      case 'too-small':
+        return { icon: '\u26A0', label: 'Too small to claim', color: '#ff9800' };
+      case 'failed':
+      default:
+        return { icon: '\u2715', label: t('wallet.statusFailed'), color: '#f44336' };
+    }
+  }, []);
+
+  const formatTimestamp = useCallback((timestamp: number) => {
+    return new Date(timestamp).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }, []);
+
+  const handleCopyValue = useCallback(async (label: string, value: string) => {
+    await Clipboard.setStringAsync(value);
+    setSnackMsg(`${label} copied`);
+    setSnackVisible(true);
+  }, []);
+
+  const renderPendingDepositModal = () => {
+    if (!selectedPendingDeposit) return null;
+
+    const deposit = selectedPendingDeposit;
+    const date = new Date(deposit.timestamp);
+    const statusConfig = getPendingDepositStatusConfig(deposit.status);
+
+    return (
+      <Modal
+        visible={!!selectedPendingDeposit}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedPendingDeposit(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: primaryTextColor }]}>
+                {t('wallet.transactionDetails')}
+              </Text>
+              <IconButton
+                icon="close"
+                iconColor={iconColor}
+                size={24}
+                onPress={() => setSelectedPendingDeposit(null)}
+              />
+            </View>
+
+            <View style={styles.modalAmountContainer}>
+              <View style={styles.modalIcon}>
+                <Text style={[styles.modalIconText, { color: primaryTextColor }]}>⛓️</Text>
+              </View>
+              <Text style={styles.modalAmount}>+{deposit.amountSats.toLocaleString()} sats</Text>
+              <Text style={[styles.modalStatus, { color: statusConfig.color }]}>
+                {statusConfig.icon} {statusConfig.label}
+              </Text>
+            </View>
+
+            <Divider style={styles.modalDivider} />
+
+            <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+              <View style={styles.modalDetails}>
+                <DetailRow label={t('wallet.type')} value={t('wallet.received')} />
+                <DetailRow label="Status" value={statusConfig.label} />
+                <DetailRow label={t('wallet.method')} value={t('wallet.methodOnchain')} />
+                <DetailRow label={`Amount (${t('wallet.sats')})`} value={deposit.amountSats.toLocaleString()} />
+                <DetailRow
+                  label={t('wallet.date')}
+                  value={date.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                />
+                <DetailRow label={t('wallet.time')} value={formatTimestamp(deposit.timestamp)} />
+                <DetailRow
+                  label="ID"
+                  value={deposit.key}
+                  onPress={() => handleCopyValue('Pending receive ID', deposit.key)}
+                  copyable
+                />
+                <DetailRow
+                  label="TXID"
+                  value={deposit.txid}
+                  onPress={() => handleCopyValue('TXID', deposit.txid)}
+                  copyable
+                />
+                <DetailRow label="Vout" value={String(deposit.vout)} />
+                {deposit.failureReason && (
+                  <DetailRow label="Failure reason" value={deposit.failureReason} />
+                )}
+                <TouchableOpacity onPress={() => Linking.openURL(`https://mempool.space/tx/${deposit.txid}`)}>
+                  <Text style={styles.mempoolLink}>{t('wallet.viewOnMempool')}</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+
+            <Button
+              mode="outlined"
+              onPress={() => setSelectedPendingDeposit(null)}
+              style={styles.closeModalButton}
+              textColor={primaryTextColor}
+            >
+              {t('common.close')}
+            </Button>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
 
   return (
     <LinearGradient colors={gradientColors} style={styles.gradient}>
@@ -617,20 +752,19 @@ export default function ReceiveScreen() {
                         Pending Receives
                       </Text>
                       {pendingDeposits.map((dep) => {
-                        const statusConfig = {
-                          claiming: { icon: '⏳', label: 'Claiming...', color: '#ffc107' },
-                          claimed: { icon: '✅', label: 'Claimed', color: '#4caf50' },
-                          'too-small': { icon: '⚠️', label: 'Too small to claim', color: secondaryTextColor },
-                          failed: { icon: '❌', label: 'Failed', color: '#f44336' },
-                        }[dep.status];
+                        const statusConfig = getPendingDepositStatusConfig(dep.status);
                         const shortTxid = `${dep.txid.slice(0, 8)}…${dep.txid.slice(-6)}`;
                         return (
-                          <View key={dep.key} style={{
-                            flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-                            paddingVertical: 8, paddingHorizontal: 10, marginVertical: 2,
-                            borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.04)',
-                            borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-                          }}>
+                          <TouchableOpacity
+                            key={dep.key}
+                            onPress={() => setSelectedPendingDeposit(dep)}
+                            style={{
+                              flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                              paddingVertical: 8, paddingHorizontal: 10, marginVertical: 2,
+                              borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.04)',
+                              borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+                            }}
+                          >
                             <View>
                               <Text style={{ color: primaryTextColor, fontSize: 13, fontWeight: '500' }}>
                                 {dep.amountSats.toLocaleString()} sats
@@ -640,7 +774,7 @@ export default function ReceiveScreen() {
                             <Text style={{ fontSize: 11, color: statusConfig.color }}>
                               {statusConfig.icon} {statusConfig.label}
                             </Text>
-                          </View>
+                          </TouchableOpacity>
                         );
                       })}
                     </View>
@@ -659,7 +793,33 @@ export default function ReceiveScreen() {
       >
         {snackMsg}
       </Snackbar>
+      {renderPendingDepositModal()}
     </LinearGradient>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+  onPress,
+  copyable = false,
+}: {
+  label: string;
+  value: string;
+  onPress?: () => void;
+  copyable?: boolean;
+}) {
+  const { themeMode } = useAppTheme();
+  const primaryTextColor = getPrimaryTextColor(themeMode);
+  const secondaryTextColor = getSecondaryTextColor(themeMode);
+
+  return (
+    <TouchableOpacity style={styles.detailRow} onPress={onPress} disabled={!onPress}>
+      <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>{label}</Text>
+      <Text style={[styles.detailValue, { color: primaryTextColor }, copyable && styles.detailValueCopyable]}>
+        {value}
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -785,6 +945,94 @@ const styles = StyleSheet.create({
   claimStatusText: { fontSize: 14, marginTop: 12, fontWeight: '600' },
   addressLoadingContainer: { paddingVertical: 10, alignItems: 'center' },
   addressLoadingText: { fontSize: 14 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#1a1a2e',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 8,
+    paddingBottom: 24,
+    maxHeight: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  modalAmountContainer: {
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+  },
+  modalIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(255, 193, 7, 0.16)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalIconText: {
+    fontSize: 34,
+  },
+  modalAmount: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#4CAF50',
+    marginBottom: 8,
+  },
+  modalStatus: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalDivider: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginBottom: 8,
+  },
+  modalScroll: {
+    maxHeight: 360,
+  },
+  modalDetails: {
+    paddingHorizontal: 16,
+  },
+  detailRow: {
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  detailLabel: {
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  detailValue: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  detailValueCopyable: {
+    color: BRAND_COLOR,
+  },
+  mempoolLink: {
+    color: BRAND_COLOR,
+    fontSize: 15,
+    fontWeight: '600',
+    paddingVertical: 16,
+  },
+  closeModalButton: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
   inlineValueRow: {
     flexDirection: 'row',
     alignItems: 'center',
