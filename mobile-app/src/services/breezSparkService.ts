@@ -120,6 +120,7 @@ export interface TransactionInfo {
   paymentRequest?: string;
   method?: 'lightning' | 'onchain';
   txid?: string;
+  failureReason?: string;
 }
 
 export interface DepositInfo {
@@ -293,6 +294,14 @@ export async function initializeSDK(
       config.apiKey = effectiveApiKey;
     } else {
       console.warn('⚠️ [BreezSparkService] No API key configured');
+    }
+
+    // Allow deposit claims to use network-recommended fees (+2 sat/vB leeway)
+    // This prevents maxDepositClaimFeeExceeded errors during fee spikes
+    try {
+      config.maxDepositClaimFee = new BreezSDK.MaxFee.NetworkRecommended({ leewaySatPerVbyte: BigInt(2) });
+    } catch (feeConfigErr) {
+      console.warn('⚠️ [BreezSparkService] Failed to set maxDepositClaimFee:', feeConfigErr);
     }
 
     // Use wallet-specific storage directory
@@ -921,7 +930,15 @@ export async function claimDeposit(txid: string, vout: number): Promise<void> {
     throw new Error('SDK not available');
   }
 
-  await sdkInstance.claimDeposit({ txid, vout });
+  // Use network-recommended fees with leeway to prevent maxDepositClaimFeeExceeded
+  let maxFee: unknown;
+  try {
+    maxFee = new BreezSDK.MaxFee.NetworkRecommended({ leewaySatPerVbyte: BigInt(2) });
+  } catch {
+    // Fall back to no maxFee (SDK default)
+  }
+
+  await sdkInstance.claimDeposit({ txid, vout, maxFee });
 }
 
 /**
@@ -991,6 +1008,20 @@ export async function listPayments(): Promise<TransactionInfo[]> {
       const txid = payment.details?.inner?.txId || payment.details?.txId || payment.details?.txid || payment.txid;
 
       const mappedStatus = mapPaymentStatus(payment.status);
+      const failureReasonRaw =
+        payment.failureReason ||
+        payment.error ||
+        payment.claimError ||
+        payment.details?.error ||
+        payment.details?.failureReason ||
+        payment.details?.claimError ||
+        payment.status?.failedReason;
+      const failureReason =
+        typeof failureReasonRaw === 'string'
+          ? failureReasonRaw
+          : failureReasonRaw
+            ? JSON.stringify(failureReasonRaw)
+            : undefined;
 
       return {
         id: payment.id,
@@ -1002,6 +1033,7 @@ export async function listPayments(): Promise<TransactionInfo[]> {
         description,
         method,
         txid: txid ? String(txid) : undefined,
+        failureReason,
       };
     });
   } catch (error) {
