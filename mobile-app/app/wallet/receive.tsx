@@ -14,7 +14,7 @@ import {
   getInputBackgroundColor,
   BRAND_COLOR,
 } from '../../src/utils/theme-helpers';
-import { BreezSparkService, onPaymentReceived } from '../../src/services/breezSparkService';
+import { BreezSparkService, onPaymentReceived, extractSdkErrorMessage } from '../../src/services/breezSparkService';
 import { useWallet } from '../../src/hooks/useWallet';
 import { useCurrency, type InputCurrency } from '../../src/hooks/useCurrency';
 import { useLightningAddress } from '../../src/hooks/useLightningAddress';
@@ -293,19 +293,7 @@ export default function ReceiveScreen() {
               amountSats: deposit.amountSats,
               status: 'claiming',
               timestamp: Date.now(),
-              failureReason: (() => {
-                try {
-                  if (!deposit.claimError) return undefined;
-                  if (deposit.claimError instanceof Error) return deposit.claimError.message;
-                  if (typeof deposit.claimError === 'string') return deposit.claimError;
-                  if (typeof deposit.claimError === 'object' && deposit.claimError !== null) {
-                    const msg = (deposit.claimError as Record<string, unknown>).message;
-                    if (typeof msg === 'string') return msg;
-                    try { return JSON.stringify(deposit.claimError); } catch { return 'Claim error (details unavailable)'; }
-                  }
-                  return String(deposit.claimError);
-                } catch { return 'Claim error'; }
-              })(),
+              failureReason: deposit.claimError ? extractSdkErrorMessage(deposit.claimError, 'Claim failed') : undefined,
             }];
           });
 
@@ -327,7 +315,7 @@ export default function ReceiveScreen() {
           } catch (claimError) {
             claimedKeys.add(key);
             if (isCancelled) return;
-            const errMsg = claimError instanceof Error ? claimError.message : String(claimError);
+            const errMsg = extractSdkErrorMessage(claimError, 'Claim failed');
             const isDust = errMsg.includes('dust') || errMsg.includes('less than');
             setPendingDeposits(prev => prev.map(d =>
               d.key === key ? { ...d, status: isDust ? 'too-small' : 'failed', failureReason: errMsg } : d

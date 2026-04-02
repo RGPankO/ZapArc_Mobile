@@ -20,7 +20,7 @@ import { NotificationTriggerService } from './notificationTriggerService';
  * SDK errors may not be standard Error instances — they can be uniffi enum objects
  * with properties like .message, .variant, .code, .inner, etc.
  */
-function extractSdkErrorMessage(error: unknown, fallback = 'Payment failed'): string {
+export function extractSdkErrorMessage(error: unknown, fallback = 'Payment failed'): string {
   if (!error) return fallback;
 
   // Standard Error
