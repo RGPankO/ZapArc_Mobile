@@ -293,11 +293,19 @@ export default function ReceiveScreen() {
               amountSats: deposit.amountSats,
               status: 'claiming',
               timestamp: Date.now(),
-              failureReason: deposit.claimError
-                ? (typeof deposit.claimError === 'object' && deposit.claimError !== null
-                    ? ((deposit.claimError as Record<string, unknown>).message as string) || JSON.stringify(deposit.claimError)
-                    : String(deposit.claimError))
-                : undefined,
+              failureReason: (() => {
+                try {
+                  if (!deposit.claimError) return undefined;
+                  if (deposit.claimError instanceof Error) return deposit.claimError.message;
+                  if (typeof deposit.claimError === 'string') return deposit.claimError;
+                  if (typeof deposit.claimError === 'object' && deposit.claimError !== null) {
+                    const msg = (deposit.claimError as Record<string, unknown>).message;
+                    if (typeof msg === 'string') return msg;
+                    try { return JSON.stringify(deposit.claimError); } catch { return 'Claim error (details unavailable)'; }
+                  }
+                  return String(deposit.claimError);
+                } catch { return 'Claim error'; }
+              })(),
             }];
           });
 
