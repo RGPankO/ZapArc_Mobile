@@ -279,6 +279,10 @@ class GoogleDriveBackupService {
         throw new Error('Could not get access token. Please sign in again.');
       }
 
+      // Log granted scopes for debugging
+      const currentUser = await GoogleSignin.getCurrentUser();
+      console.log('🔑 [GoogleDrive] Token obtained, granted scopes:', currentUser?.scopes || 'unknown');
+
       return tokens.accessToken;
     } catch (error) {
       console.error('❌ [GoogleDrive] Failed to get access token:', error);
@@ -329,9 +333,9 @@ class GoogleDriveBackupService {
     });
 
     if (!createResponse.ok) {
-      const error = await createResponse.text();
-      console.error('❌ [GoogleDrive] Failed to create folder:', error);
-      throw new Error('Failed to create backup folder');
+      const errorText = await createResponse.text();
+      console.error(`❌ [GoogleDrive] Failed to create folder (${createResponse.status}):`, errorText);
+      throw new Error(`Failed to create backup folder (${createResponse.status}: ${errorText})`);
     }
 
     const folder = await createResponse.json();
