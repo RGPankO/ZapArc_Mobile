@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-nat
 import { Text, Button, Menu, IconButton } from 'react-native-paper';
 import { StyledTextInput } from '../../src/components';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   getGradientColors,
@@ -146,7 +146,14 @@ export default function SendScreen() {
 
   const { balance, refreshBalance } = useWallet();
   const { secondaryFiatCurrency, convertToSats, formatSatsWithFiat, isLoadingRates } = useCurrency();
-  const { contacts } = useContacts();
+  const { contacts, refreshContacts } = useContacts();
+
+  // Refresh contacts when screen gains focus (e.g. after adding a contact in address book)
+  useFocusEffect(
+    useCallback(() => {
+      refreshContacts();
+    }, [refreshContacts])
+  );
   const { addressInfo } = useLightningAddress();
 
   const [step, setStep] = useState<SendStep>('input');
@@ -1032,11 +1039,7 @@ export default function SendScreen() {
               <TouchableOpacity
                 style={styles.addressBookButton}
                 onPress={() => {
-                  if (contacts.length > 0) {
-                    setContactModalVisible(true);
-                  } else {
-                    router.push('/wallet/settings/address-book');
-                  }
+                  setContactModalVisible(true);
                 }}
               >
                 <IconButton icon="contacts" iconColor={BRAND_COLOR} size={24} style={styles.addressBookIcon} />
