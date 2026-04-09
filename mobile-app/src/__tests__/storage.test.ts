@@ -297,6 +297,57 @@ describe('StorageService', () => {
     });
   });
 
+  describe('PIN lockout/backoff', () => {
+    it('applies lockout after threshold failed PIN attempts', async () => {
+      const masterKeyId = 'mk-lockout';
+      jest.spyOn(storageService, 'getMasterKeyMnemonic').mockRejectedValue(new Error('Wrong PIN'));
+
+      await storageService.verifyMasterKeyPin(masterKeyId, '111111');
+      await storageService.verifyMasterKeyPin(masterKeyId, '111111');
+
+      const beforeThreshold = await storageService.getPinAuthStatus(masterKeyId);
+      expect(beforeThreshold.failedAttempts).toBe(2);
+      expect(beforeThreshold.isLocked).toBe(false);
+
+      await storageService.verifyMasterKeyPin(masterKeyId, '111111');
+      const atThreshold = await storageService.getPinAuthStatus(masterKeyId);
+
+      expect(atThreshold.failedAttempts).toBe(3);
+      expect(atThreshold.isLocked).toBe(true);
+      expect(atThreshold.remainingMs).toBeGreaterThan(0);
+    });
+
+    it('clears lockout state on successful PIN verification', async () => {
+      const masterKeyId = 'mk-success-reset';
+      jest.spyOn(storageService, 'getMasterKeyMnemonic').mockRejectedValue(new Error('Wrong PIN'));
+
+      await storageService.verifyMasterKeyPin(masterKeyId, '111111');
+      await storageService.verifyMasterKeyPin(masterKeyId, '111111');
+      await storageService.verifyMasterKeyPin(masterKeyId, '111111');
+
+      (storageService.getMasterKeyMnemonic as jest.Mock).mockResolvedValue('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about');
+
+      const isValid = await storageService.verifyMasterKeyPin(masterKeyId, '123456');
+      expect(isValid).toBe(true);
+
+      const status = await storageService.getPinAuthStatus(masterKeyId);
+      expect(status.failedAttempts).toBe(0);
+      expect(status.isLocked).toBe(false);
+    });
+
+    it('clears expired lockout state after timeout', async () => {
+      const now = Date.now();
+      (SecureStore.getItemAsync as jest.Mock).mockResolvedValueOnce(
+        JSON.stringify({ failedAttempts: 4, lockoutUntil: now - 1000 })
+      );
+
+      const status = await storageService.getPinAuthStatus('mk-expired');
+      expect(status.failedAttempts).toBe(0);
+      expect(status.isLocked).toBe(false);
+      expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('zap_arc_pin_auth_state_mk-expired');
+    });
+  });
+
   describe('biometric PIN auth gating', () => {
     it('stores biometric PIN with requireAuthentication enabled', async () => {
       (SecureStore.setItemAsync as jest.Mock).mockResolvedValue(undefined);

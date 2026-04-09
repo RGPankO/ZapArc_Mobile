@@ -9,6 +9,7 @@ import * as BreezSparkService from '../services/breezSparkService';
 import * as WalletCache from '../services/walletCacheService';
 import { deriveSubWalletMnemonic } from '../utils/mnemonic';
 import type { ActiveWalletInfo } from '../features/wallet/types';
+import type { PinAuthStatus } from '../services/storageService';
 
 // =============================================================================
 // Types
@@ -40,6 +41,7 @@ export interface WalletAuthActions {
   lock: () => Promise<void>;
   verifyPin: (pin: string) => Promise<boolean>;
   changePin: (oldPin: string, newPin: string) => Promise<boolean>;
+  getPinAuthStatus: (masterKeyId?: string) => Promise<PinAuthStatus | null>;
 
   // Biometric
   unlockWithBiometric: () => Promise<boolean>;
@@ -277,7 +279,12 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
 
         const isValid = await storageService.verifyMasterKeyPin(currentMasterKeyId, pin);
         if (!isValid) {
-          setError('Invalid PIN');
+          const authStatus = await storageService.getPinAuthStatus(currentMasterKeyId);
+          if (authStatus.isLocked) {
+            setError(`PIN temporarily locked. Try again in ${Math.ceil(authStatus.remainingMs / 1000)}s.`);
+          } else {
+            setError('Invalid PIN');
+          }
           return false;
         }
 
@@ -354,6 +361,18 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
     [currentMasterKeyId]
   );
 
+  const getPinAuthStatus = useCallback(
+    async (masterKeyId?: string): Promise<PinAuthStatus | null> => {
+      const resolvedMasterKeyId = masterKeyId || currentMasterKeyId;
+      if (!resolvedMasterKeyId) {
+        return null;
+      }
+
+      return storageService.getPinAuthStatus(resolvedMasterKeyId);
+    },
+    [currentMasterKeyId]
+  );
+
   const changePin = useCallback(
     async (_oldPin: string, _newPin: string): Promise<boolean> => {
       // TODO(security): Implement atomic PIN rotation in storageService.
@@ -383,7 +402,12 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
         // This is called from WalletSelectionScreen which requires re-authentication
         const isValid = await storageService.verifyMasterKeyPin(masterKeyId, pin);
         if (!isValid) {
-          setError('Invalid PIN');
+          const authStatus = await storageService.getPinAuthStatus(masterKeyId);
+          if (authStatus.isLocked) {
+            setError(`PIN temporarily locked. Try again in ${Math.ceil(authStatus.remainingMs / 1000)}s.`);
+          } else {
+            setError('Invalid PIN');
+          }
           return false;
         }
 
@@ -574,6 +598,7 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
     lock,
     verifyPin,
     changePin,
+    getPinAuthStatus,
     unlockWithBiometric,
     selectWallet,
     selectSubWallet,

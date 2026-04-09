@@ -64,6 +64,7 @@ export function PinEntryScreen(): React.JSX.Element {
     biometricType,
     activeWalletInfo,
     selectWallet,
+    getPinAuthStatus,
   } = useWalletAuth();
 
   // State
@@ -71,6 +72,7 @@ export function PinEntryScreen(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [attempts, setAttempts] = useState(0);
   const [isUnlocking, setIsUnlocking] = useState(false);
+  const [lockoutUntil, setLockoutUntil] = useState(0);
 
   // Animation ref for shake effect
   const shakeAnimation = useRef(new Animated.Value(0)).current;
@@ -97,6 +99,50 @@ export function PinEntryScreen(): React.JSX.Element {
     return () => backHandler.remove();
   }, []);
 
+  const applyPinAuthStatus = useCallback(async () => {
+    const status = await getPinAuthStatus(targetMasterKeyId || activeWalletInfo?.masterKeyId);
+    if (!status) {
+      return null;
+    }
+
+    setAttempts(status.failedAttempts);
+
+    if (status.isLocked) {
+      setLockoutUntil(status.lockoutUntil);
+      setError(t('auth.pinLockedTryLater', { seconds: Math.max(1, Math.ceil(status.remainingMs / 1000)) }));
+    } else {
+      setLockoutUntil(0);
+    }
+
+    return status;
+  }, [getPinAuthStatus, targetMasterKeyId, activeWalletInfo?.masterKeyId, t]);
+
+  useEffect(() => {
+    applyPinAuthStatus();
+  }, [applyPinAuthStatus]);
+
+  useEffect(() => {
+    if (!lockoutUntil || lockoutUntil <= Date.now()) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      const now = Date.now();
+      if (now >= lockoutUntil) {
+        setLockoutUntil(0);
+        setError(null);
+        void applyPinAuthStatus();
+        clearInterval(timer);
+        return;
+      }
+
+      const remainingSeconds = Math.max(1, Math.ceil((lockoutUntil - now) / 1000));
+      setError(t('auth.pinLockedTryLater', { seconds: remainingSeconds }));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [lockoutUntil, applyPinAuthStatus, t]);
+
   // Auto-submit when PIN is complete
   useEffect(() => {
     if (pin.length === PIN_LENGTH) {
@@ -110,6 +156,10 @@ export function PinEntryScreen(): React.JSX.Element {
 
   const handleKeyPress = useCallback(
     (key: string) => {
+      if (lockoutUntil > Date.now()) {
+        return;
+      }
+
       if (key === 'delete') {
         setPin((prev) => prev.slice(0, -1));
         setError(null);
@@ -123,7 +173,7 @@ export function PinEntryScreen(): React.JSX.Element {
       setPin((prev) => prev + key);
       setError(null);
     },
-    [pin]
+    [pin, lockoutUntil]
   );
 
   // ========================================
@@ -156,8 +206,10 @@ export function PinEntryScreen(): React.JSX.Element {
           router.replace('/wallet/home');
         } else {
           setIsUnlocking(false);
-          setError(t('auth.incorrectPin'));
-          setAttempts((prev) => prev + 1);
+          const authStatus = await applyPinAuthStatus();
+          if (!authStatus?.isLocked) {
+            setError(t('auth.incorrectPin'));
+          }
           shake();
           setPin('');
         }
@@ -168,8 +220,10 @@ export function PinEntryScreen(): React.JSX.Element {
           router.replace('/wallet/home');
         } else {
           setIsUnlocking(false);
-          setError(t('auth.incorrectPin'));
-          setAttempts((prev) => prev + 1);
+          const authStatus = await applyPinAuthStatus();
+          if (!authStatus?.isLocked) {
+            setError(t('auth.incorrectPin'));
+          }
           shake();
           setPin('');
         }
@@ -177,10 +231,11 @@ export function PinEntryScreen(): React.JSX.Element {
     } catch (err) {
       setIsUnlocking(false);
       setError(err instanceof Error ? err.message : t('auth.unlockFailed'));
+      void applyPinAuthStatus();
       shake();
       setPin('');
     }
-  }, [pin, unlock, selectWallet, targetMasterKeyId, targetSubWalletIndex, shake]);
+  }, [pin, unlock, selectWallet, targetMasterKeyId, targetSubWalletIndex, shake, applyPinAuthStatus, t]);
 
   const handleBiometricUnlock = useCallback(async () => {
     try {
@@ -292,9 +347,9 @@ export function PinEntryScreen(): React.JSX.Element {
           )}
 
           {/* Attempts Warning */}
-          {attempts >= 3 && (
+          {attempts >= 1 && lockoutUntil <= Date.now() && (
             <Text style={styles.warningText}>
-              {t('auth.attemptsRemaining', { count: 5 - attempts })}
+              {t('auth.attemptsRemaining', { count: Math.max(0, 3 - attempts) })}
             </Text>
           )}
         </View>
@@ -329,7 +384,7 @@ export function PinEntryScreen(): React.JSX.Element {
                       key={keyIndex}
                       style={styles.keypadKey}
                       onPress={() => handleKeyPress('delete')}
-                      disabled={pin.length === 0}
+                      disabled={pin.length === 0 || lockoutUntil > Date.now()}
                     >
                       <IconButton
                         icon="backspace-outline"
@@ -348,6 +403,7 @@ export function PinEntryScreen(): React.JSX.Element {
                     style={styles.keypadKey}
                     onPress={() => handleKeyPress(key)}
                     activeOpacity={0.7}
+                    disabled={lockoutUntil > Date.now()}
                   >
                     <Text style={[styles.keypadKeyText, { color: primaryText }]}>{key}</Text>
                   </TouchableOpacity>

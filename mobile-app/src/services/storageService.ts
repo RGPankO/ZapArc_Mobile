@@ -30,7 +30,26 @@ const STORAGE_KEYS = {
   ACTIVE_MASTER_KEY_ID: 'zap_arc_active_master_key',
   ACTIVE_SUB_WALLET_INDEX: 'zap_arc_active_sub_wallet',
   BIOMETRIC_PIN_PREFIX: 'zap_arc_biometric_pin_', // Prefix for biometric-protected PINs
+  PIN_AUTH_STATE_PREFIX: 'zap_arc_pin_auth_state_', // Prefix for PIN lockout/backoff state
 } as const;
+
+const PIN_AUTH_CONFIG = {
+  LOCKOUT_THRESHOLD: 3,
+  BASE_BACKOFF_MS: 5000,
+  MAX_BACKOFF_MS: 300000,
+} as const;
+
+type PinAuthState = {
+  failedAttempts: number;
+  lockoutUntil: number;
+};
+
+export type PinAuthStatus = {
+  failedAttempts: number;
+  isLocked: boolean;
+  lockoutUntil: number;
+  remainingMs: number;
+};
 
 const BIOMETRIC_SECURE_STORE_OPTIONS: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.WHEN_PASSCODE_SET_THIS_DEVICE_ONLY,
@@ -57,6 +76,80 @@ class StorageService {
     } finally {
       release();
     }
+  }
+
+  private getPinAuthStateKey(masterKeyId: string): string {
+    return `${STORAGE_KEYS.PIN_AUTH_STATE_PREFIX}${masterKeyId}`;
+  }
+
+  private getInitialPinAuthState(): PinAuthState {
+    return {
+      failedAttempts: 0,
+      lockoutUntil: 0,
+    };
+  }
+
+  private calculateBackoffMs(failedAttempts: number): number {
+    if (failedAttempts < PIN_AUTH_CONFIG.LOCKOUT_THRESHOLD) {
+      return 0;
+    }
+
+    const exponent = failedAttempts - PIN_AUTH_CONFIG.LOCKOUT_THRESHOLD;
+    const delay = PIN_AUTH_CONFIG.BASE_BACKOFF_MS * 2 ** exponent;
+    return Math.min(delay, PIN_AUTH_CONFIG.MAX_BACKOFF_MS);
+  }
+
+  private async loadPinAuthState(masterKeyId: string): Promise<PinAuthState> {
+    try {
+      const key = this.getPinAuthStateKey(masterKeyId);
+      const raw = await SecureStore.getItemAsync(key);
+      if (!raw) {
+        return this.getInitialPinAuthState();
+      }
+
+      const parsed = JSON.parse(raw) as Partial<PinAuthState>;
+      return {
+        failedAttempts: typeof parsed.failedAttempts === 'number' ? parsed.failedAttempts : 0,
+        lockoutUntil: typeof parsed.lockoutUntil === 'number' ? parsed.lockoutUntil : 0,
+      };
+    } catch (error) {
+      console.error('❌ [StorageService] Failed to load PIN auth state:', error);
+      return this.getInitialPinAuthState();
+    }
+  }
+
+  private async savePinAuthState(masterKeyId: string, state: PinAuthState): Promise<void> {
+    const key = this.getPinAuthStateKey(masterKeyId);
+    await SecureStore.setItemAsync(key, JSON.stringify(state));
+  }
+
+  private async clearPinAuthState(masterKeyId: string): Promise<void> {
+    const key = this.getPinAuthStateKey(masterKeyId);
+    await SecureStore.deleteItemAsync(key);
+  }
+
+  async getPinAuthStatus(masterKeyId: string): Promise<PinAuthStatus> {
+    const state = await this.loadPinAuthState(masterKeyId);
+    const now = Date.now();
+    const isLocked = state.lockoutUntil > now;
+    const remainingMs = isLocked ? state.lockoutUntil - now : 0;
+
+    if (!isLocked && state.lockoutUntil > 0) {
+      await this.clearPinAuthState(masterKeyId);
+      return {
+        failedAttempts: 0,
+        isLocked: false,
+        lockoutUntil: 0,
+        remainingMs: 0,
+      };
+    }
+
+    return {
+      failedAttempts: state.failedAttempts,
+      isLocked,
+      lockoutUntil: state.lockoutUntil,
+      remainingMs,
+    };
   }
 
   // ========================================
@@ -649,12 +742,43 @@ class StorageService {
     if (__DEV__) console.log('🔵 [StorageService] VERIFY_MASTER_KEY_PIN', { masterKeyId });
 
     try {
+      const pinAuthStatus = await this.getPinAuthStatus(masterKeyId);
+      if (pinAuthStatus.isLocked) {
+        if (__DEV__) {
+          console.warn('⚠️ [StorageService] VERIFY_MASTER_KEY_PIN blocked by lockout', {
+            masterKeyId,
+            remainingMs: pinAuthStatus.remainingMs,
+          });
+        }
+        return false;
+      }
+
       // Always perform a real decrypt for auth decisions.
       const mnemonic = await this.getMasterKeyMnemonic(masterKeyId, pin, false);
       const isValid = mnemonic !== null;
+
+      if (isValid) {
+        await this.clearPinAuthState(masterKeyId);
+      }
+
       if (__DEV__) console.log('✅ [StorageService] VERIFY_MASTER_KEY_PIN', { isValid });
       return isValid;
     } catch (error) {
+      try {
+        const currentState = await this.loadPinAuthState(masterKeyId);
+        const nextFailedAttempts = currentState.failedAttempts + 1;
+        const backoffMs = this.calculateBackoffMs(nextFailedAttempts);
+
+        const nextState: PinAuthState = {
+          failedAttempts: nextFailedAttempts,
+          lockoutUntil: backoffMs > 0 ? Date.now() + backoffMs : 0,
+        };
+
+        await this.savePinAuthState(masterKeyId, nextState);
+      } catch (stateError) {
+        console.error('❌ [StorageService] Failed to persist PIN auth state:', stateError);
+      }
+
       console.error('❌ [StorageService] VERIFY_MASTER_KEY_PIN FAILED', error);
       return false;
     }
