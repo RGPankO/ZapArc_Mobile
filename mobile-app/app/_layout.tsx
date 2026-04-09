@@ -8,6 +8,7 @@ import { syncAllFromCache } from '../src/services/notificationSubscriptionServic
 import { ThemeProvider } from '../src/contexts/ThemeContext';
 import { LanguageProvider } from '../src/contexts/LanguageContext';
 import { FeedbackProvider } from '../src/features/wallet/components/FeedbackComponents';
+import { initializeTlsPinning } from '../src/services/tlsPinningService';
 
 export default function RootLayout(): React.JSX.Element {
   useEffect(() => {
@@ -18,6 +19,10 @@ export default function RootLayout(): React.JSX.Element {
     // This registers all wallets with the backend in one shot, no SDK init needed.
     syncAllFromCache().catch((e) =>
       console.warn('⚠️ [Layout] Notification sync failed:', e)
+    );
+
+    initializeTlsPinning().catch((e) =>
+      console.warn('⚠️ [Layout] TLS pinning init failed:', e)
     );
   }, []);
 
