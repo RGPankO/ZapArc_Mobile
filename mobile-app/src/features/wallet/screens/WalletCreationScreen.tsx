@@ -27,7 +27,7 @@ import { useWallet } from '../../../hooks/useWallet';
 import { useAppTheme } from '../../../contexts/ThemeContext';
 import { getGradientColors, BRAND_COLOR } from '../../../utils/theme-helpers';
 import { WALLET_PIN_LENGTH } from '../constants/security';
-import { promptNotificationsIfNeeded } from '../utils/notificationPrompt';
+import { runWalletSecurityOnboarding } from '../utils/walletSecurityOnboarding';
 
 // =============================================================================
 // Types
@@ -310,7 +310,7 @@ export function WalletCreationScreen(): React.JSX.Element {
   // ========================================
 
   const handleComplete = useCallback(async () => {
-    await promptNotificationsIfNeeded();
+    await runWalletSecurityOnboarding('create');
     router.replace('/wallet/home');
   }, []);
 

@@ -1,7 +1,7 @@
 // Wallet Settings Screen
 // Main settings hub for wallet configuration
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, List, Divider, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +12,7 @@ import { useSettings } from '../../../hooks/useSettings';
 import { useLanguage } from '../../../hooks/useLanguage';
 import { useAppTheme } from '../../../contexts/ThemeContext';
 import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_COLOR } from '../../../utils/theme-helpers';
+import { shouldShowWalletSecurityReminderBadge } from '../utils/walletSecurityOnboarding';
 
 // =============================================================================
 // Component
@@ -22,10 +23,13 @@ export function WalletSettingsScreen(): React.JSX.Element {
   const { currentLanguage, t } = useLanguage();
   const { themeMode } = useAppTheme();
 
+  const [showSecurityReminder, setShowSecurityReminder] = useState(false);
+
   // Reload settings when screen comes into focus (catches changes from sub-screens)
   useFocusEffect(
     useCallback(() => {
       loadSettings();
+      shouldShowWalletSecurityReminderBadge().then(setShowSecurityReminder).catch(() => setShowSecurityReminder(false));
     }, [loadSettings])
   );
 
@@ -148,7 +152,12 @@ export function WalletSettingsScreen(): React.JSX.Element {
                 <List.Icon {...props} icon="bell" color={BRAND_COLOR} />
               )}
               right={(props) => (
-                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
+                <View style={styles.rightIconsRow}>
+                  {showSecurityReminder && !settings?.notificationsEnabled && (
+                    <List.Icon {...props} icon="alert-circle" color="#F59E0B" />
+                  )}
+                  <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
+                </View>
               )}
               onPress={() => router.push('/wallet/settings/notifications')}
               titleStyle={[styles.listTitle, { color: primaryTextColor }]}
@@ -280,7 +289,12 @@ export function WalletSettingsScreen(): React.JSX.Element {
                 <List.Icon {...props} icon="fingerprint" color={BRAND_COLOR} />
               )}
               right={(props) => (
-                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
+                <View style={styles.rightIconsRow}>
+                  {showSecurityReminder && !settings?.biometricEnabled && (
+                    <List.Icon {...props} icon="alert-circle" color="#F59E0B" />
+                  )}
+                  <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
+                </View>
               )}
               onPress={() => router.push('/wallet/settings/security')}
               titleStyle={[styles.listTitle, { color: primaryTextColor }]}
@@ -390,6 +404,10 @@ const styles = StyleSheet.create({
   divider: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     marginLeft: 56,
+  },
+  rightIconsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   bottomSpacer: {
     height: 32,

@@ -24,7 +24,7 @@ import {
 import { useWallet } from '../../../hooks/useWallet';
 import { useAppTheme } from '../../../contexts/ThemeContext';
 import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_COLOR } from '../../../utils/theme-helpers';
-import { promptNotificationsIfNeeded } from '../utils/notificationPrompt';
+import { runWalletSecurityOnboarding } from '../utils/walletSecurityOnboarding';
 
 // =============================================================================
 // Types
@@ -133,7 +133,7 @@ export function WalletImportScreen(): React.JSX.Element {
   // ========================================
 
   const handleComplete = useCallback(async () => {
-    await promptNotificationsIfNeeded();
+    await runWalletSecurityOnboarding('restore');
     router.replace('/wallet/home');
   }, []);
 
