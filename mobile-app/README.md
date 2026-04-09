@@ -32,6 +32,7 @@ A Lightning Network mobile wallet for iOS and Android, built with React Native a
 - **Auto-Lock** - Configurable timeout (1-60 minutes)
 - **Secure Storage** - Expo SecureStore for sensitive data
 - **Encrypted Mnemonics** - PIN-derived key encryption
+- **Screen Capture Guard** - Screenshot and screen-record blocked on seed reveal and backup screens
 
 ### 🌐 Multi-Language
 

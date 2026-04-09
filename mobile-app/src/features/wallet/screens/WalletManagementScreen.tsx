@@ -1,7 +1,7 @@
 // Wallet Management Screen
 // Manage master keys and sub-wallets with add, rename, archive, and delete actions
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -31,7 +31,7 @@ import { useAppTheme } from '../../../contexts/ThemeContext';
 import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, getIconColor, BRAND_COLOR } from '../../../utils/theme-helpers';
 import { useWallet } from '../../../hooks/useWallet';
 import { useWalletAuth } from '../../../hooks/useWalletAuth';
-import { storageService } from '../../../services';
+import { securityService, storageService } from '../../../services';
 import { settingsService } from '../../../services/settingsService';
 import type { MasterKeyEntry, SubWalletEntry } from '../types';
 
@@ -87,6 +87,22 @@ export function WalletManagementScreen(): React.JSX.Element {
   // Reveal Phrase State
   const [revealMnemonic, setRevealMnemonic] = useState<string | null>(null);
   const [isRevealing, setIsRevealing] = useState(false);
+
+  const shouldPreventCapture = useMemo(
+    () => modalType === 'revealPhrase' || modalType === 'revealPinPrompt' || Boolean(revealMnemonic),
+    [modalType, revealMnemonic]
+  );
+
+  useEffect(() => {
+    if (!shouldPreventCapture) {
+      return;
+    }
+
+    securityService.enableScreenshotPrevention();
+    return () => {
+      securityService.disableScreenshotPrevention();
+    };
+  }, [shouldPreventCapture]);
 
   // Keep active master key always expanded
   useEffect(() => {

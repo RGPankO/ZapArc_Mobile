@@ -1,7 +1,7 @@
 // Backup and Recovery Settings Screen
 // Manage wallet backup and recovery phrase
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -22,7 +22,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { useWallet } from '../../../../hooks/useWallet';
 import { useSettings } from '../../../../hooks/useSettings';
 import { settingsService } from '../../../../services/settingsService';
-import { storageService } from '../../../../services';
+import { securityService, storageService } from '../../../../services';
 import { useAppTheme } from '../../../../contexts/ThemeContext';
 import { useLanguage } from '../../../../hooks/useLanguage';
 import { getGradientColors, getPrimaryTextColor, getSecondaryTextColor, BRAND_COLOR } from '../../../../utils/theme-helpers';
@@ -49,6 +49,13 @@ export function BackupScreen(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(false);
   const [pinPromptVisible, setPinPromptVisible] = useState(false);
   const [manualPin, setManualPin] = useState('');
+
+  useEffect(() => {
+    securityService.enableScreenshotPrevention();
+    return () => {
+      securityService.disableScreenshotPrevention();
+    };
+  }, []);
 
   // Authenticate and reveal mnemonic
   const handleRevealMnemonic = useCallback(async () => {

@@ -7,6 +7,19 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { storageService } from './storageService';
 import { settingsService } from './settingsService';
 
+let screenCaptureModule: {
+  preventScreenCaptureAsync?: () => Promise<void>;
+  allowScreenCaptureAsync?: () => Promise<void>;
+} | null = null;
+
+try {
+  // Optional dependency. If unavailable, keep fallback behavior with warning logs.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
+  screenCaptureModule = require('expo-screen-capture');
+} catch {
+  screenCaptureModule = null;
+}
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -41,6 +54,7 @@ class SecurityService {
   private appStateSubscription: { remove: () => void } | null = null;
   private isLocked: boolean = false;
   private lockListeners: Set<(locked: boolean, reason: string | null) => void> = new Set();
+  private screenshotGuardCount: number = 0;
   private config: SecurityConfig = {
     autoLockTimeout: 900, // 15 minutes default
     biometricEnabled: true,
@@ -306,15 +320,57 @@ class SecurityService {
   // ========================================
 
   enableScreenshotPrevention(): void {
-    // Note: This requires native module implementation
-    // On Android, use FLAG_SECURE
-    // On iOS, use a blur overlay or secure field
-    console.log('🔐 [Security] Screenshot prevention enabled (placeholder)');
+    this.screenshotGuardCount += 1;
+
+    if (this.screenshotGuardCount > 1) {
+      this.config.screenshotPrevention = true;
+      return;
+    }
+
+    if (!screenCaptureModule?.preventScreenCaptureAsync) {
+      console.warn('⚠️ [Security] expo-screen-capture not available; native capture blocking skipped');
+      this.config.screenshotPrevention = true;
+      return;
+    }
+
+    screenCaptureModule.preventScreenCaptureAsync()
+      .then(() => {
+        console.log('🔐 [Security] Screenshot prevention enabled');
+      })
+      .catch((error) => {
+        console.warn('⚠️ [Security] Failed to enable screenshot prevention:', error);
+      });
+
     this.config.screenshotPrevention = true;
   }
 
   disableScreenshotPrevention(): void {
-    console.log('🔐 [Security] Screenshot prevention disabled');
+    if (this.screenshotGuardCount <= 0) {
+      this.screenshotGuardCount = 0;
+      this.config.screenshotPrevention = false;
+      return;
+    }
+
+    this.screenshotGuardCount -= 1;
+
+    if (this.screenshotGuardCount > 0) {
+      this.config.screenshotPrevention = true;
+      return;
+    }
+
+    if (!screenCaptureModule?.allowScreenCaptureAsync) {
+      this.config.screenshotPrevention = false;
+      return;
+    }
+
+    screenCaptureModule.allowScreenCaptureAsync()
+      .then(() => {
+        console.log('🔓 [Security] Screenshot prevention disabled');
+      })
+      .catch((error) => {
+        console.warn('⚠️ [Security] Failed to disable screenshot prevention:', error);
+      });
+
     this.config.screenshotPrevention = false;
   }
 
