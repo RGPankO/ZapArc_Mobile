@@ -25,26 +25,26 @@
         "backgroundColor": "#1a1a2e"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.zaparc.app",
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "data": [
-            {
-              "scheme": "mobile-app"
-            }
-          ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
-        }
-      ]
+      "package": "com.zaparc.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "scheme": "mobile-app",
+    "intentFilters": [
+      {
+        "action": "VIEW",
+        "data": [
+          {
+            "scheme": "mobile-app"
+          }
+        ],
+        "category": [
+          "BROWSABLE",
+          "DEFAULT"
+        ]
+      }
+    ],
     "plugins": [
       "expo-router",
       "@breeztech/breez-sdk-spark-react-native",
@@ -87,9 +87,7 @@
           "color": "#1a1a2e"
         }
       ],
-      "expo-document-picker",
-      "expo-web-browser",
-      "expo-font"
+      "expo-document-picker"
     ],
     "extra": {
       "router": {},
