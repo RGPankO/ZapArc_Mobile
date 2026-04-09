@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Constants from 'expo-constants';
 import { useSettings } from '../../../hooks/useSettings';
 import { useLanguage } from '../../../hooks/useLanguage';
 import { useAppTheme } from '../../../contexts/ThemeContext';
@@ -20,6 +21,7 @@ import { shouldShowWalletSecurityReminderBadge } from '../utils/walletSecurityOn
 
 export function WalletSettingsScreen(): React.JSX.Element {
   const { settings, isLoading: settingsLoading, loadSettings } = useSettings();
+  const appVersion = Constants.expoConfig?.version ?? '1.0.1';
   const { currentLanguage, t } = useLanguage();
   const { themeMode } = useAppTheme();
 
@@ -311,7 +313,7 @@ export function WalletSettingsScreen(): React.JSX.Element {
 
             <List.Item
               title={t('settings.version')}
-              description="1.0.0"
+              description={appVersion}
               left={(props) => (
                 <List.Icon {...props} icon="information" color={BRAND_COLOR} />
               )}
