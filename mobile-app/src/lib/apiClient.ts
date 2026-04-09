@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { NetworkConfig } from '../config/network';
 import { tokenService } from '../services/tokenService';
-import { isTlsPinningError } from '../services/tlsPinningService';
 
 const DEBUG = __DEV__; // Only log in development
 
@@ -56,16 +55,6 @@ apiClient.interceptors.response.use(
       });
     }
     if (axios.isAxiosError(error)) {
-      if (isTlsPinningError(error)) {
-        return Promise.reject(
-          new ApiError(
-            'Secure connection check failed. Please update the app or try again later.',
-            'TLS_PINNING_FAILED',
-            error.response?.status || 0
-          )
-        );
-      }
-
       const message = error.response?.data?.error?.message || error.message;
       const code = error.response?.data?.error?.code || 'REQUEST_FAILED';
       return Promise.reject(new ApiError(message, code, error.response?.status || 0));
