@@ -2,7 +2,6 @@
 // Exports all wallet settings screens
 
 export { WalletConfigScreen } from './WalletConfigScreen';
-export { AmountsSettingsScreen } from './AmountsSettingsScreen';
 export { LanguageSettingsScreen } from './LanguageSettingsScreen';
 export { SecuritySettingsScreen } from './SecuritySettingsScreen';
 export { DomainManagementScreen } from './DomainManagementScreen';

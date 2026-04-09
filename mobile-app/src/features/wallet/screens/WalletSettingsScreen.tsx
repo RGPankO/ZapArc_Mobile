@@ -227,22 +227,6 @@ export function WalletSettingsScreen(): React.JSX.Element {
 
             <Divider style={styles.divider} />
 
-            <List.Item
-              title={t('settings.defaultTipAmounts')}
-              description={`${settings?.defaultPostingAmounts?.join(', ') || '100, 500, 1000'} ${t('wallet.sats')}`}
-              left={(props) => (
-                <List.Icon {...props} icon="currency-btc" color={BRAND_COLOR} />
-              )}
-              right={(props) => (
-                <List.Icon {...props} icon="chevron-right" color={secondaryTextColor} />
-              )}
-              onPress={() => router.push('/wallet/settings/amounts')}
-              titleStyle={[styles.listTitle, { color: primaryTextColor }]}
-              descriptionStyle={[styles.listDescription, { color: secondaryTextColor }]}
-              style={styles.listItem}
-            />
-
-            <Divider style={styles.divider} />
 
             <List.Item
               title={t('settings.displayCurrency')}

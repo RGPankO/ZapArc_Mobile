@@ -23,10 +23,6 @@ export interface UserSettings {
   customLNURL?: string; // Custom LNURL-pay address (when useBuiltInWallet is false)
   customLightningAddress?: string; // Alternative Lightning address format
 
-  // Tip Configuration
-  defaultPostingAmounts: [number, number, number]; // Amounts for tip requests when posting
-  defaultTippingAmounts: [number, number, number]; // Amounts when tipping others
-
   // App Behavior
   theme: ThemeMode; // Light or dark theme
   biometricEnabled: boolean;
@@ -161,8 +157,6 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   primaryDenomination: 'sats', // Default to satoshis
   secondaryFiatCurrency: 'usd', // Default to USD for fiat conversion
   useBuiltInWallet: true,
-  defaultPostingAmounts: [100, 500, 1000],
-  defaultTippingAmounts: [100, 500, 1000],
   theme: 'dark', // Default to dark theme to match current app style
   biometricEnabled: false,
   autoLockTimeout: 900, // 15 minutes

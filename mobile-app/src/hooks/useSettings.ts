@@ -40,8 +40,6 @@ export interface SettingsActions {
   setAutoLockTimeout: (timeout: AutoLockTimeout) => Promise<void>;
   setBiometricEnabled: (enabled: boolean) => Promise<void>;
   setNotificationsEnabled: (enabled: boolean) => Promise<void>;
-  setDefaultTipAmounts: (amounts: [number, number, number]) => Promise<void>;
-  setDefaultPostAmounts: (amounts: [number, number, number]) => Promise<void>;
   setCustomLNURL: (lnurl: string | undefined) => Promise<void>;
   setSharingPlatforms: (platforms: SocialPlatform[]) => Promise<void>;
 
@@ -185,20 +183,6 @@ export function useSettings(): SettingsState & SettingsActions {
   const setNotificationsEnabled = useCallback(
     async (enabled: boolean): Promise<void> => {
       await updateSettings({ notificationsEnabled: enabled });
-    },
-    [updateSettings]
-  );
-
-  const setDefaultTipAmounts = useCallback(
-    async (amounts: [number, number, number]): Promise<void> => {
-      await updateSettings({ defaultTippingAmounts: amounts });
-    },
-    [updateSettings]
-  );
-
-  const setDefaultPostAmounts = useCallback(
-    async (amounts: [number, number, number]): Promise<void> => {
-      await updateSettings({ defaultPostingAmounts: amounts });
     },
     [updateSettings]
   );
@@ -390,8 +374,6 @@ export function useSettings(): SettingsState & SettingsActions {
     setAutoLockTimeout,
     setBiometricEnabled,
     setNotificationsEnabled,
-    setDefaultTipAmounts,
-    setDefaultPostAmounts,
     setCustomLNURL,
     setSharingPlatforms,
 

@@ -113,9 +113,6 @@ export function TipCreatorScreen(): React.JSX.Element {
 
   // Load settings on mount
   useEffect(() => {
-    if (settings?.defaultPostingAmounts) {
-      setAmounts([...settings.defaultPostingAmounts]);
-    }
     if (settings?.customLNURL) {
       setLnurl(settings.customLNURL);
       setUseCustomLnurl(true);
