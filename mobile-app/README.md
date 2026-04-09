@@ -303,6 +303,9 @@ npm run lint:fix
 - **expo-secure-store** - Encrypted storage
 - **expo-local-authentication** - Biometric auth
 - **expo-crypto** - Cryptographic functions
+- **react-native-ssl-public-key-pinning** - Wallet API TLS public-key pinning
+
+Pinning rotation + incident procedure: `docs/TLS_CERT_PINNING_ROTATION.md`
 
 ### UI/UX
 

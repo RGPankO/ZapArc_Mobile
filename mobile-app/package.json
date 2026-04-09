@@ -59,7 +59,8 @@
     "react-native-screens": "~4.4.0",
     "react-native-svg": "15.9.0",
     "react-native-web": "~0.19.13",
-    "yup": "^1.7.0"
+    "yup": "^1.7.0",
+    "react-native-ssl-public-key-pinning": "^1.2.6"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
