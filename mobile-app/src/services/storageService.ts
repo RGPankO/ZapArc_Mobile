@@ -32,13 +32,9 @@ const STORAGE_KEYS = {
   BIOMETRIC_PIN_PREFIX: 'zap_arc_biometric_pin_', // Prefix for biometric-protected PINs
 } as const;
 
-// NOTE: We intentionally do NOT use requireAuthentication here because:
-// 1. The app already handles biometric auth via LocalAuthentication before reading the PIN
-// 2. requireAuthentication would cause double biometric prompts (OS + app)
-// 3. Changing options would make existing stored PINs unreadable (breaking existing users)
-// Security is enforced at the application layer via LocalAuthentication.authenticateAsync()
 const BIOMETRIC_SECURE_STORE_OPTIONS: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.WHEN_PASSCODE_SET_THIS_DEVICE_ONLY,
+  requireAuthentication: true,
 };
 
 // =============================================================================
@@ -1061,15 +1057,11 @@ class StorageService {
   // ========================================
 
   /**
-   * Store PIN for biometric unlock
-   * This PIN is stored in secure storage (encrypted at rest)
-   * Access control is enforced by checking biometric BEFORE retrieving the PIN
+   * Store PIN for biometric unlock with OS-level authentication required on read.
    */
   async storeBiometricPin(masterKeyId: string, pin: string): Promise<void> {
     try {
       const key = `${STORAGE_KEYS.BIOMETRIC_PIN_PREFIX}${masterKeyId}`;
-      // Store in SecureStore (encrypted at rest)
-      // Authentication is checked via LocalAuthentication before retrieving
       await SecureStore.setItemAsync(key, pin, BIOMETRIC_SECURE_STORE_OPTIONS);
       if (__DEV__) console.log('✅ [StorageService] Biometric PIN stored for master key:', masterKeyId);
     } catch (error) {
@@ -1080,24 +1072,48 @@ class StorageService {
 
   /**
    * Retrieve PIN for biometric unlock.
-   * SecureStore enforces OS-level authentication on access.
+   * Primary path enforces OS-level authentication on read.
+   * Legacy migration: if an older record exists without auth gating, re-save it with auth required.
    */
   async getBiometricPin(masterKeyId: string): Promise<string | null> {
-    try {
-      const key = `${STORAGE_KEYS.BIOMETRIC_PIN_PREFIX}${masterKeyId}`;
-      // Don't require authentication here - user already authenticated via LocalAuthentication
-      const pin = await SecureStore.getItemAsync(key); // No options — compatible with PINs stored before hardening
+    const key = `${STORAGE_KEYS.BIOMETRIC_PIN_PREFIX}${masterKeyId}`;
 
-      if (pin) {
+    try {
+      const authenticatedPin = await SecureStore.getItemAsync(
+        key,
+        BIOMETRIC_SECURE_STORE_OPTIONS
+      );
+
+      if (authenticatedPin) {
         if (__DEV__) console.log('✅ [StorageService] Biometric PIN retrieved for master key:', masterKeyId);
       } else {
         if (__DEV__) console.log('⚠️ [StorageService] No biometric PIN found for master key:', masterKeyId);
       }
 
-      return pin;
-    } catch (error) {
-      console.error('❌ [StorageService] Failed to retrieve biometric PIN:', error);
-      return null;
+      return authenticatedPin;
+    } catch (authError) {
+      try {
+        const legacyPin = await SecureStore.getItemAsync(key);
+        if (!legacyPin) {
+          return null;
+        }
+
+        await SecureStore.setItemAsync(
+          key,
+          legacyPin,
+          BIOMETRIC_SECURE_STORE_OPTIONS
+        );
+
+        if (__DEV__) {
+          console.log('♻️ [StorageService] Migrated legacy biometric PIN to auth-gated storage for master key:', masterKeyId);
+        }
+
+        return legacyPin;
+      } catch (migrationError) {
+        console.error('❌ [StorageService] Failed to retrieve biometric PIN:', authError);
+        console.error('❌ [StorageService] Failed legacy biometric PIN migration:', migrationError);
+        return null;
+      }
     }
   }
 
@@ -1121,7 +1137,7 @@ class StorageService {
   async hasBiometricPin(masterKeyId: string): Promise<boolean> {
     try {
       const key = `${STORAGE_KEYS.BIOMETRIC_PIN_PREFIX}${masterKeyId}`;
-      const pin = await SecureStore.getItemAsync(key); // No options — compatible with PINs stored before hardening
+      const pin = await SecureStore.getItemAsync(key);
       return pin !== null;
     } catch (error) {
       console.error('❌ [StorageService] Failed to check biometric PIN:', error);

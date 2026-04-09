@@ -296,6 +296,57 @@ describe('StorageService', () => {
       expect(index).toBe(3); // Should skip 0, 1, 2
     });
   });
+
+  describe('biometric PIN auth gating', () => {
+    it('stores biometric PIN with requireAuthentication enabled', async () => {
+      (SecureStore.setItemAsync as jest.Mock).mockResolvedValue(undefined);
+
+      await storageService.storeBiometricPin('mk-1', '1234');
+
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+        'zap_arc_biometric_pin_mk-1',
+        '1234',
+        expect.objectContaining({ requireAuthentication: true })
+      );
+    });
+
+    it('reads biometric PIN with requireAuthentication enabled', async () => {
+      (SecureStore.getItemAsync as jest.Mock).mockResolvedValue('1234');
+
+      const pin = await storageService.getBiometricPin('mk-1');
+
+      expect(pin).toBe('1234');
+      expect(SecureStore.getItemAsync).toHaveBeenCalledWith(
+        'zap_arc_biometric_pin_mk-1',
+        expect.objectContaining({ requireAuthentication: true })
+      );
+    });
+
+    it('migrates legacy biometric PIN when authenticated read fails', async () => {
+      (SecureStore.getItemAsync as jest.Mock)
+        .mockRejectedValueOnce(new Error('Auth required'))
+        .mockResolvedValueOnce('4321');
+      (SecureStore.setItemAsync as jest.Mock).mockResolvedValue(undefined);
+
+      const pin = await storageService.getBiometricPin('mk-legacy');
+
+      expect(pin).toBe('4321');
+      expect(SecureStore.getItemAsync).toHaveBeenNthCalledWith(
+        1,
+        'zap_arc_biometric_pin_mk-legacy',
+        expect.objectContaining({ requireAuthentication: true })
+      );
+      expect(SecureStore.getItemAsync).toHaveBeenNthCalledWith(
+        2,
+        'zap_arc_biometric_pin_mk-legacy'
+      );
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+        'zap_arc_biometric_pin_mk-legacy',
+        '4321',
+        expect.objectContaining({ requireAuthentication: true })
+      );
+    });
+  });
 });
 
 // =============================================================================
