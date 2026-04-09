@@ -1,6 +1,26 @@
 import { Linking } from 'react-native';
 import { router } from 'expo-router';
 
+const TRUSTED_DEEP_LINK_SCHEME = 'mobile-app:';
+const TRUSTED_DEEP_LINK_HOSTS = new Set(['', 'verify-email', 'reset-password']);
+
+function normalizeDeepLinkRoute(urlObj: URL): string {
+  const path = urlObj.pathname.replace(/^\/+/, '');
+  if (path.length > 0) {
+    return path;
+  }
+
+  return urlObj.host;
+}
+
+function isTrustedDeepLink(urlObj: URL): boolean {
+  if (urlObj.protocol !== TRUSTED_DEEP_LINK_SCHEME) {
+    return false;
+  }
+
+  return TRUSTED_DEEP_LINK_HOSTS.has(urlObj.host);
+}
+
 export interface DeepLinkParams {
   token?: string;
   [key: string]: string | undefined;
@@ -35,11 +55,20 @@ export function handleDeepLink(url: string): boolean {
     }
 
     const urlObj = new URL(url);
-    const path = urlObj.pathname;
+
+    if (!isTrustedDeepLink(urlObj)) {
+      console.warn('Rejected untrusted deep link:', {
+        protocol: urlObj.protocol,
+        host: urlObj.host,
+      });
+      return false;
+    }
+
+    const route = normalizeDeepLinkRoute(urlObj);
     const params = parseDeepLinkParams(url);
 
-    switch (path) {
-      case '/verify-email':
+    switch (route) {
+      case 'verify-email':
         if (params.token) {
           if (__DEV__) {
             console.log('Navigating to email verification [token:***]');
@@ -52,7 +81,7 @@ export function handleDeepLink(url: string): boolean {
         }
         break;
 
-      case '/reset-password':
+      case 'reset-password':
         if (params.token) {
           if (__DEV__) {
             console.log('Navigating to password reset [token:***]');
@@ -67,11 +96,9 @@ export function handleDeepLink(url: string): boolean {
 
       default:
         if (__DEV__) {
-          console.log('Unknown deep link path:', path);
+          console.log('Unknown deep link route:', route);
         }
-        // Navigate to home screen for unknown paths
-        router.push('/');
-        return true;
+        return false;
     }
 
     return false;
@@ -115,7 +142,7 @@ export function initializeDeepLinking(): void {
 export function isValidDeepLink(url: string): boolean {
   try {
     const urlObj = new URL(url);
-    return urlObj.protocol === 'mobile-app:';
+    return isTrustedDeepLink(urlObj);
   } catch {
     return false;
   }
