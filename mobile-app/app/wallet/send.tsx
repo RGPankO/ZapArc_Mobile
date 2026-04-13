@@ -540,9 +540,16 @@ export default function SendScreen() {
 
       let paymentAmount: number;
       if (isOnchainFlow) {
-        const satsAmount = Math.floor(Number(amount));
-        if (!satsAmount || satsAmount <= 0) {
+        const parsedAmount = parseFloat(amount);
+        if (!parsedAmount || parsedAmount <= 0) {
           Alert.alert(t('common.error'), t('send.amountRequiredOnchain'));
+          return;
+        }
+        const satsAmount = inputCurrency === 'sats'
+          ? Math.floor(parsedAmount)
+          : convertToSats(parsedAmount, inputCurrency);
+        if (!satsAmount || satsAmount <= 0) {
+          Alert.alert(t('send.conversionError'), t('send.conversionErrorMessage'));
           return;
         }
         paymentAmount = satsAmount;
@@ -1134,18 +1141,55 @@ export default function SendScreen() {
           ) : (
             <>
               <Text style={[styles.label, { color: primaryTextColor }]}>{t('send.amountRequiredOnchainLabel')}</Text>
-              <StyledTextInput
-                label={t('send.amountInSats')}
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType="number-pad"
-                style={styles.input}
-              />
-              {amount.length > 0 && Number(amount) > 0 && Number(amount) < 1000 && (
-                <Text style={{ color: '#f44336', fontSize: 12, marginTop: -4, marginBottom: 4 }}>
-                  Minimum on-chain send: 1,000 sats
-                </Text>
+
+              <View style={styles.amountInputRow}>
+                <StyledTextInput
+                  label={t('send.amountInCurrency').replace('{{currency}}', currencyLabels[inputCurrency])}
+                  value={amount}
+                  onChangeText={setAmount}
+                  keyboardType="decimal-pad"
+                  style={[styles.input, styles.amountInput]}
+                />
+
+                <Menu
+                  visible={currencyMenuVisible}
+                  onDismiss={() => setCurrencyMenuVisible(false)}
+                  anchor={
+                    <TouchableOpacity
+                      style={[styles.currencySelector, { backgroundColor: gradientColors[1] || '#16213e' }]}
+                      onPress={() => setCurrencyMenuVisible(true)}
+                    >
+                      <Text style={styles.currencySelectorText}>{currencyLabels[inputCurrency]} ▼</Text>
+                    </TouchableOpacity>
+                  }
+                  contentStyle={[styles.currencyMenu, { backgroundColor: gradientColors[0] || '#1a1a2e' }]}
+                >
+                  {currencyOptions.map((currency) => (
+                    <Menu.Item
+                      key={currency}
+                      onPress={() => handleCurrencyChange(currency)}
+                      title={currencyLabels[currency]}
+                      titleStyle={inputCurrency === currency ? styles.currencyMenuItemActive : { color: primaryTextColor }}
+                    />
+                  ))}
+                </Menu>
+              </View>
+
+              {previewDisplay && previewSats > 0 && inputCurrency !== 'sats' && (
+                <View style={styles.conversionPreview}>
+                  <Text style={styles.conversionText}>≈ {previewDisplay.satsDisplay}</Text>
+                  {previewDisplay.fiatDisplay && <Text style={styles.conversionFiat}>({previewDisplay.fiatDisplay})</Text>}
+                </View>
               )}
+
+              {(() => {
+                const onchainSats = inputCurrency === 'sats' ? Math.floor(Number(amount)) : convertToSats(parseFloat(amount) || 0, inputCurrency);
+                return amount.length > 0 && onchainSats > 0 && onchainSats < 1000 ? (
+                  <Text style={{ color: '#f44336', fontSize: 12, marginTop: -4, marginBottom: 4 }}>
+                    Minimum on-chain send: 1,000 sats
+                  </Text>
+                ) : null;
+              })()}
 
               <Text style={[styles.label, { color: primaryTextColor }]}>{t('send.confirmationSpeed')}</Text>
               <View style={styles.speedCardsColumn}>
